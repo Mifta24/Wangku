@@ -24,6 +24,26 @@ class _TransactionListPageState extends State<TransactionListPage> {
   final TextEditingController _searchController = TextEditingController();
   TransactionFilters _filters = TransactionFilters.empty;
   int _visibleCount = _pageSize;
+  DateTime _selectedMonth = DateTime.now();
+
+  static const _shortMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+  static const _fullMonths = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+  String _formatCurrency(double amount) {
+    final absAmount = amount.abs().toStringAsFixed(0);
+    // Simple currency formatter
+    String result = '';
+    int count = 0;
+    for (int i = absAmount.length - 1; i >= 0; i--) {
+      result = absAmount[i] + result;
+      count++;
+      if (count == 3 && i > 0) {
+        result = '.$result';
+        count = 0;
+      }
+    }
+    return '${amount < 0 ? '-' : ''}Rp $result';
+  }
 
   @override
   void initState() {
@@ -103,6 +123,75 @@ class _TransactionListPageState extends State<TransactionListPage> {
     return result;
   }
 
+  Future<void> _showMonthPicker() async {
+    DateTime tempDate = _selectedMonth;
+    final picked = await showDialog<DateTime>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.chevron_left),
+                    onPressed: () => setStateDialog(() => tempDate = DateTime(tempDate.year - 1, tempDate.month)),
+                  ),
+                  Text('${tempDate.year}', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+                  IconButton(
+                    icon: const Icon(Icons.chevron_right),
+                    onPressed: () => setStateDialog(() => tempDate = DateTime(tempDate.year + 1, tempDate.month)),
+                  ),
+                ],
+              ),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: GridView.builder(
+                  shrinkWrap: true,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    childAspectRatio: 1.5,
+                  ),
+                  itemCount: 12,
+                  itemBuilder: (context, index) {
+                    final month = index + 1;
+                    final isSelected = tempDate.year == _selectedMonth.year && month == _selectedMonth.month;
+                    return InkWell(
+                      onTap: () => Navigator.pop(context, DateTime(tempDate.year, month, 1)),
+                      child: Container(
+                        alignment: Alignment.center,
+                        margin: EdgeInsets.all(4.w),
+                        decoration: BoxDecoration(
+                          color: isSelected ? AppColors.primary : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8.r),
+                        ),
+                        child: Text(
+                          _shortMonths[index],
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : AppColors.textPrimary,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            );
+          }
+        );
+      }
+    );
+
+    if (picked != null) {
+      setState(() {
+        _selectedMonth = picked;
+        _visibleCount = _pageSize;
+      });
+    }
+  }
+
   Future<void> _openFilterSheet(List<CategoryModel> categories) async {
     final authProvider = context.read<AuthProvider>();
     final txnProvider = context.read<TransactionProvider>();
@@ -122,28 +211,6 @@ class _TransactionListPageState extends State<TransactionListPage> {
         _filters = nextFilters;
         _visibleCount = _pageSize;
       });
-
-      final userId = authProvider.currentUser?.id;
-      if (userId == null) {
-        return;
-      }
-
-      if (nextFilters.dateRange != null) {
-        final start = DateTime(
-          nextFilters.dateRange!.start.year,
-          nextFilters.dateRange!.start.month,
-          nextFilters.dateRange!.start.day,
-        );
-        final end = DateTime(
-          nextFilters.dateRange!.end.year,
-          nextFilters.dateRange!.end.month,
-          nextFilters.dateRange!.end.day,
-          23,
-          59,
-          59,
-        );
-        await txnProvider.loadByDateRange(userId, start, end);
-      }
     }
   }
 
@@ -401,33 +468,174 @@ class _TransactionListPageState extends State<TransactionListPage> {
     }
 
     final allItems = txnProvider.transactions;
-    final filteredItems = _applyFilters(allItems);
+    
+    final monthItems = allItems.where((t) => 
+        t.date.year == _selectedMonth.year && 
+        t.date.month == _selectedMonth.month).toList();
+        
+    double totalIncome = 0;
+    double totalExpense = 0;
+    for (final t in monthItems) {
+      if (t.type == 'income') totalIncome += t.amount;
+      if (t.type == 'expense') totalExpense += t.amount;
+    }
+    double totalBalance = totalIncome - totalExpense;
+
+    final filteredItems = _applyFilters(monthItems);
     final visibleItems = filteredItems.take(_visibleCount).toList();
 
     return Column(
       children: [
+        // Month Picker Row
         Padding(
-          padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 8.h),
+          padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 0),
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (_) => setState(() => _visibleCount = _pageSize),
-                  decoration: const InputDecoration(
-                    hintText: 'Cari catatan / kategori',
-                    prefixIcon: Icon(Icons.search_rounded),
-                    isDense: true,
+              GestureDetector(
+                onTap: _showMonthPicker,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12.r),
+                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.calendar_month, color: AppColors.primary, size: 18.sp),
+                      SizedBox(width: 8.w),
+                      Text(
+                        '${_fullMonths[_selectedMonth.month - 1]} ${_selectedMonth.year}',
+                        style: GoogleFonts.inter(
+                          fontSize: 14.sp, 
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      SizedBox(width: 4.w),
+                      Icon(Icons.arrow_drop_down, color: AppColors.primary, size: 20.sp),
+                    ],
                   ),
                 ),
               ),
-              SizedBox(width: 10.w),
               IconButton(
                 onPressed: () => _openFilterSheet(txnProvider.categories),
                 icon: const Icon(Icons.tune_rounded),
                 tooltip: 'Filter',
               ),
             ],
+          ),
+        ),
+        
+        // Summary Row
+        Padding(
+          padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 12.h),
+          child: Row(
+            children: [
+               Expanded(
+                 child: Container(
+                   padding: EdgeInsets.all(12.w),
+                   decoration: BoxDecoration(
+                     color: Colors.white,
+                     borderRadius: BorderRadius.circular(12.r),
+                     border: Border.all(color: Colors.grey.shade200),
+                     boxShadow: [
+                       BoxShadow(
+                         color: Colors.black.withValues(alpha: 0.02),
+                         blurRadius: 4,
+                         offset: const Offset(0, 2),
+                       )
+                     ]
+                   ),
+                   child: Column(
+                     crossAxisAlignment: CrossAxisAlignment.start,
+                     children: [
+                       Row(
+                         children: [
+                           Icon(Icons.arrow_downward, color: AppColors.income, size: 14.sp),
+                           SizedBox(width: 4.w),
+                           Text('Pemasukan', style: GoogleFonts.inter(fontSize: 10.sp, color: AppColors.textSecondary)),
+                         ],
+                       ),
+                       SizedBox(height: 4.h),
+                       Text(_formatCurrency(totalIncome), style: GoogleFonts.inter(fontSize: 12.sp, color: AppColors.income, fontWeight: FontWeight.bold)),
+                     ]
+                   ),
+                 ),
+               ),
+               SizedBox(width: 8.w),
+               Expanded(
+                 child: Container(
+                   padding: EdgeInsets.all(12.w),
+                   decoration: BoxDecoration(
+                     color: Colors.white,
+                     borderRadius: BorderRadius.circular(12.r),
+                     border: Border.all(color: Colors.grey.shade200),
+                     boxShadow: [
+                       BoxShadow(
+                         color: Colors.black.withValues(alpha: 0.02),
+                         blurRadius: 4,
+                         offset: const Offset(0, 2),
+                       )
+                     ]
+                   ),
+                   child: Column(
+                     crossAxisAlignment: CrossAxisAlignment.start,
+                     children: [
+                       Row(
+                         children: [
+                           Icon(Icons.arrow_upward, color: AppColors.expense, size: 14.sp),
+                           SizedBox(width: 4.w),
+                           Text('Pengeluaran', style: GoogleFonts.inter(fontSize: 10.sp, color: AppColors.textSecondary)),
+                         ],
+                       ),
+                       SizedBox(height: 4.h),
+                       Text(_formatCurrency(totalExpense), style: GoogleFonts.inter(fontSize: 12.sp, color: AppColors.expense, fontWeight: FontWeight.bold)),
+                     ]
+                   ),
+                 ),
+               ),
+            ],
+          ),
+        ),
+
+        // Balance Row
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16.w),
+          child: Container(
+             padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+             decoration: BoxDecoration(
+               color: AppColors.primary.withValues(alpha: 0.05),
+               borderRadius: BorderRadius.circular(12.r),
+             ),
+             child: Row(
+               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+               children: [
+                 Text('Saldo Bulan Ini', style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                 Text(_formatCurrency(totalBalance), style: GoogleFonts.inter(fontSize: 14.sp, fontWeight: FontWeight.bold, color: totalBalance >= 0 ? AppColors.primary : AppColors.error)),
+               ],
+             ),
+          ),
+        ),
+        
+        // Search Bar
+        Padding(
+          padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 8.h),
+          child: TextField(
+            controller: _searchController,
+            onChanged: (_) => setState(() => _visibleCount = _pageSize),
+            decoration: InputDecoration(
+              hintText: 'Cari catatan / kategori',
+              prefixIcon: const Icon(Icons.search_rounded),
+              isDense: true,
+              filled: true,
+              fillColor: Colors.grey.withValues(alpha: 0.1),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12.r),
+                borderSide: BorderSide.none,
+              ),
+            ),
           ),
         ),
         Padding(

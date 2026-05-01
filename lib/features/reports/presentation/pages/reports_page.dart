@@ -15,6 +15,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../data/services/report_export_service.dart';
+import 'package:open_filex/open_filex.dart';
+import 'package:share_plus/share_plus.dart';
 
 enum BudgetFilter { all, budgeted, warning }
 
@@ -41,6 +43,8 @@ class _ReportsPageState extends State<ReportsPage> {
   BudgetSort _budgetSort = BudgetSort.spentDesc;
 
   String _formatCurrency(double amount) => _currencyFormatter.format(amount);
+
+  String _displayIcon(String icon) => icon.isNotEmpty ? icon : '?';
 
   List<CategoryModel> _filterAndSortCategories(
     List<CategoryModel> categories,
@@ -94,12 +98,7 @@ class _ReportsPageState extends State<ReportsPage> {
         );
         return;
       }
-      ScaffoldMessenger.of(parentContext).showSnackBar(
-        SnackBar(
-          content: Text('CSV tersimpan di: $path'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      _showExportActions(path);
     } catch (e) {
       if (!parentContext.mounted) return;
       ScaffoldMessenger.of(parentContext).showSnackBar(
@@ -131,12 +130,7 @@ class _ReportsPageState extends State<ReportsPage> {
         );
         return;
       }
-      ScaffoldMessenger.of(parentContext).showSnackBar(
-        SnackBar(
-          content: Text('PDF tersimpan di: $path'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      _showExportActions(path);
     } catch (e) {
       if (!parentContext.mounted) return;
       ScaffoldMessenger.of(parentContext).showSnackBar(
@@ -150,6 +144,59 @@ class _ReportsPageState extends State<ReportsPage> {
     }
   }
 
+  void _showExportActions(String path) {
+    final parentContext = context;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Laporan berhasil diexport',
+                style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                path,
+                style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 16),
+              AppButton(
+                label: 'Buka File',
+                icon: Icons.folder_open,
+                onPressed: () async {
+                  await OpenFilex.open(path);
+                  if (!parentContext.mounted) return;
+                  Navigator.pop(parentContext);
+                },
+              ),
+              const SizedBox(height: 12),
+              AppButton(
+                label: 'Bagikan',
+                icon: Icons.share_outlined,
+                onPressed: () async {
+                  await SharePlus.instance.share(
+                    ShareParams(files: [XFile(path)]),
+                  );
+                  if (!parentContext.mounted) return;
+                  Navigator.pop(parentContext);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _openBudgetSheet(
     BudgetProvider budgetProvider,
     String userId,
@@ -158,6 +205,7 @@ class _ReportsPageState extends State<ReportsPage> {
       text: budgetProvider.monthlyBudget?.toStringAsFixed(0) ?? '',
     );
     final parentContext = context;
+    BuildContext? sheetContext;
     try {
       await showModalBottomSheet<void>(
         context: context,
@@ -167,6 +215,7 @@ class _ReportsPageState extends State<ReportsPage> {
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         builder: (context) {
+          sheetContext = context;
           return Padding(
             padding: EdgeInsets.only(
               left: 20,
@@ -208,8 +257,9 @@ class _ReportsPageState extends State<ReportsPage> {
                           }
 
                           await budgetProvider.saveBudget(userId, amount);
+                          if (sheetContext?.mounted != true) return;
+                          Navigator.pop(sheetContext!);
                           if (!parentContext.mounted) return;
-                          Navigator.pop(parentContext);
                           ScaffoldMessenger.of(parentContext).showSnackBar(
                             const SnackBar(
                               content: Text('Anggaran berhasil disimpan'),
@@ -239,6 +289,7 @@ class _ReportsPageState extends State<ReportsPage> {
       text: (budgetProvider.categoryBudget(category.id))?.toStringAsFixed(0) ?? '',
     );
     final parentContext = context;
+    BuildContext? sheetContext;
 
     try {
       await showModalBottomSheet<void>(
@@ -249,6 +300,7 @@ class _ReportsPageState extends State<ReportsPage> {
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         builder: (context) {
+          sheetContext = context;
           return Padding(
             padding: EdgeInsets.only(
               left: 20,
@@ -294,8 +346,9 @@ class _ReportsPageState extends State<ReportsPage> {
                             category.id,
                             amount,
                           );
+                          if (sheetContext?.mounted != true) return;
+                          Navigator.pop(sheetContext!);
                           if (!parentContext.mounted) return;
-                          Navigator.pop(parentContext);
                           ScaffoldMessenger.of(parentContext).showSnackBar(
                             SnackBar(
                               content: Text('Anggaran ${category.name} disimpan'),
@@ -308,6 +361,144 @@ class _ReportsPageState extends State<ReportsPage> {
                 ),
               ],
             ),
+          );
+        },
+      );
+    } finally {
+      controller.dispose();
+    }
+  }
+
+  Future<void> _openCategoryBudgetPickerSheet(
+    BudgetProvider budgetProvider,
+    String userId,
+    List<CategoryModel> categories,
+  ) async {
+    if (categories.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Belum ada kategori pengeluaran'),
+          backgroundColor: AppColors.warning,
+        ),
+      );
+      return;
+    }
+
+    final controller = TextEditingController();
+    final parentContext = context;
+    BuildContext? sheetContext;
+    CategoryModel? selected = categories.first;
+
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: AppColors.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (context) {
+          sheetContext = context;
+          return StatefulBuilder(
+            builder: (context, setSheetState) {
+              return Padding(
+                padding: EdgeInsets.only(
+                  left: 20,
+                  right: 20,
+                  top: 20,
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Tambah Anggaran Kategori',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<CategoryModel>(
+                      initialValue: selected,
+                      isExpanded: true,
+                      items: categories.map((cat) {
+                        return DropdownMenuItem(
+                          value: cat,
+                          child: Row(
+                            children: [
+                              Text(_displayIcon(cat.icon)),
+                              const SizedBox(width: 8),
+                              Expanded(child: Text(cat.name)),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setSheetState(() => selected = value);
+                      },
+                      decoration: const InputDecoration(
+                        labelText: 'Pilih kategori',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    AppTextField(
+                      controller: controller,
+                      hintText: 'Masukkan anggaran kategori (Rp)',
+                      prefixIcon: Icons.savings_outlined,
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 16),
+                    AppButton(
+                      label: 'Simpan Anggaran',
+                      onPressed: budgetProvider.isLoading
+                          ? null
+                          : () async {
+                              if (selected == null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Pilih kategori terlebih dahulu'),
+                                    backgroundColor: AppColors.error,
+                                  ),
+                                );
+                                return;
+                              }
+
+                              final raw = controller.text.replaceAll(RegExp(r'[^0-9]'), '');
+                              final amount = double.tryParse(raw);
+                              if (amount == null || amount <= 0) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Anggaran harus lebih dari 0'),
+                                    backgroundColor: AppColors.error,
+                                  ),
+                                );
+                                return;
+                              }
+
+                              await budgetProvider.saveCategoryBudget(
+                                userId,
+                                selected!.id,
+                                amount,
+                              );
+                              if (sheetContext?.mounted != true) return;
+                              Navigator.pop(sheetContext!);
+                              if (!parentContext.mounted) return;
+                              ScaffoldMessenger.of(parentContext).showSnackBar(
+                                SnackBar(
+                                  content: Text('Anggaran ${selected!.name} disimpan'),
+                                  backgroundColor: AppColors.success,
+                                ),
+                              );
+                            },
+                      isLoading: budgetProvider.isLoading,
+                      icon: Icons.check_circle_outline,
+                    ),
+                  ],
+                ),
+              );
+            },
           );
         },
       );
@@ -517,7 +708,22 @@ class _ReportsPageState extends State<ReportsPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Anggaran per Kategori'),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Anggaran per Kategori'),
+                          TextButton(
+                            onPressed: userId == null
+                                ? null
+                                : () => _openCategoryBudgetPickerSheet(
+                                      budget,
+                                      userId,
+                                      expenseCategories,
+                                    ),
+                            child: const Text('Tambah'),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 8),
                       Wrap(
                         spacing: 8,
@@ -606,7 +812,7 @@ class _ReportsPageState extends State<ReportsPage> {
                                       ),
                                       child: Center(
                                         child: Text(
-                                          cat.icon,
+                                          _displayIcon(cat.icon),
                                           style: const TextStyle(fontSize: 18),
                                         ),
                                       ),
@@ -727,7 +933,7 @@ class _ReportsPageState extends State<ReportsPage> {
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Center(
-                                    child: Text(cat.icon, style: const TextStyle(fontSize: 14)),
+                                    child: Text(_displayIcon(cat.icon), style: const TextStyle(fontSize: 14)),
                                   ),
                                 ),
                                 const SizedBox(width: 8),

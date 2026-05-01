@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
@@ -41,7 +40,7 @@ class NotificationService {
       iOS: iosSettings,
     );
 
-    await _plugin.initialize(initSettings);
+    await _plugin.initialize(settings: initSettings);
 
     final androidPlugin = _plugin
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
@@ -67,10 +66,11 @@ class NotificationService {
     );
 
     await _plugin.show(
-      _budgetAlertId,
-      'Anggaran mendekati limit',
-      'Sudah terpakai ${(percent * 100).toStringAsFixed(0)}%. Sisa Rp ${remaining.toStringAsFixed(0)}.',
-      details,
+      id: _budgetAlertId,
+      title: 'Anggaran mendekati limit',
+      body:
+          'Sudah terpakai ${(percent * 100).toStringAsFixed(0)}%. Sisa Rp ${remaining.toStringAsFixed(0)}.',
+      notificationDetails: details,
     );
   }
 
@@ -105,20 +105,18 @@ class NotificationService {
     );
 
     await _plugin.zonedSchedule(
-      _dailyReminderId,
-      'Jangan lupa catat transaksi',
-      'Catat pemasukan dan pengeluaran hari ini supaya rapi.',
-      scheduled,
-      details,
+      id: _dailyReminderId,
+      title: 'Jangan lupa catat transaksi',
+      body: 'Catat pemasukan dan pengeluaran hari ini supaya rapi.',
+      scheduledDate: scheduled,
+      notificationDetails: details,
       androidScheduleMode: AndroidScheduleMode.inexact,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.time,
     );
   }
 
   Future<void> cancelDailyReminder() async {
     if (!_initialized) return;
-    await _plugin.cancel(_dailyReminderId);
+    await _plugin.cancel(id: _dailyReminderId);
   }
 }

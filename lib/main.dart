@@ -12,6 +12,8 @@ import 'core/config/router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/database/hive_manager.dart';
 import 'core/notifications/notification_service.dart';
+import 'core/notifications/budget_background_worker.dart';
+import 'package:workmanager/workmanager.dart';
 
 const String _supabaseUrl = String.fromEnvironment('SUPABASE_URL');
 const String _supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
@@ -43,6 +45,18 @@ void main() async {
 
   // Inisialisasi notifikasi lokal
   await NotificationService.instance.initialize();
+
+  // Inisialisasi WorkManager untuk background budget checks
+  await Workmanager().initialize(callbackDispatcher);
+  await Workmanager().registerPeriodicTask(
+    'budget_check',
+    budgetCheckTask,
+    frequency: const Duration(hours: 6),
+    existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
+    constraints: Constraints(
+      networkType: NetworkType.notRequired,
+    ),
+  );
 
   runApp(
     MultiProvider(

@@ -14,8 +14,11 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../presentation/providers/dashboard_provider.dart';
 import '../../../transactions/presentation/providers/transaction_provider.dart';
 import '../../../transactions/domain/models/transaction_model.dart';
+import '../../../transactions/domain/models/category_model.dart';
 import '../../../transactions/presentation/pages/transaction_list_page.dart';
+import '../../../transactions/presentation/widgets/add_category_dialog.dart';
 import '../../../reports/presentation/pages/reports_page.dart';
+import '../widgets/manage_shortcuts_sheet.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -62,7 +65,7 @@ class _DashboardPageState extends State<DashboardPage> {
     return formatter.format(amount);
   }
 
-  void _showQuickAddSheet() {
+  void _showQuickAddSheet({String? initialType, String? initialCategoryId}) {
     final txnProvider = context.read<TransactionProvider>();
     final authProvider = context.read<AuthProvider>();
     final parentContext = context;
@@ -70,7 +73,7 @@ class _DashboardPageState extends State<DashboardPage> {
     // Bersihkan form
     _amountController.clear();
     _noteController.clear();
-    _selectedCategoryId = null;
+    _selectedCategoryId = initialCategoryId;
 
     showModalBottomSheet<void>(
       context: context,
@@ -80,7 +83,7 @@ class _DashboardPageState extends State<DashboardPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
       ),
       builder: (context) {
-        String selectedType = 'expense'; // 'income' atau 'expense'
+        String selectedType = initialType ?? 'expense'; // 'income' atau 'expense'
 
         return Padding(
           padding: EdgeInsets.only(
@@ -173,74 +176,101 @@ class _DashboardPageState extends State<DashboardPage> {
                       ],
                     ),
                     SizedBox(height: 16.h),
-                    // Category selector
-                    if (categories.isNotEmpty)
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Kategori',
-                            style: GoogleFonts.inter(
-                              fontSize: 12.sp,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textSecondary,
+                    // Sering Digunakan
+                    Builder(
+                      builder: (context) {
+                        final frequentCategories = txnProvider.getFrequentCategories(selectedType, limit: 4);
+                        if (frequentCategories.isEmpty) return const SizedBox.shrink();
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Sering Digunakan',
+                              style: GoogleFonts.inter(
+                                fontSize: 12.sp,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary,
+                              ),
                             ),
+                            SizedBox(height: 8.h),
+                            Wrap(
+                              spacing: 8.w,
+                              runSpacing: 8.h,
+                              children: [
+                                for (final cat in frequentCategories)
+                                  _buildCategoryChip(cat, _selectedCategoryId, (id) {
+                                    setSheetState(() => _selectedCategoryId = id);
+                                  }),
+                              ],
+                            ),
+                            SizedBox(height: 16.h),
+                          ],
+                        );
+                      }
+                    ),
+                    // Category selector
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Semua Kategori',
+                          style: GoogleFonts.inter(
+                            fontSize: 12.sp,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
                           ),
-                          SizedBox(height: 8.h),
-                          Wrap(
-                            spacing: 8.w,
-                            runSpacing: 8.h,
-                            children: [
+                        ),
+                        SizedBox(height: 8.h),
+                        Wrap(
+                          spacing: 8.w,
+                          runSpacing: 8.h,
+                          children: [
+                            if (categories.isNotEmpty)
                               for (final cat in categories)
-                                GestureDetector(
-                                  onTap: () {
-                                    setSheetState(() {
-                                      _selectedCategoryId = cat.id;
-                                    });
-                                  },
-                                  child: Container(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 12.w,
-                                      vertical: 6.h,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(20.r),
-                                      color: _selectedCategoryId == cat.id
-                                          ? Color(
-                                              int.parse(
-                                                'FF${cat.color.replaceFirst('#', '')}',
-                                                radix: 16,
-                                              ),
-                                            )
-                                          : Colors.grey.withValues(alpha: 0.2),
-                                      border: Border.all(
-                                        color: _selectedCategoryId == cat.id
-                                            ? Color(
-                                                int.parse(
-                                                  'FF${cat.color.replaceFirst('#', '')}',
-                                                  radix: 16,
-                                                ),
-                                              )
-                                            : Colors.transparent,
-                                      ),
-                                    ),
-                                    child: Text(
-                                      cat.name,
+                                _buildCategoryChip(cat, _selectedCategoryId, (id) {
+                                  setSheetState(() => _selectedCategoryId = id);
+                                }),
+                            
+                            // Tambah Kategori Baru
+                            GestureDetector(
+                              onTap: () async {
+                                final result = await showDialog<CategoryModel>(
+                                  context: context,
+                                  builder: (context) => AddCategoryDialog(type: selectedType),
+                                );
+                                if (result != null) {
+                                  setSheetState(() => _selectedCategoryId = result.id);
+                                }
+                              },
+                              child: Container(
+                                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(20.r),
+                                  border: Border.all(color: AppColors.primary),
+                                  color: AppColors.primary.withValues(alpha: 0.1),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.add, size: 14.sp, color: AppColors.primary),
+                                    SizedBox(width: 4.w),
+                                    Text(
+                                      'Baru',
                                       style: GoogleFonts.inter(
                                         fontSize: 12.sp,
                                         fontWeight: FontWeight.w500,
-                                        color: _selectedCategoryId == cat.id
-                                            ? Colors.white
-                                            : Colors.grey,
+                                        color: AppColors.primary,
                                       ),
                                     ),
-                                  ),
+                                  ],
                                 ),
-                            ],
-                          ),
-                          SizedBox(height: 16.h),
-                        ],
-                      ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 16.h),
+                      ],
+                    ),
                     // Amount input
                     AppTextField(
                       controller: _amountController,
@@ -333,6 +363,40 @@ class _DashboardPageState extends State<DashboardPage> {
     context.goNamed('login');
   }
 
+  Widget _buildCategoryChip(CategoryModel cat, String? selectedId, Function(String) onSelect) {
+    final isSelected = selectedId == cat.id;
+    final color = Color(int.parse('FF${cat.color.replaceFirst('#', '')}', radix: 16));
+    
+    return GestureDetector(
+      onTap: () => onSelect(cat.id),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20.r),
+          color: isSelected ? color : Colors.grey.withValues(alpha: 0.2),
+          border: Border.all(
+            color: isSelected ? color : Colors.transparent,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(cat.icon, style: TextStyle(fontSize: 14.sp)),
+            SizedBox(width: 4.w),
+            Text(
+              cat.name,
+              style: GoogleFonts.inter(
+                fontSize: 12.sp,
+                fontWeight: FontWeight.w500,
+                color: isSelected ? Colors.white : AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final pages = [
@@ -391,8 +455,49 @@ class _HomeTab extends StatelessWidget {
     required this.formatCurrency,
   });
 
-  final VoidCallback onQuickAdd;
+  final void Function({String? initialType, String? initialCategoryId}) onQuickAdd;
   final String Function(double) formatCurrency;
+
+  Widget _buildShortcutChip(CategoryModel cat, String type, VoidCallback onTap) {
+    final color = Color(int.parse('FF${cat.color.replaceFirst('#', '')}', radix: 16));
+    
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20.r),
+          color: Colors.white,
+          border: Border.all(color: Colors.grey.shade200),
+          boxShadow: [
+             BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 4, offset: const Offset(0, 2))
+          ]
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: EdgeInsets.all(4.w),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.2),
+                shape: BoxShape.circle,
+              ),
+              child: Text(cat.icon, style: TextStyle(fontSize: 10.sp)),
+            ),
+            SizedBox(width: 8.w),
+            Text(
+              cat.name,
+              style: GoogleFonts.inter(
+                fontSize: 12.sp,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -476,6 +581,72 @@ class _HomeTab extends StatelessWidget {
               ],
             ),
             SizedBox(height: 16.h),
+            
+            // Akses Cepat
+            Builder(
+              builder: (context) {
+                final shortcuts = txnProvider.customShortcuts;
+                
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Akses Cepat',
+                          style: GoogleFonts.inter(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        InkWell(
+                          onTap: () {
+                            showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (context) => const ManageShortcutsSheet(),
+                            );
+                          },
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                            child: Text(
+                              'Kelola',
+                              style: GoogleFonts.inter(
+                                fontSize: 12.sp,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 12.h),
+                    if (shortcuts.isEmpty)
+                       Text(
+                         'Belum ada shortcut. Klik Kelola untuk menambahkan.',
+                         style: GoogleFonts.inter(fontSize: 12.sp, color: AppColors.textSecondary),
+                       )
+                    else
+                       SingleChildScrollView(
+                         scrollDirection: Axis.horizontal,
+                         clipBehavior: Clip.none,
+                         child: Row(
+                           children: shortcuts.map((cat) => Padding(
+                               padding: EdgeInsets.only(right: 8.w),
+                               child: _buildShortcutChip(cat, cat.type, () => onQuickAdd(initialType: cat.type, initialCategoryId: cat.id)),
+                             )).toList(),
+                         ),
+                       ),
+                    SizedBox(height: 16.h),
+                  ],
+                );
+              }
+            ),
+            
             // Weekly spending card
             AppCard(
               child: Column(

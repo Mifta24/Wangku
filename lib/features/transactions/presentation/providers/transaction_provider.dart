@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:wangku/core/database/hive_manager.dart';
 import '../../domain/models/transaction_model.dart';
 import '../../domain/models/category_model.dart';
 import '../../data/repositories/transaction_repository.dart';
@@ -9,6 +10,7 @@ class TransactionProvider extends ChangeNotifier {
   // State
   List<TransactionModel> _transactions = [];
   List<CategoryModel> _categories = [];
+  List<String> _customShortcuts = [];
   bool _isLoading = false;
   String? _errorMessage;
   DateTime _selectedMonth = DateTime.now();
@@ -65,8 +67,9 @@ class TransactionProvider extends ChangeNotifier {
     _clearError();
 
     try {
-      // Load categories
-      await loadCategories();
+      // Load categories & shortcuts
+      await loadCategories(userId);
+      await loadShortcuts(userId);
 
       // Load transaksi bulan ini
       final startDate = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
@@ -108,15 +111,79 @@ class TransactionProvider extends ChangeNotifier {
   }
 
   /// Load categories
-  Future<void> loadCategories() async {
+  Future<void> loadCategories(String userId) async {
     try {
-      final cats = await _repository.getCategories();
+      final cats = await _repository.getCategories(userId: userId);
       _categories = cats;
       notifyListeners();
     } catch (e) {
       _setError('Gagal load kategori: ${e.toString()}');
       notifyListeners();
     }
+  }
+
+  /// Tambah custom category
+  Future<void> addCustomCategory(CategoryModel category) async {
+    try {
+      _clearError();
+      final newCat = await _repository.createCategory(category);
+      _categories.add(newCat);
+      notifyListeners();
+    } catch (e) {
+      _setError('Gagal tambah kategori custom: ${e.toString()}');
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  /// Dapatkan kategori yang sering digunakan
+  List<CategoryModel> getFrequentCategories(String type, {int limit = 4}) {
+    final relevantTxs = _transactions.where((t) => t.type == type).toList();
+    if (relevantTxs.isEmpty) return [];
+
+    final Map<String, int> frequencies = {};
+    for (var tx in relevantTxs) {
+      frequencies[tx.categoryId] = (frequencies[tx.categoryId] ?? 0) + 1;
+    }
+
+    final sortedEntries = frequencies.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    final topCategoryIds = sortedEntries.take(limit).map((e) => e.key).toList();
+    
+    return topCategoryIds
+        .map((id) => _categories.cast<CategoryModel?>().firstWhere((c) => c?.id == id, orElse: () => null))
+        .whereType<CategoryModel>()
+        .toList();
+  }
+
+  /// Get custom shortcuts
+  List<CategoryModel> get customShortcuts {
+    if (_customShortcuts.isEmpty) {
+      final expenses = getFrequentCategories('expense', limit: 3);
+      final incomes = getFrequentCategories('income', limit: 2);
+      return [...expenses, ...incomes];
+    }
+    
+    return _customShortcuts
+        .map((id) => _categories.cast<CategoryModel?>().firstWhere((c) => c?.id == id, orElse: () => null))
+        .whereType<CategoryModel>()
+        .toList();
+  }
+
+  /// Load shortcuts
+  Future<void> loadShortcuts(String userId) async {
+    final hiveManager = HiveManager.instance;
+    _customShortcuts = await hiveManager.getShortcuts(userId);
+    notifyListeners();
+  }
+
+  /// Save shortcuts
+  Future<void> saveShortcuts(String userId, List<String> categoryIds) async {
+    final hiveManager = HiveManager.instance;
+    await hiveManager.saveShortcuts(userId, categoryIds);
+    _customShortcuts = categoryIds;
+    notifyListeners();
   }
 
   /// Load transaksi untuk bulan tertentu

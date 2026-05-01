@@ -7,6 +7,7 @@ part 'category_model.g.dart';
 abstract class CategoryModel with _$CategoryModel {
   const factory CategoryModel({
     required String id,
+    @JsonKey(name: 'user_id') String? userId,
     required String name,
     required String icon,
     required String color, // HexColor string

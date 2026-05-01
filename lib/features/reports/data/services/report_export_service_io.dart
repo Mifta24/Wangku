@@ -53,7 +53,7 @@ class ReportExportService {
               pw.Text('Laporan Transaksi',
                   style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
               pw.SizedBox(height: 12),
-              pw.Table.fromTextArray(
+              pw.TableHelper.fromTextArray(
                 headers: headers,
                 data: rows,
                 headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),

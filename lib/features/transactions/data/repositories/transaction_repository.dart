@@ -18,7 +18,8 @@ abstract class ITransactionRepository {
     TransactionModel transaction,
   );
   Future<void> deleteTransaction(String id);
-  Future<List<CategoryModel>> getCategories({String? type});
+  Future<List<CategoryModel>> getCategories({required String userId, String? type});
+  Future<CategoryModel> createCategory(CategoryModel category);
   Future<Map<String, double>> getMonthlyAggregates({
     required String userId,
     required DateTime month,
@@ -116,22 +117,41 @@ class TransactionRepository implements ITransactionRepository {
   }
 
   @override
-  Future<List<CategoryModel>> getCategories({String? type}) async {
+  Future<List<CategoryModel>> getCategories({required String userId, String? type}) async {
     try {
-      final categories = type != null
-          ? await _service.getCategoriesByType(type)
-          : await _service.getCategories();
+      // Kita fetch semua category (global + milik user)
+      final categories = await _service.getCategories(userId);
 
       // Cache ke Hive
       await _hiveManager.cacheCategories(categories);
+      
+      if (type != null) {
+        return categories.where((c) => c.type == type).toList();
+      }
       return categories;
     } catch (e) {
       // Fallback ke Hive cache
       final cached = await _hiveManager.getCategories();
       if (cached.isNotEmpty) {
+        if (type != null) {
+          return cached.where((c) => c.type == type).toList();
+        }
         return cached;
       }
       // Jika tidak ada cache, throw
+      rethrow;
+    }
+  }
+
+  @override
+  Future<CategoryModel> createCategory(CategoryModel category) async {
+    try {
+      final newCat = await _service.createCategory(category);
+      // Kita tambahkan juga ke local cache
+      final currentCached = await _hiveManager.getCategories();
+      await _hiveManager.cacheCategories([...currentCached, newCat]);
+      return newCat;
+    } catch (e) {
       rethrow;
     }
   }

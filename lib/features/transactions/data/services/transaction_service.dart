@@ -143,11 +143,12 @@ class TransactionService {
   }
 
   /// Fetch semua kategori
-  Future<List<CategoryModel>> getCategories() async {
+  Future<List<CategoryModel>> getCategories(String userId) async {
     try {
       final response = await _supabase
           .from(_categoriesTable)
           .select()
+          .or('user_id.is.null,user_id.eq.$userId')
           .order('name', ascending: true);
 
       return (response as List<dynamic>)
@@ -155,6 +156,24 @@ class TransactionService {
           .toList();
     } catch (e) {
       throw Exception('Gagal fetch kategori: ${e.toString()}');
+    }
+  }
+
+  /// Create custom category
+  Future<CategoryModel> createCategory(CategoryModel category) async {
+    try {
+      final data = category.toJson();
+      data.remove('id'); // let db generate UUID
+      
+      final response = await _supabase
+          .from(_categoriesTable)
+          .insert(data)
+          .select()
+          .single();
+
+      return CategoryModel.fromJson(response);
+    } catch (e) {
+      throw Exception('Gagal membuat kategori custom: ${e.toString()}');
     }
   }
 

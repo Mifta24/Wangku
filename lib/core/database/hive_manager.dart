@@ -370,6 +370,60 @@ class HiveManager {
     }
   }
 
+  /// Save current user id for background tasks
+  Future<void> saveCurrentUserId(String userId) async {
+    try {
+      final userBox = _userBoxInstance ?? await Hive.openBox<dynamic>(_userBox);
+      await userBox.put('current_user_id', userId);
+    } catch (e) {
+      debugPrint('Error saving current user id: $e');
+    }
+  }
+
+  /// Get current user id for background tasks
+  Future<String?> getCurrentUserId() async {
+    try {
+      final userBox = _userBoxInstance ?? await Hive.openBox<dynamic>(_userBox);
+      return userBox.get('current_user_id') as String?;
+    } catch (e) {
+      debugPrint('Error getting current user id: $e');
+      return null;
+    }
+  }
+
+  /// Clear current user id
+  Future<void> clearCurrentUserId() async {
+    try {
+      final userBox = _userBoxInstance ?? await Hive.openBox<dynamic>(_userBox);
+      await userBox.delete('current_user_id');
+    } catch (e) {
+      debugPrint('Error clearing current user id: $e');
+    }
+  }
+
+  /// Save user custom shortcuts
+  Future<void> saveShortcuts(String userId, List<String> categoryIds) async {
+    try {
+      final userBox = _userBoxInstance ?? await Hive.openBox<dynamic>(_userBox);
+      await userBox.put('${userId}_shortcuts', categoryIds);
+    } catch (e) {
+      debugPrint('Error saving shortcuts: $e');
+    }
+  }
+
+  /// Get user custom shortcuts
+  Future<List<String>> getShortcuts(String userId) async {
+    try {
+      final userBox = _userBoxInstance ?? await Hive.openBox<dynamic>(_userBox);
+      final data = userBox.get('${userId}_shortcuts');
+      if (data == null) return [];
+      return List<String>.from(data);
+    } catch (e) {
+      debugPrint('Error getting shortcuts: $e');
+      return [];
+    }
+  }
+
   /// Close all boxes (call saat app shutdown)
   Future<void> closeBoxes() async {
     try {

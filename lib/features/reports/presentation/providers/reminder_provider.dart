@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/database/hive_manager.dart';
@@ -11,7 +10,6 @@ class ReminderProvider extends ChangeNotifier {
   TimeOfDay _time = const TimeOfDay(hour: 20, minute: 0);
   bool _isLoading = false;
   String? _errorMessage;
-  String? _userId;
 
   bool get enabled => _enabled;
   TimeOfDay get time => _time;
@@ -19,7 +17,6 @@ class ReminderProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
 
   Future<void> load(String userId) async {
-    _userId = userId;
     _setLoading(true);
     _errorMessage = null;
     try {
@@ -44,7 +41,6 @@ class ReminderProvider extends ChangeNotifier {
   }
 
   Future<void> setEnabled(String userId, bool value) async {
-    _userId = userId;
     _enabled = value;
     _setLoading(true);
     _errorMessage = null;
@@ -70,7 +66,6 @@ class ReminderProvider extends ChangeNotifier {
   }
 
   Future<void> setTime(String userId, TimeOfDay time) async {
-    _userId = userId;
     _time = time;
     _setLoading(true);
     _errorMessage = null;

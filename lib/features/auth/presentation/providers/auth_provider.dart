@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/database/hive_manager.dart';
 import '../../data/services/auth_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
+  final HiveManager _hiveManager = HiveManager.instance;
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -31,6 +33,10 @@ class AuthProvider extends ChangeNotifier {
     _setError(null);
     try {
       await _authService.signInWithEmailPassword(email, password);
+      final userId = _authService.currentUser?.id;
+      if (userId != null) {
+        await _hiveManager.saveCurrentUserId(userId);
+      }
       _setLoading(false);
       return true; // Berhasil
     } catch (e) {
@@ -46,6 +52,10 @@ class AuthProvider extends ChangeNotifier {
     _setError(null);
     try {
       await _authService.signUp(email, password, name);
+      final userId = _authService.currentUser?.id;
+      if (userId != null) {
+        await _hiveManager.saveCurrentUserId(userId);
+      }
       _setLoading(false);
       return true;
     } catch (e) {
@@ -59,6 +69,7 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     _setLoading(true);
     await _authService.signOut();
+    await _hiveManager.clearCurrentUserId();
     _setLoading(false);
   }
 
