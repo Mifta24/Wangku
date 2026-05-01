@@ -1,7 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 
-import '../../../transactions/presentation/providers/transaction_provider.dart';
+import '../../../transactions/data/repositories/transaction_repository.dart';
+import '../../../transactions/domain/models/transaction_model.dart';
+
+enum PeriodType { week, month, year }
+enum TransactionType { expense, income }
 
 class CategoryDistribution {
   final String categoryId;
@@ -9,6 +13,7 @@ class CategoryDistribution {
   final String icon;
   final double total;
   final String color; // hex
+  final double percentage;
 
   CategoryDistribution({
     required this.categoryId,
@@ -16,57 +21,148 @@ class CategoryDistribution {
     required this.icon,
     required this.total,
     required this.color,
+    required this.percentage,
   });
 }
 
-class MonthlyAggregate {
-  final String label;
-  final double income;
-  final double expense;
-
-  MonthlyAggregate({required this.label, required this.income, required this.expense});
-}
-
 class ReportProvider extends ChangeNotifier {
-  final TransactionProvider txnProvider;
+  final TransactionRepository _repository = TransactionRepository();
+  final String userId;
 
-  ReportProvider({required this.txnProvider}) {
-    // React when transactions update
-    txnProvider.addListener(_recompute);
-    _recompute();
+  PeriodType _periodType = PeriodType.month;
+  TransactionType _transactionType = TransactionType.expense;
+  DateTime _currentDate = DateTime.now();
+  
+  List<TransactionModel> _transactions = [];
+  List<CategoryDistribution> _categories = [];
+  double _totalAmount = 0.0;
+  bool _isLoading = false;
+
+  ReportProvider({required this.userId}) {
+    _loadData();
   }
 
-  List<MonthlyAggregate> _monthly = [];
-  List<CategoryDistribution> _categories = [];
-
-  List<MonthlyAggregate> get monthly => _monthly;
+  // Getters
+  PeriodType get periodType => _periodType;
+  TransactionType get transactionType => _transactionType;
+  DateTime get currentDate => _currentDate;
   List<CategoryDistribution> get categories => _categories;
+  double get totalAmount => _totalAmount;
+  bool get isLoading => _isLoading;
 
-  void _recompute() {
-    final now = DateTime.now();
-    // last 6 months
-    final months = List.generate(6, (i) {
-      final dt = DateTime(now.year, now.month - (5 - i));
-      return DateFormat.MMM('id_ID').format(dt);
-    });
+  void setPeriodType(PeriodType type) {
+    if (_periodType == type) return;
+    _periodType = type;
+    _loadData();
+  }
 
-    final List<MonthlyAggregate> tmp = [];
-    for (int i = 0; i < 6; i++) {
-      final dt = DateTime(now.year, now.month - (5 - i));
-      final monthTx = txnProvider.transactions.where((t) => t.date.year == dt.year && t.date.month == dt.month);
-      final income = monthTx.where((t) => t.type == 'income').fold<double>(0.0, (p, e) => p + e.amount);
-      final expense = monthTx.where((t) => t.type == 'expense').fold<double>(0.0, (p, e) => p + e.amount);
-      tmp.add(MonthlyAggregate(label: months[i], income: income, expense: expense));
+  void setTransactionType(TransactionType type) {
+    if (_transactionType == type) return;
+    _transactionType = type;
+    _processData(); // Doesn't need fetch, just re-filter
+  }
+
+  void nextPeriod() {
+    switch (_periodType) {
+      case PeriodType.week:
+        _currentDate = _currentDate.add(const Duration(days: 7));
+        break;
+      case PeriodType.month:
+        _currentDate = DateTime(_currentDate.year, _currentDate.month + 1, 1);
+        break;
+      case PeriodType.year:
+        _currentDate = DateTime(_currentDate.year + 1, 1, 1);
+        break;
+    }
+    _loadData();
+  }
+
+  void previousPeriod() {
+    switch (_periodType) {
+      case PeriodType.week:
+        _currentDate = _currentDate.subtract(const Duration(days: 7));
+        break;
+      case PeriodType.month:
+        _currentDate = DateTime(_currentDate.year, _currentDate.month - 1, 1);
+        break;
+      case PeriodType.year:
+        _currentDate = DateTime(_currentDate.year - 1, 1, 1);
+        break;
+    }
+    _loadData();
+  }
+
+  String get periodLabel {
+    switch (_periodType) {
+      case PeriodType.week:
+        final weekday = _currentDate.weekday;
+        final start = _currentDate.subtract(Duration(days: weekday - 1));
+        final end = start.add(const Duration(days: 6));
+        final format = DateFormat('d MMM');
+        return '${format.format(start)} - ${format.format(end)}';
+      case PeriodType.month:
+        return DateFormat('MMMM yyyy', 'id_ID').format(_currentDate);
+      case PeriodType.year:
+        return _currentDate.year.toString();
+    }
+  }
+
+  Future<void> _loadData() async {
+    _isLoading = true;
+    notifyListeners();
+
+    DateTime start, end;
+    switch (_periodType) {
+      case PeriodType.week:
+        final weekday = _currentDate.weekday;
+        start = _currentDate.subtract(Duration(days: weekday - 1));
+        start = DateTime(start.year, start.month, start.day);
+        end = start.add(const Duration(days: 7));
+        break;
+      case PeriodType.month:
+        start = DateTime(_currentDate.year, _currentDate.month, 1);
+        end = DateTime(_currentDate.year, _currentDate.month + 1, 1);
+        break;
+      case PeriodType.year:
+        start = DateTime(_currentDate.year, 1, 1);
+        end = DateTime(_currentDate.year + 1, 1, 1);
+        break;
     }
 
-    // categories for current month
-    final curMonth = DateTime(now.year, now.month);
-    final monthTx = txnProvider.transactions.where((t) => t.date.year == curMonth.year && t.date.month == curMonth.month && t.type == 'expense');
+    try {
+      _transactions = await _repository.getTransactions(
+        userId: userId,
+        startDate: start,
+        endDate: end,
+      );
+    } catch (e) {
+      debugPrint('Error loading report data: $e');
+      _transactions = [];
+    }
+
+    _processData();
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  void _processData() {
+    final typeStr = _transactionType == TransactionType.expense ? 'expense' : 'income';
+    final relevantTxs = _transactions.where((t) => t.type == typeStr).toList();
+    
+    _totalAmount = relevantTxs.fold(0.0, (sum, t) => sum + t.amount);
+
+    if (_totalAmount == 0) {
+      _categories = [];
+      notifyListeners();
+      return;
+    }
+
     final Map<String, double> sums = {};
     final Map<String, String> names = {};
     final Map<String, String> colors = {};
     final Map<String, String> icons = {};
-    for (final t in monthTx) {
+
+    for (final t in relevantTxs) {
       final cid = t.categoryId;
       sums[cid] = (sums[cid] ?? 0) + t.amount;
       names[cid] = t.category?.name ?? 'Lain-lain';
@@ -75,26 +171,18 @@ class ReportProvider extends ChangeNotifier {
     }
 
     final List<CategoryDistribution> cats = sums.entries.map((e) {
-      final name = names[e.key]!;
-      final color = colors[e.key]!;
-      final icon = icons[e.key] ?? '';
       return CategoryDistribution(
         categoryId: e.key,
-        name: name,
-        icon: icon,
+        name: names[e.key]!,
+        icon: icons[e.key] ?? '',
         total: e.value,
-        color: color,
+        color: colors[e.key]!,
+        percentage: e.value / _totalAmount,
       );
     }).toList();
 
-    _monthly = tmp;
+    cats.sort((a, b) => b.total.compareTo(a.total));
     _categories = cats;
     notifyListeners();
-  }
-
-  @override
-  void dispose() {
-    txnProvider.removeListener(_recompute);
-    super.dispose();
   }
 }

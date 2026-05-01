@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:wangku/features/transactions/presentation/widgets/add_category_dialog.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/app_button.dart';
@@ -16,8 +17,8 @@ import '../../../transactions/presentation/providers/transaction_provider.dart';
 import '../../../transactions/domain/models/transaction_model.dart';
 import '../../../transactions/domain/models/category_model.dart';
 import '../../../transactions/presentation/pages/transaction_list_page.dart';
-import '../../../transactions/presentation/widgets/add_category_dialog.dart';
 import '../../../reports/presentation/pages/reports_page.dart';
+import '../../../reports/presentation/pages/budget_page.dart';
 import '../widgets/manage_shortcuts_sheet.dart';
 
 class DashboardPage extends StatefulWidget {
@@ -406,6 +407,7 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
       const TransactionListPage(),
       const ReportsPage(),
+      const BudgetPage(),
       _ProfileTab(onLogout: _handleLogout),
     ];
 
@@ -438,7 +440,9 @@ class _DashboardPageState extends State<DashboardPage> {
           NavigationDestination(
               icon: Icon(Icons.receipt_long_rounded), label: 'Transaksi'),
           NavigationDestination(
-              icon: Icon(Icons.bar_chart_rounded), label: 'Analisis'),
+              icon: Icon(Icons.pie_chart_rounded), label: 'Analisis'),
+          NavigationDestination(
+              icon: Icon(Icons.account_balance_wallet_rounded), label: 'Anggaran'),
           NavigationDestination(icon: Icon(Icons.person_rounded), label: 'Profil'),
         ],
         onDestinationSelected: (index) {
