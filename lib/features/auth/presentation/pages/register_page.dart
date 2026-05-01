@@ -1,8 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+
+import '../../../../core/constants/app_assets.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/widgets/app_button.dart';
+import '../../../../shared/widgets/app_text_field.dart';
+import '../../../../shared/widgets/auth_illustration.dart';
 import '../providers/auth_provider.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -18,9 +27,39 @@ class _RegisterPageState extends State<RegisterPage> {
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _isPasswordVisible = false;
+  static const int _cooldownDuration = 30;
+  int _cooldownSeconds = 0;
+  Timer? _cooldownTimer;
+
+  void _startCooldown() {
+    _cooldownTimer?.cancel();
+    setState(() {
+      _cooldownSeconds = _cooldownDuration;
+    });
+
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      if (_cooldownSeconds <= 1) {
+        timer.cancel();
+        setState(() {
+          _cooldownSeconds = 0;
+        });
+        return;
+      }
+
+      setState(() {
+        _cooldownSeconds -= 1;
+      });
+    });
+  }
 
   @override
   void dispose() {
+    _cooldownTimer?.cancel();
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -28,7 +67,18 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   void _handleRegister() async {
+    if (_cooldownSeconds > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Tunggu $_cooldownSeconds detik sebelum mencoba lagi.'),
+          backgroundColor: AppColors.expense,
+        ),
+      );
+      return;
+    }
+
     if (_formKey.currentState!.validate()) {
+      _startCooldown();
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final success = await authProvider.register(
         _emailController.text.trim(),
@@ -39,16 +89,19 @@ class _RegisterPageState extends State<RegisterPage> {
       if (success) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Pendaftaran berhasil! Silakan login.'), backgroundColor: Colors.green),
+            const SnackBar(
+              content: Text('Pendaftaran berhasil! Silakan login.'),
+              backgroundColor: AppColors.income,
+            ),
           );
-          Navigator.pop(context); // Kembali ke halaman Login
+          context.pop();
         }
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(authProvider.errorMessage ?? 'Terjadi kesalahan'),
-              backgroundColor: Colors.redAccent,
+              backgroundColor: AppColors.expense,
             ),
           );
         }
@@ -67,9 +120,9 @@ class _RegisterPageState extends State<RegisterPage> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFFEFF6FF), // Blue 50
-              Color(0xFFDBEAFE), // Blue 100
-              Color(0xFFFFFFFF), // White
+              AppColors.authGradientTop,
+              AppColors.authGradientMiddle,
+              AppColors.authGradientBottom,
             ],
           ),
         ),
@@ -87,9 +140,14 @@ class _RegisterPageState extends State<RegisterPage> {
                     Align(
                       alignment: Alignment.centerLeft,
                       child: IconButton(
-                        icon: const Icon(LucideIcons.arrowLeft, color: Color(0xFF1E293B)),
-                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimary),
+                        onPressed: () => context.pop(),
                       ),
+                    ),
+                    AuthIllustration(
+                      assetPath: AppAssets.registerIllustration,
+                      semanticLabel: 'Ilustrasi register',
+                      height: 210,
                     ),
                     SizedBox(height: 16.h),
                     
@@ -99,7 +157,7 @@ class _RegisterPageState extends State<RegisterPage> {
                       style: GoogleFonts.inter(
                         fontSize: 28.sp,
                         fontWeight: FontWeight.w800,
-                        color: const Color(0xFF1E293B), // Slate 800
+                        color: AppColors.textPrimary,
                         height: 1.2,
                       ),
                     ),
@@ -109,28 +167,17 @@ class _RegisterPageState extends State<RegisterPage> {
                       textAlign: TextAlign.center,
                       style: GoogleFonts.inter(
                         fontSize: 14.sp,
-                        color: const Color(0xFF64748B), // Slate 500
+                        color: AppColors.textSecondary,
                       ),
                     ),
                     SizedBox(height: 48.h),
 
                     // Input Nama
-                    TextFormField(
+                    AppTextField(
                       controller: _nameController,
                       keyboardType: TextInputType.name,
-                      style: GoogleFonts.inter(fontSize: 14.sp),
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: Colors.white,
-                        hintText: 'Nama Lengkap',
-                        hintStyle: GoogleFonts.inter(color: const Color(0xFF94A3B8)),
-                        prefixIcon: const Icon(LucideIcons.user, color: Color(0xFF94A3B8)),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16.r),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: EdgeInsets.symmetric(vertical: 16.h),
-                      ),
+                      hintText: 'Nama Lengkap',
+                      prefixIcon: LucideIcons.user,
                       validator: (value) {
                         if (value == null || value.isEmpty) return 'Nama tidak boleh kosong';
                         return null;
@@ -139,22 +186,11 @@ class _RegisterPageState extends State<RegisterPage> {
                     SizedBox(height: 16.h),
 
                     // Input Email
-                    TextFormField(
+                    AppTextField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
-                      style: GoogleFonts.inter(fontSize: 14.sp),
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: Colors.white,
-                        hintText: 'Email',
-                        hintStyle: GoogleFonts.inter(color: const Color(0xFF94A3B8)),
-                        prefixIcon: const Icon(LucideIcons.mail, color: Color(0xFF94A3B8)),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16.r),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: EdgeInsets.symmetric(vertical: 16.h),
-                      ),
+                      hintText: 'Email',
+                      prefixIcon: LucideIcons.mail,
                       validator: (value) {
                         if (value == null || value.isEmpty) return 'Email tidak boleh kosong';
                         if (!value.contains('@')) return 'Email tidak valid';
@@ -164,32 +200,21 @@ class _RegisterPageState extends State<RegisterPage> {
                     SizedBox(height: 16.h),
 
                     // Input Password
-                    TextFormField(
+                    AppTextField(
                       controller: _passwordController,
+                      hintText: 'Password (Minimal 6 karakter)',
+                      prefixIcon: LucideIcons.lock,
                       obscureText: !_isPasswordVisible,
-                      style: GoogleFonts.inter(fontSize: 14.sp),
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: Colors.white,
-                        hintText: 'Password (Minimal 6 karakter)',
-                        hintStyle: GoogleFonts.inter(color: const Color(0xFF94A3B8)),
-                        prefixIcon: const Icon(LucideIcons.lock, color: Color(0xFF94A3B8)),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _isPasswordVisible ? LucideIcons.eyeOff : LucideIcons.eye,
-                            color: const Color(0xFF94A3B8),
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _isPasswordVisible = !_isPasswordVisible;
-                            });
-                          },
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _isPasswordVisible ? LucideIcons.eyeOff : LucideIcons.eye,
+                          color: AppColors.hint,
                         ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16.r),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: EdgeInsets.symmetric(vertical: 16.h),
+                        onPressed: () {
+                          setState(() {
+                            _isPasswordVisible = !_isPasswordVisible;
+                          });
+                        },
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) return 'Password tidak boleh kosong';
@@ -200,34 +225,14 @@ class _RegisterPageState extends State<RegisterPage> {
                     SizedBox(height: 32.h),
 
                     // Tombol Register
-                    ElevatedButton(
-                      onPressed: isLoading ? null : _handleRegister,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).primaryColor,
-                        padding: EdgeInsets.symmetric(vertical: 16.h),
-                        elevation: 4,
-                        shadowColor: Theme.of(context).primaryColor.withOpacity(0.4),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16.r),
-                        ),
-                      ),
-                      child: isLoading
-                          ? SizedBox(
-                              height: 20.sp,
-                              width: 20.sp,
-                              child: const CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            )
-                          : Text(
-                              'Daftar Sekarang',
-                              style: GoogleFonts.inter(
-                                fontSize: 16.sp,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
+                    AppButton(
+                      label: _cooldownSeconds > 0
+                          ? 'Coba lagi dalam $_cooldownSeconds dtk'
+                          : 'Daftar Sekarang',
+                      isLoading: isLoading,
+                      onPressed: (_cooldownSeconds > 0 || isLoading)
+                          ? null
+                          : _handleRegister,
                     ),
                     SizedBox(height: 24.h),
 
@@ -239,11 +244,11 @@ class _RegisterPageState extends State<RegisterPage> {
                           'Sudah punya akun? ',
                           style: GoogleFonts.inter(
                             fontSize: 14.sp,
-                            color: const Color(0xFF64748B),
+                            color: AppColors.textSecondary,
                           ),
                         ),
                         GestureDetector(
-                          onTap: () => Navigator.pop(context),
+                          onTap: () => context.pop(),
                           child: Text(
                             'Masuk',
                             style: GoogleFonts.inter(

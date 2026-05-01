@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+
+import '../../../../core/constants/app_assets.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/widgets/app_button.dart';
+import '../../../../shared/widgets/app_text_field.dart';
+import '../../../../shared/widgets/auth_illustration.dart';
 import '../providers/auth_provider.dart';
-import 'register_page.dart';
+
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -36,16 +43,19 @@ class _LoginPageState extends State<LoginPage> {
       if (success) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Login berhasil!'), backgroundColor: Colors.green),
+            const SnackBar(
+              content: Text('Login berhasil!'),
+              backgroundColor: AppColors.income,
+            ),
           );
-          // TODO: Navigasi ke Dashboard menggunakan Navigator/GoRouter
+          context.goNamed('dashboard');
         }
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(authProvider.errorMessage ?? 'Terjadi kesalahan'),
-              backgroundColor: Colors.redAccent,
+              backgroundColor: AppColors.expense,
             ),
           );
         }
@@ -64,9 +74,9 @@ class _LoginPageState extends State<LoginPage> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFFEFF6FF), // Blue 50
-              Color(0xFFDBEAFE), // Blue 100
-              Color(0xFFFFFFFF), // White
+              AppColors.authGradientTop,
+              AppColors.authGradientMiddle,
+              AppColors.authGradientBottom,
             ],
           ),
         ),
@@ -80,20 +90,19 @@ class _LoginPageState extends State<LoginPage> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Logo Workspace / Icon APP
-                    Icon(
-                      LucideIcons.wallet,
-                      size: 64.sp,
-                      color: Theme.of(context).primaryColor,
+                    AuthIllustration(
+                      assetPath: AppAssets.loginIllustration,
+                      semanticLabel: 'Ilustrasi login',
+                      height: 210,
                     ),
-                    SizedBox(height: 24.h),
+                    SizedBox(height: 20.h),
                     Text(
                       'Selamat Datang\ndi Wangku',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.inter(
                         fontSize: 28.sp,
                         fontWeight: FontWeight.w800,
-                        color: const Color(0xFF1E293B), // Slate 800
+                        color: AppColors.textPrimary,
                         height: 1.2,
                       ),
                     ),
@@ -103,28 +112,17 @@ class _LoginPageState extends State<LoginPage> {
                       textAlign: TextAlign.center,
                       style: GoogleFonts.inter(
                         fontSize: 14.sp,
-                        color: const Color(0xFF64748B), // Slate 500
+                        color: AppColors.textSecondary,
                       ),
                     ),
                     SizedBox(height: 48.h),
 
                     // Input Email
-                    TextFormField(
+                    AppTextField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
-                      style: GoogleFonts.inter(fontSize: 14.sp),
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: Colors.white,
-                        hintText: 'Email',
-                        hintStyle: GoogleFonts.inter(color: const Color(0xFF94A3B8)),
-                        prefixIcon: const Icon(LucideIcons.mail, color: Color(0xFF94A3B8)),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16.r),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: EdgeInsets.symmetric(vertical: 16.h),
-                      ),
+                      hintText: 'Email',
+                      prefixIcon: LucideIcons.mail,
                       validator: (value) {
                         if (value == null || value.isEmpty) return 'Email tidak boleh kosong';
                         if (!value.contains('@')) return 'Email tidak valid';
@@ -134,32 +132,21 @@ class _LoginPageState extends State<LoginPage> {
                     SizedBox(height: 16.h),
 
                     // Input Password
-                    TextFormField(
+                    AppTextField(
                       controller: _passwordController,
+                      hintText: 'Password',
+                      prefixIcon: LucideIcons.lock,
                       obscureText: !_isPasswordVisible,
-                      style: GoogleFonts.inter(fontSize: 14.sp),
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: Colors.white,
-                        hintText: 'Password',
-                        hintStyle: GoogleFonts.inter(color: const Color(0xFF94A3B8)),
-                        prefixIcon: const Icon(LucideIcons.lock, color: Color(0xFF94A3B8)),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _isPasswordVisible ? LucideIcons.eyeOff : LucideIcons.eye,
-                            color: const Color(0xFF94A3B8),
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _isPasswordVisible = !_isPasswordVisible;
-                            });
-                          },
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _isPasswordVisible ? LucideIcons.eyeOff : LucideIcons.eye,
+                          color: AppColors.hint,
                         ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16.r),
-                          borderSide: BorderSide.none,
-                        ),
-                        contentPadding: EdgeInsets.symmetric(vertical: 16.h),
+                        onPressed: () {
+                          setState(() {
+                            _isPasswordVisible = !_isPasswordVisible;
+                          });
+                        },
                       ),
                       validator: (value) => value == null || value.isEmpty ? 'Password tidak boleh kosong' : null,
                     ),
@@ -170,7 +157,7 @@ class _LoginPageState extends State<LoginPage> {
                       alignment: Alignment.centerRight,
                       child: TextButton(
                         onPressed: () {
-                          // TODO: Fitur Lupa Password
+                          context.pushNamed('forgot-password');
                         },
                         child: Text(
                           'Lupa Password?',
@@ -185,34 +172,10 @@ class _LoginPageState extends State<LoginPage> {
                     SizedBox(height: 24.h),
 
                     // Tombol Login
-                    ElevatedButton(
-                      onPressed: isLoading ? null : _handleLogin,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).primaryColor,
-                        padding: EdgeInsets.symmetric(vertical: 16.h),
-                        elevation: 4,
-                        shadowColor: Theme.of(context).primaryColor.withOpacity(0.4),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16.r),
-                        ),
-                      ),
-                      child: isLoading
-                          ? SizedBox(
-                              height: 20.sp,
-                              width: 20.sp,
-                              child: const CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            )
-                          : Text(
-                              'Masuk',
-                              style: GoogleFonts.inter(
-                                fontSize: 16.sp,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
+                    AppButton(
+                      label: 'Masuk',
+                      isLoading: isLoading,
+                      onPressed: _handleLogin,
                     ),
                     SizedBox(height: 24.h),
 
@@ -224,15 +187,12 @@ class _LoginPageState extends State<LoginPage> {
                           'Belum punya akun? ',
                           style: GoogleFonts.inter(
                             fontSize: 14.sp,
-                            color: const Color(0xFF64748B),
+                            color: AppColors.textSecondary,
                           ),
                         ),
                         GestureDetector(
                           onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const RegisterPage()),
-                            );
+                            context.pushNamed('register');
                           },
                           child: Text(
                             'Daftar',

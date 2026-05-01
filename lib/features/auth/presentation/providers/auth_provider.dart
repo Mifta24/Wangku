@@ -61,4 +61,19 @@ class AuthProvider extends ChangeNotifier {
     await _authService.signOut();
     _setLoading(false);
   }
+
+  // Fungsi Lupa Password
+  Future<bool> forgotPassword(String email) async {
+    _setLoading(true);
+    _setError(null);
+    try {
+      await _authService.resetPassword(email);
+      _setLoading(false);
+      return true;
+    } catch (e) {
+      _setError(e.toString().replaceAll('Exception: ', ''));
+      _setLoading(false);
+      return false;
+    }
+  }
 }
