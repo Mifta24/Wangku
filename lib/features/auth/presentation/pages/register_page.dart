@@ -88,10 +88,16 @@ class _RegisterPageState extends State<RegisterPage> {
 
       if (success) {
         if (mounted) {
+          final needsConfirmation = authProvider.needsEmailConfirmation;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Pendaftaran berhasil! Silakan login.'),
+            SnackBar(
+              content: Text(
+                needsConfirmation
+                    ? 'Pendaftaran berhasil! Cek email Anda untuk konfirmasi akun sebelum login.'
+                    : 'Pendaftaran berhasil! Silakan login.',
+              ),
               backgroundColor: AppColors.income,
+              duration: Duration(seconds: needsConfirmation ? 5 : 3),
             ),
           );
           context.pop();

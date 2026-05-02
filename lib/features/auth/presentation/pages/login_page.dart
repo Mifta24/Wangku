@@ -40,26 +40,19 @@ class _LoginPageState extends State<LoginPage> {
         _passwordController.text,
       );
 
-      if (success) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Login berhasil!'),
-              backgroundColor: AppColors.income,
-            ),
-          );
-          context.goNamed('dashboard');
-        }
-      } else {
+      if (!success) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(authProvider.errorMessage ?? 'Terjadi kesalahan'),
               backgroundColor: AppColors.expense,
+              duration: const Duration(seconds: 4),
             ),
           );
         }
       }
+      // Jika success, GoRouter otomatis redirect ke /dashboard
+      // via AuthStateRefreshNotifier yang mendengarkan onAuthStateChange
     }
   }
 

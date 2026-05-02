@@ -9,9 +9,11 @@ class AuthProvider extends ChangeNotifier {
 
   bool _isLoading = false;
   String? _errorMessage;
+  bool _needsEmailConfirmation = false;
 
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  bool get needsEmailConfirmation => _needsEmailConfirmation;
 
   // Cek apakah user sudah login atau belum
   User? get currentUser => _authService.currentUser;
@@ -50,9 +52,17 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> register(String email, String password, String name) async {
     _setLoading(true);
     _setError(null);
+    _needsEmailConfirmation = false;
     try {
-      await _authService.signUp(email, password, name);
-      final userId = _authService.currentUser?.id;
+      final response = await _authService.signUp(email, password, name);
+      // Jika session null, artinya Supabase memerlukan konfirmasi email
+      if (response.session == null) {
+        _needsEmailConfirmation = true;
+        _setLoading(false);
+        return true;
+      }
+      // Jika session ada, user langsung login
+      final userId = response.user?.id;
       if (userId != null) {
         await _hiveManager.saveCurrentUserId(userId);
       }
