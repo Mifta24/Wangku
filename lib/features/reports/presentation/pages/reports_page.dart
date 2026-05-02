@@ -31,10 +31,8 @@ class _ReportsPageState extends State<ReportsPage> {
 
     if (userId == null) return const Center(child: Text('Please login'));
 
-    return ChangeNotifierProvider<ReportProvider>(
-      create: (_) => ReportProvider(userId: userId),
-      child: Consumer<ReportProvider>(
-        builder: (context, report, _) {
+    return Consumer<ReportProvider>(
+      builder: (context, report, _) {
           return SafeArea(
             child: Column(
               children: [
@@ -59,8 +57,7 @@ class _ReportsPageState extends State<ReportsPage> {
             ),
           );
         },
-      ),
-    );
+      );
   }
 
   Widget _buildHeader(ReportProvider report) {

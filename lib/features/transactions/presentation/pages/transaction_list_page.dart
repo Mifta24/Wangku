@@ -193,9 +193,6 @@ class _TransactionListPageState extends State<TransactionListPage> {
   }
 
   Future<void> _openFilterSheet(List<CategoryModel> categories) async {
-    final authProvider = context.read<AuthProvider>();
-    final txnProvider = context.read<TransactionProvider>();
-
     final nextFilters = await showTransactionFilterSheet(
       context: context,
       initialFilters: _filters,

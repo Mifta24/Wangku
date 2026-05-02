@@ -13,6 +13,9 @@ import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../presentation/providers/dashboard_provider.dart';
+import '../../../reports/presentation/providers/budget_provider.dart';
+import '../../../reports/presentation/providers/reminder_provider.dart';
+import '../../../reports/presentation/providers/report_provider.dart';
 import '../../../transactions/presentation/providers/transaction_provider.dart';
 import '../../../transactions/domain/models/transaction_model.dart';
 import '../../../transactions/domain/models/category_model.dart';
@@ -35,16 +38,25 @@ class _DashboardPageState extends State<DashboardPage> {
   final _noteController = TextEditingController();
   String? _selectedCategoryId;
 
+  late BudgetProvider _budgetProvider;
+
   @override
   void initState() {
     super.initState();
+
     // Initialize transaction provider when dashboard loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final authProvider = context.read<AuthProvider>();
-      final txnProvider = context.read<TransactionProvider>();
-      
+      _budgetProvider = context.read<BudgetProvider>();
+
       if (authProvider.currentUser != null) {
-        txnProvider.initialize(authProvider.currentUser!.id);
+        final userId = authProvider.currentUser!.id;
+        context.read<TransactionProvider>().initialize(userId);
+        _budgetProvider.loadBudget(userId);
+        _budgetProvider.loadCategoryBudgets(userId);
+        context.read<ReminderProvider>().load(userId);
+        context.read<ReportProvider>().init(userId);
       }
     });
   }
@@ -412,44 +424,46 @@ class _DashboardPageState extends State<DashboardPage> {
     ];
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Wangku',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+        appBar: AppBar(
+          title: Text(
+            'Wangku',
+            style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+          ),
+          centerTitle: true,
         ),
-        centerTitle: true,
-      ),
-      body: pages[_currentIndex],
-      floatingActionButton: _currentIndex == 0
-          ? FloatingActionButton.extended(
-              onPressed: _showQuickAddSheet,
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              icon: const Icon(LucideIcons.plus),
-              label: Text(
-                'Quick Add',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-              ),
-            )
-          : null,
-      bottomNavigationBar: NavigationBar(
-        backgroundColor: Colors.white,
-        selectedIndex: _currentIndex,
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_rounded), label: 'Home'),
-          NavigationDestination(
-              icon: Icon(Icons.receipt_long_rounded), label: 'Transaksi'),
-          NavigationDestination(
-              icon: Icon(Icons.pie_chart_rounded), label: 'Analisis'),
-          NavigationDestination(
-              icon: Icon(Icons.account_balance_wallet_rounded), label: 'Anggaran'),
-          NavigationDestination(icon: Icon(Icons.person_rounded), label: 'Profil'),
-        ],
-        onDestinationSelected: (index) {
-          setState(() => _currentIndex = index);
-        },
-      ),
-    );
+        body: pages[_currentIndex],
+        floatingActionButton: _currentIndex == 0
+            ? FloatingActionButton.extended(
+                onPressed: _showQuickAddSheet,
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                icon: const Icon(LucideIcons.plus),
+                label: Text(
+                  'Quick Add',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                ),
+              )
+            : null,
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+        bottomNavigationBar: NavigationBar(
+          backgroundColor: Colors.white,
+          selectedIndex: _currentIndex,
+          destinations: const [
+            NavigationDestination(icon: Icon(Icons.home_rounded), label: 'Home'),
+            NavigationDestination(
+                icon: Icon(Icons.receipt_long_rounded), label: 'Transaksi'),
+            NavigationDestination(
+                icon: Icon(Icons.pie_chart_rounded), label: 'Analisis'),
+            NavigationDestination(
+                icon: Icon(Icons.account_balance_wallet_rounded),
+                label: 'Anggaran'),
+            NavigationDestination(icon: Icon(Icons.person_rounded), label: 'Profil'),
+          ],
+          onDestinationSelected: (index) {
+            setState(() => _currentIndex = index);
+          },
+        ),
+      );
   }
 }
 
@@ -848,33 +862,110 @@ class _ProfileTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
+    final userId = authProvider.currentUser?.id;
 
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.person_rounded, size: 64.sp, color: Colors.grey),
-          SizedBox(height: 16.h),
-          Text(
-            authProvider.currentUser?.email ?? 'User',
-            style: GoogleFonts.inter(
-              fontSize: 16.sp,
-              fontWeight: FontWeight.w600,
+    return Consumer<ReminderProvider>(
+      builder: (context, reminder, _) {
+        return SingleChildScrollView(
+            padding: EdgeInsets.all(24.w),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Icon(Icons.person_rounded, size: 64.sp, color: Colors.grey),
+                SizedBox(height: 16.h),
+                Text(
+                  authProvider.currentUser?.email ?? 'User',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                SizedBox(height: 32.h),
+
+                // Settings Section
+                Text(
+                  'Pengaturan',
+                  style: GoogleFonts.inter(
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                SizedBox(height: 12.h),
+
+                // Reminder Setting
+                Container(
+                  padding: EdgeInsets.all(16.w),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12.r),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Pengingat Harian',
+                            style: GoogleFonts.inter(fontSize: 14.sp, fontWeight: FontWeight.w600),
+                          ),
+                          Switch(
+                            value: reminder.enabled,
+                            onChanged: userId == null ? null : (val) => reminder.setEnabled(userId, val),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        reminder.enabled ? 'Aktif pada ${reminder.time.format(context)}' : 'Nonaktif',
+                        style: GoogleFonts.inter(fontSize: 12.sp, color: AppColors.textSecondary),
+                      ),
+                      SizedBox(height: 8.h),
+                      if (reminder.enabled)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton(
+                            onPressed: userId == null
+                                ? null
+                                : () async {
+                                    final picked = await showTimePicker(
+                                      context: context,
+                                      initialTime: reminder.time,
+                                    );
+                                    if (picked == null) return;
+                                    await reminder.setTime(userId, picked);
+                                  },
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text('Ubah Waktu'),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 32.h),
+
+                ElevatedButton(
+                  onPressed: onLogout,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.error,
+                    padding: EdgeInsets.symmetric(vertical: 16.h),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+                  ),
+                  child: Text(
+                    'Logout',
+                    style: GoogleFonts.inter(color: Colors.white, fontSize: 14.sp, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
             ),
-          ),
-          SizedBox(height: 32.h),
-          ElevatedButton(
-            onPressed: onLogout,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-            ),
-            child: Text(
-              'Logout',
-              style: GoogleFonts.inter(color: Colors.white),
-            ),
-          ),
-        ],
-      ),
-    );
+          );
+        },
+      );
   }
 }

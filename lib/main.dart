@@ -8,6 +8,9 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'features/auth/presentation/providers/auth_provider.dart';
 import 'features/transactions/presentation/providers/transaction_provider.dart';
 import 'features/dashboard/presentation/providers/dashboard_provider.dart';
+import 'features/reports/presentation/providers/budget_provider.dart';
+import 'features/reports/presentation/providers/reminder_provider.dart';
+import 'features/reports/presentation/providers/report_provider.dart';
 import 'core/config/router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/database/hive_manager.dart';
@@ -15,8 +18,10 @@ import 'core/notifications/notification_service.dart';
 import 'core/notifications/budget_background_worker.dart';
 import 'package:workmanager/workmanager.dart';
 
-const String _supabaseUrl = String.fromEnvironment('SUPABASE_URL');
-const String _supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+import 'core/config/supabase_config.dart';
+
+const String _supabaseUrl = SupabaseConfig.url;
+const String _supabaseAnonKey = SupabaseConfig.anonKey;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -71,6 +76,17 @@ void main() async {
             return provider;
           },
         ),
+        // BudgetProvider depends on TransactionProvider — kept at global level
+        // to prevent InheritedNotifierElement reconciliation on every tab switch
+        ChangeNotifierProxyProvider<TransactionProvider, BudgetProvider>(
+          create: (ctx) => BudgetProvider(
+            txnProvider: ctx.read<TransactionProvider>(),
+          ),
+          update: (_, txnProvider, budgetProvider) =>
+              budgetProvider ?? BudgetProvider(txnProvider: txnProvider),
+        ),
+        ChangeNotifierProvider(create: (_) => ReminderProvider()),
+        ChangeNotifierProvider(create: (_) => ReportProvider()),
       ],
       child: const WangkuApp(),
     ),

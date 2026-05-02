@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 
 import '../../../../core/database/hive_manager.dart';
 import '../../../../core/notifications/notification_service.dart';
@@ -15,6 +15,7 @@ class BudgetProvider extends ChangeNotifier {
   String? _userId;
   DateTime? _lastBudgetAlertDate;
   bool _alertInProgress = false;
+  bool _isDisposed = false;
 
   BudgetProvider({required this.txnProvider}) {
     txnProvider.addListener(_onTransactionsChanged);
@@ -61,41 +62,47 @@ class BudgetProvider extends ChangeNotifier {
 
   Future<void> loadBudget(String userId) async {
     _userId = userId;
-    _setLoading(true);
+    _isLoading = true;
     _errorMessage = null;
+    notifyListeners();
     try {
       _monthlyBudget = await _hiveManager.getBudget(userId);
       _lastBudgetAlertDate = await _hiveManager.getBudgetAlertLastDate(userId);
     } catch (e) {
       _errorMessage = e.toString();
     }
-    _setLoading(false);
+    _isLoading = false;
+    notifyListeners();
     await _maybeNotifyBudgetWarning();
   }
 
   Future<void> loadCategoryBudgets(String userId) async {
     _userId = userId;
-    _setLoading(true);
+    _isLoading = true;
     _errorMessage = null;
+    notifyListeners();
     try {
       _categoryBudgets = await _hiveManager.getCategoryBudgets(userId);
     } catch (e) {
       _errorMessage = e.toString();
     }
-    _setLoading(false);
+    _isLoading = false;
+    notifyListeners();
   }
 
   Future<void> saveBudget(String userId, double amount) async {
     _userId = userId;
-    _setLoading(true);
+    _isLoading = true;
     _errorMessage = null;
+    notifyListeners();
     try {
       await _hiveManager.saveBudget(userId, amount);
       _monthlyBudget = amount;
     } catch (e) {
       _errorMessage = e.toString();
     }
-    _setLoading(false);
+    _isLoading = false;
+    notifyListeners();
     await _maybeNotifyBudgetWarning();
   }
 
@@ -105,8 +112,9 @@ class BudgetProvider extends ChangeNotifier {
     double amount,
   ) async {
     _userId = userId;
-    _setLoading(true);
+    _isLoading = true;
     _errorMessage = null;
+    notifyListeners();
     try {
       await _hiveManager.saveCategoryBudget(userId, categoryId, amount);
       _categoryBudgets = {
@@ -116,12 +124,19 @@ class BudgetProvider extends ChangeNotifier {
     } catch (e) {
       _errorMessage = e.toString();
     }
-    _setLoading(false);
+    _isLoading = false;
+    notifyListeners();
   }
 
   void _onTransactionsChanged() {
-    notifyListeners();
-    _maybeNotifyBudgetWarning();
+    if (_isDisposed) return;
+    // Defer to post-frame to avoid chained notifyListeners() during build,
+    // which causes the '_dependents.isEmpty' assertion error.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_isDisposed) return;
+      notifyListeners();
+      _maybeNotifyBudgetWarning();
+    });
   }
 
   Future<void> _maybeNotifyBudgetWarning() async {
@@ -151,13 +166,10 @@ class BudgetProvider extends ChangeNotifier {
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
-  void _setLoading(bool value) {
-    _isLoading = value;
-    notifyListeners();
-  }
 
   @override
   void dispose() {
+    _isDisposed = true;
     txnProvider.removeListener(_onTransactionsChanged);
     super.dispose();
   }

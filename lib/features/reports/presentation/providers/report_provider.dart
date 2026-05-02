@@ -27,7 +27,7 @@ class CategoryDistribution {
 
 class ReportProvider extends ChangeNotifier {
   final TransactionRepository _repository = TransactionRepository();
-  final String userId;
+  String? _userId;
 
   PeriodType _periodType = PeriodType.month;
   TransactionType _transactionType = TransactionType.expense;
@@ -38,7 +38,15 @@ class ReportProvider extends ChangeNotifier {
   double _totalAmount = 0.0;
   bool _isLoading = false;
 
-  ReportProvider({required this.userId}) {
+  ReportProvider({String? userId}) : _userId = userId {
+    if (_userId != null) {
+      _loadData();
+    }
+  }
+
+  void init(String userId) {
+    if (_userId == userId) return;
+    _userId = userId;
     _loadData();
   }
 
@@ -130,6 +138,9 @@ class ReportProvider extends ChangeNotifier {
     }
 
     try {
+      final userId = _userId;
+      if (userId == null) return;
+      
       _transactions = await _repository.getTransactions(
         userId: userId,
         startDate: start,
