@@ -341,6 +341,22 @@ class _DashboardPageState extends State<DashboardPage> {
                             authProvider.currentUser!.id,
                           );
 
+                          // Cek notifikasi anggaran kategori jika pengeluaran
+                          if (selectedType == 'expense' && _selectedCategoryId != null) {
+                            final cat = txnProvider.categories
+                                .cast<CategoryModel?>()
+                                .firstWhere(
+                                  (c) => c?.id == _selectedCategoryId,
+                                  orElse: () => null,
+                                );
+                            if (cat != null) {
+                              await _budgetProvider.checkCategoryWarningAfterTransaction(
+                                _selectedCategoryId!,
+                                cat.name,
+                              );
+                            }
+                          }
+
                           if (!parentContext.mounted) return;
                           Navigator.pop(parentContext);
                           ScaffoldMessenger.of(parentContext).showSnackBar(

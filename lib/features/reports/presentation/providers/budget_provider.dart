@@ -8,7 +8,6 @@ class BudgetProvider extends ChangeNotifier {
   final TransactionProvider txnProvider;
   final HiveManager _hiveManager = HiveManager.instance;
 
-  double? _monthlyBudget;
   Map<String, double> _categoryBudgets = {};
   bool _isLoading = false;
   String? _errorMessage;
@@ -21,12 +20,15 @@ class BudgetProvider extends ChangeNotifier {
     txnProvider.addListener(_onTransactionsChanged);
   }
 
-  double? get monthlyBudget => _monthlyBudget;
   Map<String, double> get categoryBudgets => _categoryBudgets;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
   double get monthExpense => txnProvider.monthExpense;
+
+  /// Total anggaran = jumlah semua anggaran kategori yang sudah di-set
+  double get totalCategoryBudget =>
+      _categoryBudgets.values.fold(0.0, (sum, v) => sum + v);
 
   double categoryExpense(String categoryId) {
     return txnProvider.monthTransactions
@@ -49,31 +51,20 @@ class BudgetProvider extends ChangeNotifier {
     return (budget - categoryExpense(categoryId)).clamp(0.0, double.infinity);
   }
 
-  double get remaining {
-    if (_monthlyBudget == null) return 0.0;
-    return (_monthlyBudget! - monthExpense).clamp(0.0, double.infinity);
-  }
+  double get remaining =>
+      (totalCategoryBudget - monthExpense).clamp(0.0, double.infinity);
 
   double get progress {
-    if (_monthlyBudget == null || _monthlyBudget! <= 0) return 0.0;
-    final ratio = monthExpense / _monthlyBudget!;
-    return ratio.clamp(0.0, 1.0);
+    final total = totalCategoryBudget;
+    if (total <= 0) return 0.0;
+    return (monthExpense / total).clamp(0.0, 1.0);
   }
 
   Future<void> loadBudget(String userId) async {
     _userId = userId;
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
     try {
-      _monthlyBudget = await _hiveManager.getBudget(userId);
       _lastBudgetAlertDate = await _hiveManager.getBudgetAlertLastDate(userId);
-    } catch (e) {
-      _errorMessage = e.toString();
-    }
-    _isLoading = false;
-    notifyListeners();
-    await _maybeNotifyBudgetWarning();
+    } catch (_) {}
   }
 
   Future<void> loadCategoryBudgets(String userId) async {
@@ -83,21 +74,6 @@ class BudgetProvider extends ChangeNotifier {
     notifyListeners();
     try {
       _categoryBudgets = await _hiveManager.getCategoryBudgets(userId);
-    } catch (e) {
-      _errorMessage = e.toString();
-    }
-    _isLoading = false;
-    notifyListeners();
-  }
-
-  Future<void> saveBudget(String userId, double amount) async {
-    _userId = userId;
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
-    try {
-      await _hiveManager.saveBudget(userId, amount);
-      _monthlyBudget = amount;
     } catch (e) {
       _errorMessage = e.toString();
     }
@@ -128,10 +104,27 @@ class BudgetProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Dipanggil setelah user input transaksi pengeluaran.
+  /// Jika pemakaian anggaran kategori >= 80%, langsung tampilkan notifikasi.
+  Future<void> checkCategoryWarningAfterTransaction(
+    String categoryId,
+    String categoryName,
+  ) async {
+    final budget = categoryBudget(categoryId);
+    if (budget == null || budget <= 0) return;
+    final prog = categoryProgress(categoryId);
+    if (prog < 0.8) return;
+    final rem = categoryRemaining(categoryId);
+    await NotificationService.instance.showCategoryBudgetWarning(
+      categoryName: categoryName,
+      percent: prog,
+      remaining: rem,
+      categoryId: categoryId,
+    );
+  }
+
   void _onTransactionsChanged() {
     if (_isDisposed) return;
-    // Defer to post-frame to avoid chained notifyListeners() during build,
-    // which causes the '_dependents.isEmpty' assertion error.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_isDisposed) return;
       notifyListeners();
@@ -143,7 +136,7 @@ class BudgetProvider extends ChangeNotifier {
     if (_alertInProgress) return;
     final userId = _userId;
     if (userId == null) return;
-    if (_monthlyBudget == null || _monthlyBudget! <= 0) return;
+    if (totalCategoryBudget <= 0) return;
     if (progress < 0.8) return;
 
     final now = DateTime.now();
@@ -165,7 +158,6 @@ class BudgetProvider extends ChangeNotifier {
     if (a == null) return false;
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
-
 
   @override
   void dispose() {

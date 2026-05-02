@@ -115,6 +115,35 @@ class NotificationService {
     );
   }
 
+  Future<void> showCategoryBudgetWarning({
+    required String categoryName,
+    required double percent,
+    required double remaining,
+    required String categoryId,
+  }) async {
+    if (!_initialized) return;
+
+    final details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        _budgetChannelId,
+        _budgetChannelName,
+        importance: Importance.high,
+        priority: Priority.high,
+      ),
+      iOS: const DarwinNotificationDetails(),
+    );
+
+    final notifId = 3000 + (categoryId.hashCode.abs() % 1000);
+
+    await _plugin.show(
+      id: notifId,
+      title: 'Batas anggaran $categoryName',
+      body:
+          'Sudah terpakai ${(percent * 100).toStringAsFixed(0)}%. Sisa anggaran Rp ${remaining.toStringAsFixed(0)}.',
+      notificationDetails: details,
+    );
+  }
+
   Future<void> cancelDailyReminder() async {
     if (!_initialized) return;
     await _plugin.cancel(id: _dailyReminderId);

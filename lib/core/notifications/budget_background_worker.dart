@@ -31,8 +31,9 @@ Future<void> _runBudgetCheck() async {
   final userId = await hive.getCurrentUserId();
   if (userId == null || userId.isEmpty) return;
 
-  final budget = await hive.getBudget(userId);
-  if (budget == null || budget <= 0) return;
+  final categoryBudgets = await hive.getCategoryBudgets(userId);
+  final totalBudget = categoryBudgets.values.fold<double>(0.0, (s, v) => s + v);
+  if (totalBudget <= 0) return;
 
   final txs = await hive.getTransactions(userId);
   final now = DateTime.now();
@@ -43,7 +44,7 @@ Future<void> _runBudgetCheck() async {
           t.date.month == now.month)
       .fold<double>(0.0, (p, e) => p + e.amount);
 
-  final progress = monthExpense / budget;
+  final progress = monthExpense / totalBudget;
   if (progress < 0.8) return;
 
   final last = await hive.getBudgetAlertLastDate(userId);
@@ -51,7 +52,7 @@ Future<void> _runBudgetCheck() async {
 
   await NotificationService.instance.showBudgetWarning(
     percent: progress,
-    remaining: (budget - monthExpense).clamp(0.0, double.infinity),
+    remaining: (totalBudget - monthExpense).clamp(0.0, double.infinity),
   );
   await hive.saveBudgetAlertLastDate(userId, now);
 }
