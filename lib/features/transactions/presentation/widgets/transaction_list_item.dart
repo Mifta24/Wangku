@@ -43,6 +43,11 @@ class TransactionListItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final isIncome = transaction.type == 'income';
     final categoryColor = _parseHexColor(transaction.category?.color ?? '#94A3B8');
+    final categoryIcon = transaction.category?.icon ?? '📝';
+    final categoryName = transaction.category?.name ?? 'Uncategorized';
+    final note = transaction.note.trim().isEmpty
+        ? 'Tanpa catatan'
+        : transaction.note.trim();
 
     return InkWell(
       borderRadius: BorderRadius.circular(16.r),
@@ -59,12 +64,8 @@ class TransactionListItem extends StatelessWidget {
               ),
               child: Center(
                 child: Text(
-                  transaction.category?.name.substring(0, 1).toUpperCase() ?? '?',
-                  style: GoogleFonts.inter(
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w700,
-                    color: categoryColor,
-                  ),
+                  categoryIcon,
+                  style: TextStyle(fontSize: 20.sp),
                 ),
               ),
             ),
@@ -74,7 +75,9 @@ class TransactionListItem extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    transaction.category?.name ?? 'Uncategorized',
+                    note,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.inter(
                       fontSize: 13.sp,
                       fontWeight: FontWeight.w700,
@@ -82,14 +85,22 @@ class TransactionListItem extends StatelessWidget {
                     ),
                   ),
                   SizedBox(height: 4.h),
-                  Text(
-                    transaction.note.isEmpty ? '-' : transaction.note,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(
-                      fontSize: 11.sp,
-                      color: AppColors.textSecondary,
-                    ),
+                  Row(
+                    children: [
+                      Text(categoryIcon, style: TextStyle(fontSize: 12.sp)),
+                      SizedBox(width: 4.w),
+                      Expanded(
+                        child: Text(
+                          categoryName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 11.sp,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   SizedBox(height: 4.h),
                   Text(

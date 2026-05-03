@@ -862,7 +862,12 @@ class _TransactionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final isIncome = transaction.type == 'income';
     final catColor = transaction.category?.color ?? '#CCCCCC';
-    
+    final categoryIcon = transaction.category?.icon ?? '📝';
+    final categoryName = transaction.category?.name ?? 'Uncategorized';
+    final note = transaction.note.trim().isEmpty
+        ? 'Tanpa catatan'
+        : transaction.note.trim();
+
     return AppCard(
       child: Row(
         children: [
@@ -877,38 +882,47 @@ class _TransactionTile extends StatelessWidget {
             ),
             child: Center(
               child: Text(
-                transaction.category?.name[0].toUpperCase() ?? '?',
-                style: GoogleFonts.inter(
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.w700,
-                ),
+                categoryIcon,
+                style: TextStyle(fontSize: 22.sp),
               ),
             ),
           ),
           SizedBox(width: 12.w),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  transaction.category?.name ?? 'Uncategorized',
-                  style: GoogleFonts.inter(
-                    fontSize: 12.sp,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                note,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
                 ),
-                if (transaction.note.isNotEmpty)
-                  Text(
-                    transaction.note,
-                    style: GoogleFonts.inter(
-                      fontSize: 10.sp,
-                      color: AppColors.textSecondary,
+              ),
+              SizedBox(height: 4.h),
+              Row(
+                children: [
+                  Text(categoryIcon, style: TextStyle(fontSize: 11.sp)),
+                  SizedBox(width: 4.w),
+                  Expanded(
+                    child: Text(
+                      categoryName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 10.sp,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ),
+        ),
           Text(
             '${isIncome ? '+' : '-'}${formatCurrency(transaction.amount)}',
             style: GoogleFonts.inter(
