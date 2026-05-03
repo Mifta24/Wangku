@@ -20,6 +20,8 @@ abstract class ITransactionRepository {
   Future<void> deleteTransaction(String id);
   Future<List<CategoryModel>> getCategories({required String userId, String? type});
   Future<CategoryModel> createCategory(CategoryModel category);
+  Future<CategoryModel> updateCategory(CategoryModel category);
+  Future<void> deleteCategory(CategoryModel category);
   Future<Map<String, double>> getMonthlyAggregates({
     required String userId,
     required DateTime month,
@@ -151,6 +153,28 @@ class TransactionRepository implements ITransactionRepository {
       final currentCached = await _hiveManager.getCategories();
       await _hiveManager.cacheCategories([...currentCached, newCat]);
       return newCat;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  @override
+  Future<CategoryModel> updateCategory(CategoryModel category) async {
+    try {
+      final updated = await _service.updateCategory(category);
+      await _hiveManager.saveCategory(updated);
+      return updated;
+    } catch (e) {
+      await _hiveManager.saveCategory(category);
+      return category;
+    }
+  }
+
+  @override
+  Future<void> deleteCategory(CategoryModel category) async {
+    try {
+      await _service.deleteCategory(category);
+      await _hiveManager.deleteCategory(category.id);
     } catch (e) {
       rethrow;
     }

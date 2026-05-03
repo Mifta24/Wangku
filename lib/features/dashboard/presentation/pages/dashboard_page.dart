@@ -20,6 +20,7 @@ import '../../../transactions/presentation/providers/transaction_provider.dart';
 import '../../../transactions/domain/models/transaction_model.dart';
 import '../../../transactions/domain/models/category_model.dart';
 import '../../../transactions/domain/models/shortcut_model.dart';
+import '../../../transactions/presentation/widgets/manage_categories_sheet.dart';
 import '../../../transactions/presentation/pages/transaction_list_page.dart';
 import '../../../reports/presentation/pages/reports_page.dart';
 import '../../../reports/presentation/pages/budget_page.dart';
@@ -944,6 +945,66 @@ class _ProfileTab extends StatelessWidget {
                     fontSize: 14.sp,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textSecondary,
+                  ),
+                ),
+                SizedBox(height: 12.h),
+
+                Container(
+                  padding: EdgeInsets.all(16.w),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12.r),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40.w,
+                        height: 40.w,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10.r),
+                        ),
+                        child: Icon(
+                          Icons.category_outlined,
+                          color: AppColors.primary,
+                          size: 20.sp,
+                        ),
+                      ),
+                      SizedBox(width: 12.w),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Manajemen Kategori',
+                              style: GoogleFonts.inter(
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              'Tambah, edit, dan hapus kategori',
+                              style: GoogleFonts.inter(
+                                fontSize: 12.sp,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (context) => const ManageCategoriesSheet(),
+                          );
+                        },
+                        child: const Text('Kelola'),
+                      ),
+                    ],
                   ),
                 ),
                 SizedBox(height: 12.h),

@@ -177,6 +177,38 @@ class TransactionService {
     }
   }
 
+  Future<CategoryModel> updateCategory(CategoryModel category) async {
+    try {
+      final data = category.toJson();
+      data.remove('id');
+      data.remove('user_id');
+
+      final response = await _supabase
+          .from(_categoriesTable)
+          .update(data)
+          .eq('id', category.id)
+          .eq('user_id', category.userId!)
+          .select()
+          .single();
+
+      return CategoryModel.fromJson(response);
+    } catch (e) {
+      throw Exception('Gagal update kategori: ${e.toString()}');
+    }
+  }
+
+  Future<void> deleteCategory(CategoryModel category) async {
+    try {
+      await _supabase
+          .from(_categoriesTable)
+          .delete()
+          .eq('id', category.id)
+          .eq('user_id', category.userId!);
+    } catch (e) {
+      throw Exception('Gagal hapus kategori: ${e.toString()}');
+    }
+  }
+
   /// Fetch kategori berdasarkan tipe (income/expense)
   Future<List<CategoryModel>> getCategoriesByType(String type) async {
     try {

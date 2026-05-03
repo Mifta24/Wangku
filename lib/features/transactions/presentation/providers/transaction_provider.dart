@@ -188,6 +188,36 @@ class TransactionProvider extends ChangeNotifier {
         .toList();
   }
 
+  Future<void> updateCategory(CategoryModel category) async {
+    try {
+      _clearError();
+      final updated = await _repository.updateCategory(category);
+      final index = _categories.indexWhere((c) => c.id == updated.id);
+      if (index != -1) {
+        _categories[index] = updated;
+      }
+      notifyListeners();
+    } catch (e) {
+      _setError('Gagal update kategori: ${e.toString()}');
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> deleteCategory(CategoryModel category) async {
+    try {
+      _clearError();
+      await _repository.deleteCategory(category);
+      _categories.removeWhere((c) => c.id == category.id);
+      _customShortcuts.removeWhere((shortcut) => shortcut.categoryId == category.id);
+      notifyListeners();
+    } catch (e) {
+      _setError('Gagal hapus kategori: ${e.toString()}');
+      notifyListeners();
+      rethrow;
+    }
+  }
+
   List<CategoryModel> get customShortcuts =>
       customShortcutPresets.map((preset) => preset.category).toList();
 
@@ -375,6 +405,7 @@ class TransactionProvider extends ChangeNotifier {
   void clear() {
     _transactions = [];
     _categories = [];
+    _customShortcuts = [];
     _isLoading = false;
     _errorMessage = null;
     notifyListeners();

@@ -412,6 +412,16 @@ class HiveManager {
     );
   }
 
+  Future<void> deleteCategory(String id) async {
+    try {
+      final box = _catBox ?? await Hive.openBox<dynamic>(_categoriesBox);
+      await box.delete(id);
+    } catch (e) {
+      debugPrint('Error deleting category: $e');
+      rethrow;
+    }
+  }
+
   Future<void> saveShortcutPresets(
     String userId,
     List<TransactionShortcut> shortcuts,
