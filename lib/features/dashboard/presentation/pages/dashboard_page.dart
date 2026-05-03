@@ -107,6 +107,7 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
       builder: (context) {
         String selectedType = initialType ?? 'expense'; // 'income' atau 'expense'
+        DateTime selectedDate = DateTime.now();
 
         return Padding(
           padding: EdgeInsets.only(
@@ -309,6 +310,63 @@ class _DashboardPageState extends State<DashboardPage> {
                       prefixIcon: Icons.note_alt_outlined,
                     ),
                     SizedBox(height: 16.h),
+                    OutlinedButton(
+                      onPressed: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: selectedDate,
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime.now().add(
+                            const Duration(days: 365),
+                          ),
+                          helpText: 'Pilih Tanggal Transaksi',
+                          cancelText: 'Batal',
+                          confirmText: 'Pilih',
+                        );
+                        if (picked == null) return;
+                        setSheetState(() => selectedDate = picked);
+                      },
+                      style: OutlinedButton.styleFrom(
+                        alignment: Alignment.centerLeft,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 14.w,
+                          vertical: 14.h,
+                        ),
+                        side: const BorderSide(color: AppColors.border),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12.r),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.calendar_today_outlined,
+                            size: 18.sp,
+                            color: AppColors.textSecondary,
+                          ),
+                          SizedBox(width: 12.w),
+                          Expanded(
+                            child: Text(
+                              DateFormat(
+                                'd MMMM yyyy',
+                                'id_ID',
+                              ).format(selectedDate),
+                              style: GoogleFonts.inter(
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: AppColors.textSecondary,
+                            size: 20.sp,
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 16.h),
                     // Save button
                     AppButton(
                       label: 'Simpan Cepat',
@@ -342,7 +400,14 @@ class _DashboardPageState extends State<DashboardPage> {
                             categoryId: _selectedCategoryId!,
                             amount: amount,
                             note: _noteController.text,
-                            date: DateTime.now(),
+                            date: DateTime(
+                              selectedDate.year,
+                              selectedDate.month,
+                              selectedDate.day,
+                              DateTime.now().hour,
+                              DateTime.now().minute,
+                              DateTime.now().second,
+                            ),
                             type: selectedType,
                           );
 
