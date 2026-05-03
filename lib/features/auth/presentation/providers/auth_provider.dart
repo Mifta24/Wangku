@@ -83,6 +83,21 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(false);
   }
 
+  Future<bool> updateProfileName(String name) async {
+    _setLoading(true);
+    _setError(null);
+    try {
+      await _authService.updateProfileName(name);
+      _setLoading(false);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _setError(e.toString().replaceAll('Exception: ', ''));
+      _setLoading(false);
+      return false;
+    }
+  }
+
   // Fungsi Lupa Password
   Future<bool> forgotPassword(String email) async {
     _setLoading(true);

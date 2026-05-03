@@ -113,6 +113,18 @@ class AuthService {
     }
   }
 
+  Future<UserResponse> updateProfileName(String name) async {
+    try {
+      return await _supabase.auth.updateUser(
+        UserAttributes(data: {'name': name}),
+      );
+    } on AuthException catch (e) {
+      throw Exception('Gagal update profil: ${e.message}');
+    } catch (e) {
+      throw Exception('Gagal update profil: ${e.toString()}');
+    }
+  }
+
   // Kirim email reset password
   Future<void> resetPassword(String email) async {
     try {

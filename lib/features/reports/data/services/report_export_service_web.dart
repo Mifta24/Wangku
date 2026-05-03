@@ -8,4 +8,8 @@ class ReportExportService {
   Future<String?> exportPdf({required List<TransactionModel> transactions}) async {
     return null;
   }
+
+  Future<String?> exportExcel({required List<TransactionModel> transactions}) async {
+    return null;
+  }
 }

@@ -24,6 +24,8 @@ import '../../../transactions/presentation/widgets/manage_categories_sheet.dart'
 import '../../../transactions/presentation/pages/transaction_list_page.dart';
 import '../../../reports/presentation/pages/reports_page.dart';
 import '../../../reports/presentation/pages/budget_page.dart';
+import '../widgets/account_profile_sheet.dart';
+import '../widgets/export_transactions_sheet.dart';
 import '../widgets/manage_notifications_sheet.dart';
 import '../widgets/manage_shortcuts_sheet.dart';
 
@@ -1106,6 +1108,66 @@ class _ProfileTab extends StatelessWidget {
                           borderRadius: BorderRadius.circular(10.r),
                         ),
                         child: Icon(
+                          Icons.manage_accounts_outlined,
+                          color: AppColors.primary,
+                          size: 20.sp,
+                        ),
+                      ),
+                      SizedBox(width: 12.w),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Akun & Profil',
+                              style: GoogleFonts.inter(
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              'Nama profil, email, dan password',
+                              style: GoogleFonts.inter(
+                                fontSize: 12.sp,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (context) => const AccountProfileSheet(),
+                          );
+                        },
+                        child: const Text('Kelola'),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 12.h),
+
+                Container(
+                  padding: EdgeInsets.all(16.w),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12.r),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40.w,
+                        height: 40.w,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10.r),
+                        ),
+                        child: Icon(
                           Icons.flash_on_outlined,
                           color: AppColors.primary,
                           size: 20.sp,
@@ -1143,6 +1205,66 @@ class _ProfileTab extends StatelessWidget {
                           );
                         },
                         child: const Text('Kelola'),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 12.h),
+
+                Container(
+                  padding: EdgeInsets.all(16.w),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12.r),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40.w,
+                        height: 40.w,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10.r),
+                        ),
+                        child: Icon(
+                          Icons.file_download_outlined,
+                          color: AppColors.primary,
+                          size: 20.sp,
+                        ),
+                      ),
+                      SizedBox(width: 12.w),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Export Transaksi',
+                              style: GoogleFonts.inter(
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              'CSV, Excel, PDF per bulan',
+                              style: GoogleFonts.inter(
+                                fontSize: 12.sp,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (context) => const ExportTransactionsSheet(),
+                          );
+                        },
+                        child: const Text('Export'),
                       ),
                     ],
                   ),

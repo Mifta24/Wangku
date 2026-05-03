@@ -76,6 +76,35 @@ class ReportExportService {
     return file.path;
   }
 
+  Future<String?> exportExcel({required List<TransactionModel> transactions}) async {
+    final dateFmt = DateFormat('yyyy-MM-dd');
+    final buffer = StringBuffer();
+    buffer.writeln('<html><head><meta charset="UTF-8"></head><body>');
+    buffer.writeln('<table border="1">');
+    buffer.writeln('<tr><th>Tanggal</th><th>Tipe</th><th>Kategori</th><th>Catatan</th><th>Jumlah</th></tr>');
+
+    for (final tx in transactions) {
+      final category = tx.category?.name ?? 'Uncategorized';
+      buffer.writeln(
+        '<tr>'
+        '<td>${dateFmt.format(tx.date)}</td>'
+        '<td>${_escapeHtml(tx.type)}</td>'
+        '<td>${_escapeHtml(category)}</td>'
+        '<td>${_escapeHtml(tx.note)}</td>'
+        '<td>${tx.amount.toStringAsFixed(0)}</td>'
+        '</tr>',
+      );
+    }
+
+    buffer.writeln('</table></body></html>');
+
+    final dir = await getApplicationDocumentsDirectory();
+    final fileName = _buildFileName('xls');
+    final file = File('${dir.path}/$fileName');
+    await file.writeAsString(buffer.toString());
+    return file.path;
+  }
+
   String _buildFileName(String ext) {
     final now = DateTime.now();
     final stamp = DateFormat('yyyyMMdd_HHmm').format(now);
@@ -88,5 +117,13 @@ class ReportExportService {
       return '"$escaped"';
     }
     return escaped;
+  }
+
+  String _escapeHtml(String value) {
+    return value
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;');
   }
 }
