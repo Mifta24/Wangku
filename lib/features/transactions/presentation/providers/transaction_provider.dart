@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:wangku/core/database/hive_manager.dart';
 import '../../domain/models/transaction_model.dart';
 import '../../domain/models/category_model.dart';
+import '../../domain/models/shortcut_model.dart';
 import '../../data/repositories/transaction_repository.dart';
 
 class TransactionProvider extends ChangeNotifier {
@@ -10,7 +11,7 @@ class TransactionProvider extends ChangeNotifier {
   // State
   List<TransactionModel> _transactions = [];
   List<CategoryModel> _categories = [];
-  List<String> _customShortcuts = [];
+  List<TransactionShortcut> _customShortcuts = [];
   bool _isLoading = false;
   String? _errorMessage;
   DateTime _selectedMonth = DateTime.now();
@@ -158,31 +159,62 @@ class TransactionProvider extends ChangeNotifier {
   }
 
   /// Get custom shortcuts
-  List<CategoryModel> get customShortcuts {
+  List<TransactionShortcutPreset> get customShortcutPresets {
     if (_customShortcuts.isEmpty) {
       final expenses = getFrequentCategories('expense', limit: 3);
       final incomes = getFrequentCategories('income', limit: 2);
-      return [...expenses, ...incomes];
+      return [...expenses, ...incomes]
+          .map(
+            (category) => TransactionShortcutPreset(
+              category: category,
+              shortcut: TransactionShortcut(categoryId: category.id),
+            ),
+          )
+          .toList();
     }
     
     return _customShortcuts
-        .map((id) => _categories.cast<CategoryModel?>().firstWhere((c) => c?.id == id, orElse: () => null))
-        .whereType<CategoryModel>()
+        .map((shortcut) {
+          final category = _categories
+              .cast<CategoryModel?>()
+              .firstWhere((c) => c?.id == shortcut.categoryId, orElse: () => null);
+          if (category == null) return null;
+          return TransactionShortcutPreset(
+            category: category,
+            shortcut: shortcut,
+          );
+        })
+        .whereType<TransactionShortcutPreset>()
         .toList();
   }
+
+  List<CategoryModel> get customShortcuts =>
+      customShortcutPresets.map((preset) => preset.category).toList();
 
   /// Load shortcuts
   Future<void> loadShortcuts(String userId) async {
     final hiveManager = HiveManager.instance;
-    _customShortcuts = await hiveManager.getShortcuts(userId);
+    _customShortcuts = await hiveManager.getShortcutPresets(userId);
     notifyListeners();
   }
 
   /// Save shortcuts
   Future<void> saveShortcuts(String userId, List<String> categoryIds) async {
+    await saveShortcutPresets(
+      userId,
+      categoryIds
+          .map((categoryId) => TransactionShortcut(categoryId: categoryId))
+          .toList(),
+    );
+  }
+
+  Future<void> saveShortcutPresets(
+    String userId,
+    List<TransactionShortcut> shortcuts,
+  ) async {
     final hiveManager = HiveManager.instance;
-    await hiveManager.saveShortcuts(userId, categoryIds);
-    _customShortcuts = categoryIds;
+    await hiveManager.saveShortcutPresets(userId, shortcuts);
+    _customShortcuts = shortcuts;
     notifyListeners();
   }
 

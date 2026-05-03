@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../transactions/domain/models/category_model.dart';
+import '../../../transactions/domain/models/shortcut_model.dart';
 import '../../../transactions/presentation/providers/transaction_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
@@ -15,25 +16,27 @@ class ManageShortcutsSheet extends StatefulWidget {
 }
 
 class _ManageShortcutsSheetState extends State<ManageShortcutsSheet> {
-  List<CategoryModel> _shortcuts = [];
+  List<TransactionShortcut> _shortcuts = [];
   bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
     final txnProvider = context.read<TransactionProvider>();
-    _shortcuts = List.from(txnProvider.customShortcuts);
+    _shortcuts = txnProvider.customShortcutPresets
+        .map((preset) => preset.shortcut)
+        .toList();
   }
 
   void _addShortcut(CategoryModel cat) {
-    if (_shortcuts.any((c) => c.id == cat.id)) {
+    if (_shortcuts.any((shortcut) => shortcut.categoryId == cat.id)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Kategori ini sudah ada di daftar akses cepat')),
       );
       return;
     }
     setState(() {
-      _shortcuts.add(cat);
+      _shortcuts.add(TransactionShortcut(categoryId: cat.id));
     });
   }
 
@@ -50,8 +53,7 @@ class _ManageShortcutsSheetState extends State<ManageShortcutsSheet> {
       final authProvider = context.read<AuthProvider>();
       final userId = authProvider.currentUser!.id;
       
-      final ids = _shortcuts.map((c) => c.id).toList();
-      await txnProvider.saveShortcuts(userId, ids);
+      await txnProvider.saveShortcutPresets(userId, _shortcuts);
       
       if (!mounted) return;
       Navigator.pop(context);
@@ -130,16 +132,27 @@ class _ManageShortcutsSheetState extends State<ManageShortcutsSheet> {
                       });
                     },
                     itemBuilder: (context, index) {
-                      final cat = _shortcuts[index];
+                      final shortcut = _shortcuts[index];
+                      final cat = _categoryForShortcut(shortcut);
+                      if (cat == null) {
+                        return const SizedBox.shrink(key: ValueKey('missing-shortcut'));
+                      }
                       final isIncome = cat.type == 'income';
                       return ListTile(
                         key: ValueKey(cat.id),
                         leading: Text(cat.icon, style: TextStyle(fontSize: 24.sp)),
                         title: Text(cat.name, style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-                        subtitle: Text(isIncome ? 'Pemasukan' : 'Pengeluaran', style: TextStyle(color: isIncome ? AppColors.income : AppColors.expense)),
+                        subtitle: Text(
+                          _shortcutSubtitle(shortcut, isIncome),
+                          style: TextStyle(color: isIncome ? AppColors.income : AppColors.expense),
+                        ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined, color: AppColors.primary),
+                              onPressed: () => _showEditShortcutModal(index, cat),
+                            ),
                             IconButton(
                               icon: const Icon(Icons.remove_circle_outline, color: AppColors.error),
                               onPressed: () => _removeShortcut(index),
@@ -203,7 +216,7 @@ class _ManageShortcutsSheetState extends State<ManageShortcutsSheet> {
                     itemCount: allCats.length,
                     itemBuilder: (context, index) {
                       final cat = allCats[index];
-                      final isAdded = _shortcuts.any((c) => c.id == cat.id);
+                      final isAdded = _shortcuts.any((shortcut) => shortcut.categoryId == cat.id);
                       return ListTile(
                         leading: Text(cat.icon, style: TextStyle(fontSize: 24.sp)),
                         title: Text(cat.name),
@@ -214,6 +227,7 @@ class _ManageShortcutsSheetState extends State<ManageShortcutsSheet> {
                           if (!isAdded) {
                             _addShortcut(cat);
                             Navigator.pop(context);
+                            _showEditShortcutModal(_shortcuts.length - 1, cat);
                           }
                         },
                       );
@@ -223,6 +237,125 @@ class _ManageShortcutsSheetState extends State<ManageShortcutsSheet> {
               ],
             );
           },
+        );
+      },
+    );
+  }
+
+  CategoryModel? _categoryForShortcut(TransactionShortcut shortcut) {
+    final txnProvider = context.read<TransactionProvider>();
+    return txnProvider.categories.cast<CategoryModel?>().firstWhere(
+          (category) => category?.id == shortcut.categoryId,
+          orElse: () => null,
+        );
+  }
+
+  String _shortcutSubtitle(TransactionShortcut shortcut, bool isIncome) {
+    final parts = <String>[isIncome ? 'Pemasukan' : 'Pengeluaran'];
+    if (shortcut.amount != null) {
+      parts.add('Rp ${shortcut.amount!.toStringAsFixed(0)}');
+    }
+    if (shortcut.note.trim().isNotEmpty) {
+      parts.add(shortcut.note.trim());
+    }
+    return parts.join(' - ');
+  }
+
+  void _showEditShortcutModal(int index, CategoryModel category) {
+    final shortcut = _shortcuts[index];
+    final amountController = TextEditingController(
+      text: shortcut.amount?.toStringAsFixed(0) ?? '',
+    );
+    final noteController = TextEditingController(text: shortcut.note);
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
+      ),
+      builder: (context) {
+        return SingleChildScrollView(
+          padding: EdgeInsets.only(
+            left: 20.w,
+            right: 20.w,
+            top: 20.h,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 20.h,
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Set Shortcut ${category.name}',
+                  style: GoogleFonts.inter(
+                    fontSize: 18.sp,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                SizedBox(height: 16.h),
+                TextField(
+                  controller: amountController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Harga default',
+                    hintText: 'Contoh: 15000',
+                    prefixIcon: const Icon(Icons.payments_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 12.h),
+                TextField(
+                  controller: noteController,
+                  decoration: InputDecoration(
+                    labelText: 'Catatan default',
+                    hintText: 'Contoh: Kopi pagi',
+                    prefixIcon: const Icon(Icons.note_alt_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 16.h),
+                ElevatedButton(
+                  onPressed: () {
+                    final amountText = amountController.text.trim();
+                    final amount =
+                        amountText.isEmpty ? null : double.tryParse(amountText);
+                    if (amountText.isNotEmpty &&
+                        (amount == null || amount <= 0)) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Harga harus lebih dari 0')),
+                      );
+                      return;
+                    }
+
+                    setState(() {
+                      _shortcuts[index] = TransactionShortcut(
+                        categoryId: category.id,
+                        amount: amount,
+                        note: noteController.text.trim(),
+                      );
+                    });
+                    FocusScope.of(context).unfocus();
+                    Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: Size(double.infinity, 48.h),
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Simpan Preset'),
+                ),
+              ],
+            ),
+          ),
         );
       },
     );

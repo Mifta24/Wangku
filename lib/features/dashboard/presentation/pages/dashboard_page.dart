@@ -19,6 +19,7 @@ import '../../../reports/presentation/providers/report_provider.dart';
 import '../../../transactions/presentation/providers/transaction_provider.dart';
 import '../../../transactions/domain/models/transaction_model.dart';
 import '../../../transactions/domain/models/category_model.dart';
+import '../../../transactions/domain/models/shortcut_model.dart';
 import '../../../transactions/presentation/pages/transaction_list_page.dart';
 import '../../../reports/presentation/pages/reports_page.dart';
 import '../../../reports/presentation/pages/budget_page.dart';
@@ -78,14 +79,21 @@ class _DashboardPageState extends State<DashboardPage> {
     return formatter.format(amount);
   }
 
-  void _showQuickAddSheet({String? initialType, String? initialCategoryId}) {
+  void _showQuickAddSheet({
+    String? initialType,
+    String? initialCategoryId,
+    double? initialAmount,
+    String? initialNote,
+  }) {
     final txnProvider = context.read<TransactionProvider>();
     final authProvider = context.read<AuthProvider>();
     final parentContext = context;
     
     // Bersihkan form
-    _amountController.clear();
-    _noteController.clear();
+    _amountController.text = initialAmount == null
+        ? ''
+        : initialAmount.toStringAsFixed(initialAmount.truncateToDouble() == initialAmount ? 0 : 2);
+    _noteController.text = initialNote ?? '';
     _selectedCategoryId = initialCategoryId;
 
     showModalBottomSheet<void>(
@@ -489,11 +497,22 @@ class _HomeTab extends StatelessWidget {
     required this.formatCurrency,
   });
 
-  final void Function({String? initialType, String? initialCategoryId}) onQuickAdd;
+  final void Function({
+    String? initialType,
+    String? initialCategoryId,
+    double? initialAmount,
+    String? initialNote,
+  }) onQuickAdd;
   final String Function(double) formatCurrency;
 
-  Widget _buildShortcutChip(CategoryModel cat, String type, VoidCallback onTap) {
+  Widget _buildShortcutChip(
+    TransactionShortcutPreset preset,
+    VoidCallback onTap,
+  ) {
+    final cat = preset.category;
     final color = Color(int.parse('FF${cat.color.replaceFirst('#', '')}', radix: 16));
+    final amount = preset.shortcut.amount;
+    final note = preset.shortcut.note.trim();
     
     return GestureDetector(
       onTap: onTap,
@@ -527,6 +546,17 @@ class _HomeTab extends StatelessWidget {
                 color: AppColors.textPrimary,
               ),
             ),
+            if (amount != null || note.isNotEmpty) ...[
+              SizedBox(width: 8.w),
+              Text(
+                amount != null ? formatCurrency(amount) : note,
+                style: GoogleFonts.inter(
+                  fontSize: 11.sp,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -619,7 +649,7 @@ class _HomeTab extends StatelessWidget {
             // Akses Cepat
             Builder(
               builder: (context) {
-                final shortcuts = txnProvider.customShortcuts;
+                final shortcuts = txnProvider.customShortcutPresets;
                 
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -671,7 +701,15 @@ class _HomeTab extends StatelessWidget {
                          child: Row(
                            children: shortcuts.map((cat) => Padding(
                                padding: EdgeInsets.only(right: 8.w),
-                               child: _buildShortcutChip(cat, cat.type, () => onQuickAdd(initialType: cat.type, initialCategoryId: cat.id)),
+                               child: _buildShortcutChip(
+                                 cat,
+                                 () => onQuickAdd(
+                                   initialType: cat.category.type,
+                                   initialCategoryId: cat.category.id,
+                                   initialAmount: cat.shortcut.amount,
+                                   initialNote: cat.shortcut.note,
+                                 ),
+                               ),
                              )).toList(),
                          ),
                        ),
