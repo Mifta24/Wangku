@@ -282,6 +282,8 @@ class HiveManager {
     required bool enabled,
     required int hour,
     required int minute,
+    String title = 'Jangan lupa catat transaksi',
+    String body = 'Catat pemasukan dan pengeluaran hari ini supaya rapi.',
   }) async {
     try {
       final box = _budgetBoxInstance ?? await Hive.openBox<dynamic>(_budgetBox);
@@ -289,6 +291,8 @@ class HiveManager {
         'enabled': enabled,
         'hour': hour,
         'minute': minute,
+        'title': title,
+        'body': body,
         'updatedAt': DateTime.now().toIso8601String(),
       });
     } catch (e) {
@@ -410,6 +414,36 @@ class HiveManager {
           .map((categoryId) => TransactionShortcut(categoryId: categoryId))
           .toList(),
     );
+  }
+
+  Future<void> saveBudgetNotificationSettings(
+    String userId, {
+    required bool enabled,
+  }) async {
+    try {
+      final box = _budgetBoxInstance ?? await Hive.openBox<dynamic>(_budgetBox);
+      await box.put('${userId}_budget_notification', {
+        'enabled': enabled,
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('Error saving budget notification settings: $e');
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getBudgetNotificationSettings(
+    String userId,
+  ) async {
+    try {
+      final box = _budgetBoxInstance ?? await Hive.openBox<dynamic>(_budgetBox);
+      final data = box.get('${userId}_budget_notification');
+      if (data == null) return null;
+      return Map<String, dynamic>.from(data as Map);
+    } catch (e) {
+      debugPrint('Error getting budget notification settings: $e');
+      return null;
+    }
   }
 
   Future<void> deleteCategory(String id) async {

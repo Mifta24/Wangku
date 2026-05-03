@@ -77,6 +77,8 @@ class NotificationService {
   Future<void> scheduleDailyReminder({
     required int hour,
     required int minute,
+    String title = 'Jangan lupa catat transaksi',
+    String body = 'Catat pemasukan dan pengeluaran hari ini supaya rapi.',
   }) async {
     if (!_initialized) return;
 
@@ -106,8 +108,8 @@ class NotificationService {
 
     await _plugin.zonedSchedule(
       id: _dailyReminderId,
-      title: 'Jangan lupa catat transaksi',
-      body: 'Catat pemasukan dan pengeluaran hari ini supaya rapi.',
+      title: title,
+      body: body,
       scheduledDate: scheduled,
       notificationDetails: details,
       androidScheduleMode: AndroidScheduleMode.inexact,

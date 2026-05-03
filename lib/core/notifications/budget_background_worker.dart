@@ -31,6 +31,10 @@ Future<void> _runBudgetCheck() async {
   final userId = await hive.getCurrentUserId();
   if (userId == null || userId.isEmpty) return;
 
+  final settings = await hive.getBudgetNotificationSettings(userId);
+  final enabled = (settings?['enabled'] as bool?) ?? true;
+  if (!enabled) return;
+
   final categoryBudgets = await hive.getCategoryBudgets(userId);
   final totalBudget = categoryBudgets.values.fold<double>(0.0, (s, v) => s + v);
   if (totalBudget <= 0) return;

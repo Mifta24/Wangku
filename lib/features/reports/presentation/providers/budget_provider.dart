@@ -15,6 +15,7 @@ class BudgetProvider extends ChangeNotifier {
   DateTime? _lastBudgetAlertDate;
   bool _alertInProgress = false;
   bool _isDisposed = false;
+  bool _notificationsEnabled = true;
 
   BudgetProvider({required this.txnProvider}) {
     txnProvider.addListener(_onTransactionsChanged);
@@ -23,6 +24,7 @@ class BudgetProvider extends ChangeNotifier {
   Map<String, double> get categoryBudgets => _categoryBudgets;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  bool get notificationsEnabled => _notificationsEnabled;
 
   double get monthExpense => txnProvider.monthExpense;
 
@@ -64,7 +66,26 @@ class BudgetProvider extends ChangeNotifier {
     _userId = userId;
     try {
       _lastBudgetAlertDate = await _hiveManager.getBudgetAlertLastDate(userId);
+      final settings =
+          await _hiveManager.getBudgetNotificationSettings(userId);
+      _notificationsEnabled = (settings?['enabled'] as bool?) ?? true;
+      notifyListeners();
     } catch (_) {}
+  }
+
+  Future<void> setNotificationsEnabled(String userId, bool enabled) async {
+    _userId = userId;
+    _notificationsEnabled = enabled;
+    notifyListeners();
+    try {
+      await _hiveManager.saveBudgetNotificationSettings(
+        userId,
+        enabled: enabled,
+      );
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+    }
   }
 
   Future<void> loadCategoryBudgets(String userId) async {
@@ -111,6 +132,7 @@ class BudgetProvider extends ChangeNotifier {
     String categoryName,
   ) async {
     final budget = categoryBudget(categoryId);
+    if (!_notificationsEnabled) return;
     if (budget == null || budget <= 0) return;
     final prog = categoryProgress(categoryId);
     if (prog < 0.8) return;
@@ -136,6 +158,7 @@ class BudgetProvider extends ChangeNotifier {
     if (_alertInProgress) return;
     final userId = _userId;
     if (userId == null) return;
+    if (!_notificationsEnabled) return;
     if (totalCategoryBudget <= 0) return;
     if (progress < 0.8) return;
 
