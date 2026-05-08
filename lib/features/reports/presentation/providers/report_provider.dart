@@ -25,6 +25,18 @@ class CategoryDistribution {
   });
 }
 
+class TrendPoint {
+  final String label;
+  final double income;
+  final double expense;
+
+  TrendPoint({
+    required this.label,
+    required this.income,
+    required this.expense,
+  });
+}
+
 class ReportProvider extends ChangeNotifier {
   final TransactionRepository _repository = TransactionRepository();
   String? _userId;
@@ -35,7 +47,10 @@ class ReportProvider extends ChangeNotifier {
   
   List<TransactionModel> _transactions = [];
   List<CategoryDistribution> _categories = [];
+  List<TrendPoint> _trendPoints = [];
   double _totalAmount = 0.0;
+  double _incomeTotal = 0.0;
+  double _expenseTotal = 0.0;
   bool _isLoading = false;
 
   ReportProvider({String? userId}) : _userId = userId {
@@ -55,7 +70,11 @@ class ReportProvider extends ChangeNotifier {
   TransactionType get transactionType => _transactionType;
   DateTime get currentDate => _currentDate;
   List<CategoryDistribution> get categories => _categories;
+  List<TrendPoint> get trendPoints => _trendPoints;
   double get totalAmount => _totalAmount;
+  double get incomeTotal => _incomeTotal;
+  double get expenseTotal => _expenseTotal;
+  double get netAmount => _incomeTotal - _expenseTotal;
   bool get isLoading => _isLoading;
 
   void setPeriodType(PeriodType type) {
@@ -157,6 +176,14 @@ class ReportProvider extends ChangeNotifier {
   }
 
   void _processData() {
+    _incomeTotal = _transactions
+        .where((t) => t.type == 'income')
+        .fold(0.0, (sum, t) => sum + t.amount);
+    _expenseTotal = _transactions
+        .where((t) => t.type == 'expense')
+        .fold(0.0, (sum, t) => sum + t.amount);
+    _trendPoints = _buildTrendPoints();
+
     final typeStr = _transactionType == TransactionType.expense ? 'expense' : 'income';
     final relevantTxs = _transactions.where((t) => t.type == typeStr).toList();
     
@@ -195,5 +222,89 @@ class ReportProvider extends ChangeNotifier {
     cats.sort((a, b) => b.total.compareTo(a.total));
     _categories = cats;
     notifyListeners();
+  }
+
+  List<TrendPoint> _buildTrendPoints() {
+    switch (_periodType) {
+      case PeriodType.week:
+        final weekday = _currentDate.weekday;
+        final start = DateTime(
+          _currentDate.year,
+          _currentDate.month,
+          _currentDate.day,
+        ).subtract(Duration(days: weekday - 1));
+        final income = List<double>.filled(7, 0);
+        final expense = List<double>.filled(7, 0);
+
+        for (final transaction in _transactions) {
+          final date = DateTime(
+            transaction.date.year,
+            transaction.date.month,
+            transaction.date.day,
+          );
+          final index = date.difference(start).inDays;
+          if (index < 0 || index >= 7) continue;
+          if (transaction.type == 'income') {
+            income[index] += transaction.amount;
+          } else {
+            expense[index] += transaction.amount;
+          }
+        }
+
+        return List.generate(7, (index) {
+          final date = start.add(Duration(days: index));
+          return TrendPoint(
+            label: DateFormat('E', 'id_ID').format(date),
+            income: income[index],
+            expense: expense[index],
+          );
+        });
+      case PeriodType.month:
+        final lastDay = DateTime(_currentDate.year, _currentDate.month + 1, 0).day;
+        final weekCount = ((lastDay - 1) ~/ 7) + 1;
+        final income = List<double>.filled(weekCount, 0);
+        final expense = List<double>.filled(weekCount, 0);
+
+        for (final transaction in _transactions) {
+          final index = (transaction.date.day - 1) ~/ 7;
+          if (index < 0 || index >= weekCount) continue;
+          if (transaction.type == 'income') {
+            income[index] += transaction.amount;
+          } else {
+            expense[index] += transaction.amount;
+          }
+        }
+
+        return List.generate(
+          weekCount,
+          (index) => TrendPoint(
+            label: 'M${index + 1}',
+            income: income[index],
+            expense: expense[index],
+          ),
+        );
+      case PeriodType.year:
+        final income = List<double>.filled(12, 0);
+        final expense = List<double>.filled(12, 0);
+
+        for (final transaction in _transactions) {
+          final index = transaction.date.month - 1;
+          if (index < 0 || index >= 12) continue;
+          if (transaction.type == 'income') {
+            income[index] += transaction.amount;
+          } else {
+            expense[index] += transaction.amount;
+          }
+        }
+
+        return List.generate(12, (index) {
+          final date = DateTime(_currentDate.year, index + 1, 1);
+          return TrendPoint(
+            label: DateFormat('MMM', 'id_ID').format(date),
+            income: income[index],
+            expense: expense[index],
+          );
+        });
+    }
   }
 }
