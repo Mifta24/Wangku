@@ -537,7 +537,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               )
             : null,
-        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
         bottomNavigationBar: NavigationBar(
           backgroundColor: Colors.white,
           selectedIndex: _currentIndex,
