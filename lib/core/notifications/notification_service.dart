@@ -49,6 +49,13 @@ class NotificationService {
     _initialized = true;
   }
 
+  Future<bool> _ensureNotificationPermission() async {
+    final androidPlugin = _plugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    final granted = await androidPlugin?.requestNotificationsPermission();
+    return granted ?? true;
+  }
+
   Future<void> showBudgetWarning({
     required double percent,
     required double remaining,
@@ -74,13 +81,15 @@ class NotificationService {
     );
   }
 
-  Future<void> scheduleDailyReminder({
+  Future<bool> scheduleDailyReminder({
     required int hour,
     required int minute,
     String title = 'Jangan lupa catat transaksi',
     String body = 'Catat pemasukan dan pengeluaran hari ini supaya rapi.',
   }) async {
-    if (!_initialized) return;
+    if (!_initialized) return false;
+    final hasPermission = await _ensureNotificationPermission();
+    if (!hasPermission) return false;
 
     final now = tz.TZDateTime.now(tz.local);
     var scheduled = tz.TZDateTime(
@@ -106,6 +115,7 @@ class NotificationService {
       iOS: const DarwinNotificationDetails(),
     );
 
+    await _plugin.cancel(id: _dailyReminderId);
     await _plugin.zonedSchedule(
       id: _dailyReminderId,
       title: title,
@@ -115,6 +125,7 @@ class NotificationService {
       androidScheduleMode: AndroidScheduleMode.inexact,
       matchDateTimeComponents: DateTimeComponents.time,
     );
+    return true;
   }
 
   Future<void> showCategoryBudgetWarning({

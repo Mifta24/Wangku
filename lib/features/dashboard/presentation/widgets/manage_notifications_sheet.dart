@@ -107,6 +107,16 @@ class _ManageNotificationsSheetState extends State<ManageNotificationsSheet> {
                             ),
                           ],
                         ),
+                        if (reminder.errorMessage != null) ...[
+                          SizedBox(height: 8.h),
+                          Text(
+                            reminder.errorMessage!,
+                            style: GoogleFonts.inter(
+                              fontSize: 12.sp,
+                              color: AppColors.error,
+                            ),
+                          ),
+                        ],
                         SizedBox(height: 12.h),
                         OutlinedButton.icon(
                           onPressed: userId == null

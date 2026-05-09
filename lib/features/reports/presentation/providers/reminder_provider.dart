@@ -43,12 +43,25 @@ class ReminderProvider extends ChangeNotifier {
     _setLoading(false);
 
     if (_enabled) {
-      await NotificationService.instance.scheduleDailyReminder(
+      final scheduled = await NotificationService.instance.scheduleDailyReminder(
         hour: _time.hour,
         minute: _time.minute,
         title: _title,
         body: _body,
       );
+      if (!scheduled) {
+        _enabled = false;
+        _errorMessage = 'Izin notifikasi belum diberikan.';
+        await _hiveManager.saveDailyReminder(
+          userId,
+          enabled: false,
+          hour: _time.hour,
+          minute: _time.minute,
+          title: _title,
+          body: _body,
+        );
+        notifyListeners();
+      }
     }
   }
 
@@ -66,12 +79,24 @@ class ReminderProvider extends ChangeNotifier {
         body: _body,
       );
       if (value) {
-        await NotificationService.instance.scheduleDailyReminder(
+        final scheduled = await NotificationService.instance.scheduleDailyReminder(
           hour: _time.hour,
           minute: _time.minute,
           title: _title,
           body: _body,
         );
+        if (!scheduled) {
+          _enabled = false;
+          _errorMessage = 'Izin notifikasi belum diberikan.';
+          await _hiveManager.saveDailyReminder(
+            userId,
+            enabled: false,
+            hour: _time.hour,
+            minute: _time.minute,
+            title: _title,
+            body: _body,
+          );
+        }
       } else {
         await NotificationService.instance.cancelDailyReminder();
       }
@@ -95,12 +120,24 @@ class ReminderProvider extends ChangeNotifier {
         body: _body,
       );
       if (_enabled) {
-        await NotificationService.instance.scheduleDailyReminder(
+        final scheduled = await NotificationService.instance.scheduleDailyReminder(
           hour: time.hour,
           minute: time.minute,
           title: _title,
           body: _body,
         );
+        if (!scheduled) {
+          _enabled = false;
+          _errorMessage = 'Izin notifikasi belum diberikan.';
+          await _hiveManager.saveDailyReminder(
+            userId,
+            enabled: false,
+            hour: time.hour,
+            minute: time.minute,
+            title: _title,
+            body: _body,
+          );
+        }
       }
     } catch (e) {
       _errorMessage = e.toString();
@@ -127,12 +164,24 @@ class ReminderProvider extends ChangeNotifier {
         body: _body,
       );
       if (_enabled) {
-        await NotificationService.instance.scheduleDailyReminder(
+        final scheduled = await NotificationService.instance.scheduleDailyReminder(
           hour: _time.hour,
           minute: _time.minute,
           title: _title,
           body: _body,
         );
+        if (!scheduled) {
+          _enabled = false;
+          _errorMessage = 'Izin notifikasi belum diberikan.';
+          await _hiveManager.saveDailyReminder(
+            userId,
+            enabled: false,
+            hour: _time.hour,
+            minute: _time.minute,
+            title: _title,
+            body: _body,
+          );
+        }
       }
     } catch (e) {
       _errorMessage = e.toString();
