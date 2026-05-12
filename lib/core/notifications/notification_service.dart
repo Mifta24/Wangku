@@ -59,6 +59,8 @@ class NotificationService {
   Future<void> showBudgetWarning({
     required double percent,
     required double remaining,
+    String title = 'Anggaran mendekati limit',
+    String? body,
   }) async {
     if (!_initialized) return;
 
@@ -74,8 +76,8 @@ class NotificationService {
 
     await _plugin.show(
       id: _budgetAlertId,
-      title: 'Anggaran mendekati limit',
-      body:
+      title: title,
+      body: body ??
           'Sudah terpakai ${(percent * 100).toStringAsFixed(0)}%. Sisa Rp ${remaining.toStringAsFixed(0)}.',
       notificationDetails: details,
     );
@@ -133,6 +135,8 @@ class NotificationService {
     required double percent,
     required double remaining,
     required String categoryId,
+    String? title,
+    String? body,
   }) async {
     if (!_initialized) return;
 
@@ -150,8 +154,8 @@ class NotificationService {
 
     await _plugin.show(
       id: notifId,
-      title: 'Batas anggaran $categoryName',
-      body:
+      title: title ?? 'Batas anggaran $categoryName',
+      body: body ??
           'Sudah terpakai ${(percent * 100).toStringAsFixed(0)}%. Sisa anggaran Rp ${remaining.toStringAsFixed(0)}.',
       notificationDetails: details,
     );

@@ -196,6 +196,13 @@ class TransactionProvider extends ChangeNotifier {
       if (index != -1) {
         _categories[index] = updated;
       }
+      _transactions = _transactions
+          .map(
+            (transaction) => transaction.categoryId == updated.id
+                ? transaction.copyWith(category: updated)
+                : transaction,
+          )
+          .toList();
       notifyListeners();
     } catch (e) {
       _setError('Gagal update kategori: ${e.toString()}');
@@ -207,6 +214,12 @@ class TransactionProvider extends ChangeNotifier {
   Future<void> deleteCategory(CategoryModel category) async {
     try {
       _clearError();
+      final isUsed = _transactions.any((t) => t.categoryId == category.id);
+      if (isUsed) {
+        throw Exception(
+          'Kategori masih dipakai transaksi. Ubah atau hapus transaksinya dulu.',
+        );
+      }
       await _repository.deleteCategory(category);
       _categories.removeWhere((c) => c.id == category.id);
       _customShortcuts.removeWhere((shortcut) => shortcut.categoryId == category.id);

@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../../../transactions/data/repositories/transaction_repository.dart';
 import '../../../transactions/domain/models/transaction_model.dart';
+import '../../../transactions/presentation/providers/transaction_provider.dart';
 
 enum PeriodType { week, month, year }
 enum TransactionType { expense, income }
@@ -52,11 +53,19 @@ class ReportProvider extends ChangeNotifier {
   double _incomeTotal = 0.0;
   double _expenseTotal = 0.0;
   bool _isLoading = false;
+  TransactionProvider? _transactionProvider;
 
   ReportProvider({String? userId}) : _userId = userId {
     if (_userId != null) {
       _loadData();
     }
+  }
+
+  void attachTransactionProvider(TransactionProvider provider) {
+    if (_transactionProvider == provider) return;
+    _transactionProvider?.removeListener(_onTransactionsChanged);
+    _transactionProvider = provider;
+    provider.addListener(_onTransactionsChanged);
   }
 
   void init(String userId) {
@@ -65,10 +74,16 @@ class ReportProvider extends ChangeNotifier {
     _loadData();
   }
 
+  void refreshFromTransactions(List<TransactionModel> transactions) {
+    _transactions = _filterTransactionsForCurrentPeriod(transactions);
+    _processData(notify: true);
+  }
+
   // Getters
   PeriodType get periodType => _periodType;
   TransactionType get transactionType => _transactionType;
   DateTime get currentDate => _currentDate;
+  List<TransactionModel> get transactions => List.unmodifiable(_transactions);
   List<CategoryDistribution> get categories => _categories;
   List<TrendPoint> get trendPoints => _trendPoints;
   double get totalAmount => _totalAmount;
@@ -86,7 +101,7 @@ class ReportProvider extends ChangeNotifier {
   void setTransactionType(TransactionType type) {
     if (_transactionType == type) return;
     _transactionType = type;
-    _processData(); // Doesn't need fetch, just re-filter
+      _processData(notify: true); // Doesn't need fetch, just re-filter
   }
 
   void nextPeriod() {
@@ -175,7 +190,7 @@ class ReportProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _processData() {
+  void _processData({bool notify = false}) {
     _incomeTotal = _transactions
         .where((t) => t.type == 'income')
         .fold(0.0, (sum, t) => sum + t.amount);
@@ -191,7 +206,7 @@ class ReportProvider extends ChangeNotifier {
 
     if (_totalAmount == 0) {
       _categories = [];
-      notifyListeners();
+      if (notify) notifyListeners();
       return;
     }
 
@@ -221,7 +236,47 @@ class ReportProvider extends ChangeNotifier {
 
     cats.sort((a, b) => b.total.compareTo(a.total));
     _categories = cats;
-    notifyListeners();
+    if (notify) notifyListeners();
+  }
+
+  List<TransactionModel> _filterTransactionsForCurrentPeriod(
+    List<TransactionModel> transactions,
+  ) {
+    final (start, end) = _currentPeriodRange();
+    return transactions
+        .where((t) => !t.date.isBefore(start) && t.date.isBefore(end))
+        .toList();
+  }
+
+  (DateTime, DateTime) _currentPeriodRange() {
+    switch (_periodType) {
+      case PeriodType.week:
+        final weekday = _currentDate.weekday;
+        final start = DateTime(
+          _currentDate.year,
+          _currentDate.month,
+          _currentDate.day,
+        ).subtract(Duration(days: weekday - 1));
+        return (start, start.add(const Duration(days: 7)));
+      case PeriodType.month:
+        final start = DateTime(_currentDate.year, _currentDate.month, 1);
+        return (start, DateTime(_currentDate.year, _currentDate.month + 1, 1));
+      case PeriodType.year:
+        final start = DateTime(_currentDate.year, 1, 1);
+        return (start, DateTime(_currentDate.year + 1, 1, 1));
+    }
+  }
+
+  void _onTransactionsChanged() {
+    final provider = _transactionProvider;
+    if (provider == null) return;
+    refreshFromTransactions(provider.transactions);
+  }
+
+  @override
+  void dispose() {
+    _transactionProvider?.removeListener(_onTransactionsChanged);
+    super.dispose();
   }
 
   List<TrendPoint> _buildTrendPoints() {

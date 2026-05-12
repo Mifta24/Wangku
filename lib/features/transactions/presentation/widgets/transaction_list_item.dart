@@ -45,9 +45,8 @@ class TransactionListItem extends StatelessWidget {
     final categoryColor = _parseHexColor(transaction.category?.color ?? '#94A3B8');
     final categoryIcon = transaction.category?.icon ?? '📝';
     final categoryName = transaction.category?.name ?? 'Uncategorized';
-    final note = transaction.note.trim().isEmpty
-        ? 'Tanpa catatan'
-        : transaction.note.trim();
+    final note = transaction.note.trim();
+    final hasNote = note.isNotEmpty;
 
     return InkWell(
       borderRadius: BorderRadius.circular(16.r),
@@ -75,7 +74,7 @@ class TransactionListItem extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    note,
+                    hasNote ? note : categoryName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.inter(
@@ -84,24 +83,26 @@ class TransactionListItem extends StatelessWidget {
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  SizedBox(height: 4.h),
-                  Row(
-                    children: [
-                      Text(categoryIcon, style: TextStyle(fontSize: 12.sp)),
-                      SizedBox(width: 4.w),
-                      Expanded(
-                        child: Text(
-                          categoryName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.inter(
-                            fontSize: 11.sp,
-                            color: AppColors.textSecondary,
+                  if (hasNote) ...[
+                    SizedBox(height: 4.h),
+                    Row(
+                      children: [
+                        Text(categoryIcon, style: TextStyle(fontSize: 12.sp)),
+                        SizedBox(width: 4.w),
+                        Expanded(
+                          child: Text(
+                            categoryName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 11.sp,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+                  ],
                   SizedBox(height: 4.h),
                   Text(
                     _formatDate(transaction.date),

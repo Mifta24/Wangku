@@ -138,9 +138,10 @@ class _ManageShortcutsSheetState extends State<ManageShortcutsSheet> {
                         return const SizedBox.shrink(key: ValueKey('missing-shortcut'));
                       }
                       final isIncome = cat.type == 'income';
+                      final color = _categoryColor(cat.color);
                       return ListTile(
                         key: ValueKey(cat.id),
-                        leading: Text(cat.icon, style: TextStyle(fontSize: 24.sp)),
+                        leading: _CategoryIcon(icon: cat.icon, color: color),
                         title: Text(cat.name, style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
                         subtitle: Text(
                           _shortcutSubtitle(shortcut, isIncome),
@@ -217,8 +218,9 @@ class _ManageShortcutsSheetState extends State<ManageShortcutsSheet> {
                     itemBuilder: (context, index) {
                       final cat = allCats[index];
                       final isAdded = _shortcuts.any((shortcut) => shortcut.categoryId == cat.id);
+                      final color = _categoryColor(cat.color);
                       return ListTile(
-                        leading: Text(cat.icon, style: TextStyle(fontSize: 24.sp)),
+                        leading: _CategoryIcon(icon: cat.icon, color: color),
                         title: Text(cat.name),
                         trailing: isAdded
                             ? const Icon(Icons.check, color: AppColors.success)
@@ -358,6 +360,38 @@ class _ManageShortcutsSheetState extends State<ManageShortcutsSheet> {
           ),
         );
       },
+    );
+  }
+
+  Color _categoryColor(String rawHex) {
+    try {
+      return Color(int.parse('FF${rawHex.replaceFirst('#', '')}', radix: 16));
+    } catch (_) {
+      return AppColors.primary;
+    }
+  }
+}
+
+class _CategoryIcon extends StatelessWidget {
+  const _CategoryIcon({
+    required this.icon,
+    required this.color,
+  });
+
+  final String icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 40.w,
+      height: 40.w,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(10.r),
+      ),
+      alignment: Alignment.center,
+      child: Text(icon, style: TextStyle(fontSize: 20.sp)),
     );
   }
 }

@@ -76,6 +76,7 @@ class _BudgetPageState extends State<BudgetPage> {
     );
     final parentContext = context;
     BuildContext? sheetContext;
+    bool isSaving = false;
 
     try {
       await showModalBottomSheet<void>(
@@ -87,68 +88,77 @@ class _BudgetPageState extends State<BudgetPage> {
         ),
         builder: (context) {
           sheetContext = context;
-          return SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Anggaran ${category.name}',
-                    style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 12),
-                  AppTextField(
-                    controller: controller,
-                    hintText: 'Masukkan anggaran kategori (Rp)',
-                    prefixIcon: Icons.savings_outlined,
-                    keyboardType: TextInputType.number,
-                  ),
-                  const SizedBox(height: 16),
-                  AppButton(
-                    label: 'Simpan Anggaran',
-                    onPressed: budgetProvider.isLoading
-                        ? null
-                        : () async {
-                            final raw = controller.text.replaceAll(RegExp(r'[^0-9]'), '');
-                            final amount = double.tryParse(raw);
-                            if (amount == null || amount <= 0) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Anggaran harus lebih dari 0'),
-                                  backgroundColor: AppColors.error,
-                                ),
-                              );
-                              return;
-                            }
+          return StatefulBuilder(
+            builder: (context, setSheetState) {
+              final raw = controller.text.replaceAll(RegExp(r'[^0-9]'), '');
+              final amount = double.tryParse(raw);
+              final canSave =
+                  !isSaving && !budgetProvider.isLoading && amount != null && amount > 0;
 
-                            await budgetProvider.saveCategoryBudget(
-                              userId,
-                              category.id,
-                              amount,
-                            );
-                            if (sheetContext?.mounted != true) return;
-                            Navigator.pop(sheetContext!);
-                            if (!parentContext.mounted) return;
-                            ScaffoldMessenger.of(parentContext).showSnackBar(
-                              SnackBar(
-                                content: Text('Anggaran ${category.name} disimpan'),
-                                backgroundColor: AppColors.success,
-                              ),
-                            );
-                          },
-                    isLoading: budgetProvider.isLoading,
-                    icon: Icons.check_circle_outline,
+              return SingleChildScrollView(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    left: 20,
+                    right: 20,
+                    top: 20,
+                    bottom: MediaQuery.of(context).viewInsets.bottom + 20,
                   ),
-                ],
-              ),
-            ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'Anggaran ${category.name}',
+                        style: GoogleFonts.inter(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      AppTextField(
+                        controller: controller,
+                        hintText: 'Masukkan anggaran kategori (Rp)',
+                        prefixIcon: Icons.savings_outlined,
+                        keyboardType: TextInputType.number,
+                        onChanged: (_) => setSheetState(() {}),
+                      ),
+                      const SizedBox(height: 16),
+                      AppButton(
+                        label: isSaving ? 'Menyimpan...' : 'Simpan Anggaran',
+                        onPressed: canSave
+                            ? () async {
+                                setSheetState(() => isSaving = true);
+                                try {
+                                  await budgetProvider.saveCategoryBudget(
+                                    userId,
+                                    category.id,
+                                    amount!,
+                                  );
+                                  if (sheetContext?.mounted != true) return;
+                                  Navigator.pop(sheetContext!);
+                                  if (!parentContext.mounted) return;
+                                  ScaffoldMessenger.of(parentContext).showSnackBar(
+                                    SnackBar(
+                                      content:
+                                          Text('Anggaran ${category.name} disimpan'),
+                                      backgroundColor: AppColors.success,
+                                    ),
+                                  );
+                                } catch (_) {
+                                  if (context.mounted) {
+                                    setSheetState(() => isSaving = false);
+                                  }
+                                }
+                              }
+                            : null,
+                        isLoading: isSaving || budgetProvider.isLoading,
+                        icon: Icons.check_circle_outline,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           );
         },
       );
@@ -176,6 +186,7 @@ class _BudgetPageState extends State<BudgetPage> {
     final parentContext = context;
     BuildContext? sheetContext;
     CategoryModel? selected = categories.first;
+    bool isSaving = false;
 
     try {
       await showModalBottomSheet<void>(
@@ -189,6 +200,14 @@ class _BudgetPageState extends State<BudgetPage> {
           sheetContext = context;
           return StatefulBuilder(
             builder: (context, setSheetState) {
+              final raw = controller.text.replaceAll(RegExp(r'[^0-9]'), '');
+              final amount = double.tryParse(raw);
+              final canSave = !isSaving &&
+                  !budgetProvider.isLoading &&
+                  selected != null &&
+                  amount != null &&
+                  amount > 0;
+
               return SingleChildScrollView(
                 child: Padding(
                   padding: EdgeInsets.only(
@@ -213,11 +232,29 @@ class _BudgetPageState extends State<BudgetPage> {
                         initialValue: selected,
                         isExpanded: true,
                         items: categories.map((cat) {
+                          final color = Color(
+                            int.parse(
+                              'FF${cat.color.replaceFirst('#', '')}',
+                              radix: 16,
+                            ),
+                          );
                           return DropdownMenuItem(
                             value: cat,
                             child: Row(
                               children: [
-                                Text(_displayIcon(cat.icon)),
+                                Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: color.withValues(alpha: 0.16),
+                                    borderRadius: BorderRadius.circular(9),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    _displayIcon(cat.icon),
+                                    style: const TextStyle(fontSize: 16),
+                                  ),
+                                ),
                                 const SizedBox(width: 8),
                                 Expanded(child: Text(cat.name)),
                               ],
@@ -237,51 +274,39 @@ class _BudgetPageState extends State<BudgetPage> {
                         hintText: 'Masukkan anggaran kategori (Rp)',
                         prefixIcon: Icons.savings_outlined,
                         keyboardType: TextInputType.number,
+                        onChanged: (_) => setSheetState(() {}),
                       ),
                       const SizedBox(height: 16),
                       AppButton(
-                        label: 'Simpan Anggaran',
-                        onPressed: budgetProvider.isLoading
-                            ? null
-                            : () async {
-                                if (selected == null) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Pilih kategori terlebih dahulu'),
-                                      backgroundColor: AppColors.error,
+                        label: isSaving ? 'Menyimpan...' : 'Simpan Anggaran',
+                        onPressed: canSave
+                            ? () async {
+                                final category = selected!;
+                                setSheetState(() => isSaving = true);
+                                try {
+                                  await budgetProvider.saveCategoryBudget(
+                                    userId,
+                                    category.id,
+                                    amount!,
+                                  );
+                                  if (sheetContext?.mounted != true) return;
+                                  Navigator.pop(sheetContext!);
+                                  if (!parentContext.mounted) return;
+                                  ScaffoldMessenger.of(parentContext).showSnackBar(
+                                    SnackBar(
+                                      content:
+                                          Text('Anggaran ${category.name} disimpan'),
+                                      backgroundColor: AppColors.success,
                                     ),
                                   );
-                                  return;
+                                } catch (_) {
+                                  if (context.mounted) {
+                                    setSheetState(() => isSaving = false);
+                                  }
                                 }
-
-                                final raw = controller.text.replaceAll(RegExp(r'[^0-9]'), '');
-                                final amount = double.tryParse(raw);
-                                if (amount == null || amount <= 0) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Anggaran harus lebih dari 0'),
-                                      backgroundColor: AppColors.error,
-                                    ),
-                                  );
-                                  return;
-                                }
-
-                                await budgetProvider.saveCategoryBudget(
-                                  userId,
-                                  selected!.id,
-                                  amount,
-                                );
-                                if (sheetContext?.mounted != true) return;
-                                Navigator.pop(sheetContext!);
-                                if (!parentContext.mounted) return;
-                                ScaffoldMessenger.of(parentContext).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Anggaran ${selected!.name} disimpan'),
-                                    backgroundColor: AppColors.success,
-                                  ),
-                                );
-                              },
-                        isLoading: budgetProvider.isLoading,
+                              }
+                            : null,
+                        isLoading: isSaving || budgetProvider.isLoading,
                         icon: Icons.check_circle_outline,
                       ),
                     ],
@@ -410,23 +435,23 @@ class _BudgetPageState extends State<BudgetPage> {
                     ),
 
                     if (filteredCategories.isNotEmpty || _budgetFilter == BudgetFilter.warning) ...[
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 6,
-                        children: [
-                          ChoiceChip(
-                            label: const Text('Semua'),
-                            selected: _budgetFilter == BudgetFilter.budgeted,
-                            onSelected: (_) => setState(() => _budgetFilter = BudgetFilter.budgeted),
-                          ),
-                          ChoiceChip(
-                            label: const Text('>= 80%'),
-                            selected: _budgetFilter == BudgetFilter.warning,
-                            onSelected: (_) => setState(() => _budgetFilter = BudgetFilter.warning),
-                          ),
-                        ],
-                      ),
+                      // const SizedBox(height: 8),
+                      // Wrap(
+                      //   spacing: 8,
+                      //   runSpacing: 6,
+                      //   children: [
+                      //     ChoiceChip(
+                      //       label: const Text('Semua'),
+                      //       selected: _budgetFilter == BudgetFilter.budgeted,
+                      //       onSelected: (_) => setState(() => _budgetFilter = BudgetFilter.budgeted),
+                      //     ),
+                      //     ChoiceChip(
+                      //       label: const Text('>= 80%'),
+                      //       selected: _budgetFilter == BudgetFilter.warning,
+                      //       onSelected: (_) => setState(() => _budgetFilter = BudgetFilter.warning),
+                      //     ),
+                      //   ],
+                      // ),
                       const SizedBox(height: 8),
                       Row(
                         children: [

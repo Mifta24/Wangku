@@ -74,6 +74,7 @@ class _ReportsPageState extends State<ReportsPage> {
                               _buildDonutChart(report),
                               const SizedBox(height: 16),
                               _buildSelectedCategoryInfo(report),
+                              _buildSelectedCategoryTransactions(report),
                               const SizedBox(height: 32),
                               _buildCategoryList(report),
                             ],
@@ -862,7 +863,7 @@ class _ReportsPageState extends State<ReportsPage> {
             height: 42,
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.16),
-              shape: BoxShape.circle,
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Center(
               child: Text(
@@ -886,13 +887,13 @@ class _ReportsPageState extends State<ReportsPage> {
                     color: AppColors.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  'Sisa kategori lain ${_formatCurrency(remainingAmount)}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary),
-                ),
+                // const SizedBox(height: 3),
+                // Text(
+                //   'Sisa kategori lain ${_formatCurrency(remainingAmount)}',
+                //   maxLines: 1,
+                //   overflow: TextOverflow.ellipsis,
+                //   style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary),
+                // ),
               ],
             ),
           ),
@@ -916,6 +917,149 @@ class _ReportsPageState extends State<ReportsPage> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSelectedCategoryTransactions(ReportProvider report) {
+    final selectedCategory = _selectedCategory(report);
+    if (selectedCategory == null) return const SizedBox.shrink();
+
+    final type = report.transactionType == TransactionType.expense
+        ? 'expense'
+        : 'income';
+    final transactions = report.transactions
+        .where(
+          (transaction) =>
+              transaction.categoryId == selectedCategory.categoryId &&
+              transaction.type == type,
+        )
+        .toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+
+    if (transactions.isEmpty) return const SizedBox.shrink();
+
+    final color = Color(
+      int.parse('FF${selectedCategory.color.replaceFirst('#', '')}', radix: 16),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.receipt_long_outlined, color: color, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Rincian ${selectedCategory.name}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ),
+                Text(
+                  '${transactions.length} transaksi',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            ...transactions.take(5).map((transaction) {
+              final note = transaction.note.trim();
+              final title = note.isEmpty ? selectedCategory.name : note;
+              return Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        selectedCategory.icon.isNotEmpty
+                            ? selectedCategory.icon
+                            : '?',
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            DateFormat('d MMM yyyy, HH:mm', 'id_ID')
+                                .format(transaction.date),
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              color: AppColors.hint,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      _formatCurrency(transaction.amount),
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        color: color,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+            if (transactions.length > 5) ...[
+              const SizedBox(height: 10),
+              Text(
+                '+${transactions.length - 5} transaksi lainnya',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -954,7 +1098,7 @@ class _ReportsPageState extends State<ReportsPage> {
                         height: 38,
                         decoration: BoxDecoration(
                           color: color.withValues(alpha: isSelected ? 0.22 : 0.15),
-                          shape: BoxShape.circle,
+                          borderRadius: BorderRadius.circular(10),
                         ),
                         child: Center(
                           child: Text(

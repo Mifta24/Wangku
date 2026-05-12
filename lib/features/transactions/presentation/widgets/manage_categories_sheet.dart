@@ -286,8 +286,9 @@ class _CategoryList extends StatelessWidget {
       );
     } catch (e) {
       if (!context.mounted) return;
+      final message = e.toString().replaceFirst('Exception: ', '');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal hapus kategori: $e')),
+        SnackBar(content: Text(message)),
       );
     }
   }
@@ -325,25 +326,179 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
   ];
 
   final List<String> _emojiOptions = const [
+    '😀',
+    '😄',
+    '😊',
+    '😍',
+    '😎',
+    '🥳',
+    '🤩',
+    '😇',
+    '🤝',
+    '🙏',
+    '💪',
+    '🧠',
+    '👨‍👩‍👧‍👦',
+    '👶',
+    '🧒',
+    '👩',
+    '👨',
+    '👵',
+    '👴',
+    '🐶',
+    '🐱',
+    '🐟',
+    '🐔',
+    '🌱',
+    '🌿',
+    '🌻',
+    '🌙',
+    '⭐',
+    '☀️',
+    '🌧️',
+    '🔥',
+    '💧',
+    '🍚',
+    '🍜',
+    '🍕',
     '🍔',
-    '🚗',
-    '🎬',
-    '🛍️',
-    '⚕️',
-    '💡',
-    '📚',
-    '💰',
-    '🎁',
-    '💻',
-    '📈',
-    '🏠',
-    '✈️',
-    '🎮',
-    '📱',
-    '👗',
+    '🍟',
+    '🌭',
+    '🥪',
+    '🥗',
+    '🍱',
+    '🍲',
+    '🍛',
+    '🍣',
+    '🥘',
+    '🥩',
+    '🍗',
+    '🥚',
+    '🥛',
+    '🍎',
+    '🍌',
+    '🍊',
+    '🍉',
+    '🥑',
+    '🥕',
+    '🍞',
+    '🥐',
+    '🍰',
+    '🍫',
     '☕',
+    '🍵',
+    '🧃',
+    '🥤',
+    '🚲',
+    '🛵',
+    '🚗',
+    '🚕',
+    '🚌',
+    '🚆',
+    '✈️',
+    '🚢',
+    '⛽',
+    '🅿️',
+    '🛣️',
+    '🏠',
+    '🏡',
+    '🏢',
+    '🏦',
+    '🏥',
+    '🏫',
+    '🏪',
+    '🏨',
+    '🏬',
     '🛒',
+    '🛍️',
+    '🎟️',
+    '🎬',
+    '🎤',
+    '🎧',
+    '🎮',
+    '🎲',
+    '🎨',
+    '🎭',
+    '⚽',
+    '🏀',
+    '🏸',
+    '🏋️',
+    '🧘',
+    '🏖️',
+    '🏕️',
+    '🎁',
+    '🎂',
+    '🎉',
+    '⚕️',
+    '💊',
+    '💉',
+    '🩺',
+    '🦷',
+    '👓',
+    '🧴',
+    '🧼',
+    '🧹',
+    '🧺',
+    '🛠️',
+    '🔧',
+    '🔌',
+    '💡',
+    '🛏️',
+    '🛋️',
+    '🚿',
+    '🧻',
+    '👕',
+    '👖',
+    '👟',
+    '👗',
+    '💄',
+    '💅',
+    '💈',
+    '📦',
+    '📮',
+    '📚',
+    '✏️',
+    '🖊️',
+    '🖥️',
+    '💻',
+    '⌨️',
+    '🖱️',
+    '📱',
+    '📷',
+    '🖨️',
+    '💾',
+    '🔐',
+    '🌐',
+    '📶',
+    '📞',
+    '📺',
+    '🎓',
+    '💼',
+    '📊',
+    '📈',
+    '📉',
+    '🧾',
     '📝',
+    '📌',
+    '📅',
+    '⏰',
+    '💰',
+    '💵',
+    '💳',
+    '🏧',
+    '🪙',
+    '💸',
+    '🧮',
+    '✅',
+    '❌',
+    '⚠️',
+    '❤️',
+    '💙',
+    '💚',
+    '💛',
+    '💜',
+    '🤍',
+    '📚',
   ];
 
   @override
@@ -382,6 +537,19 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
               ),
             ),
             SizedBox(height: 20.h),
+            Center(
+              child: Container(
+                width: 56.w,
+                height: 56.w,
+                decoration: BoxDecoration(
+                  color: _parseHexColor(_selectedColor).withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(14.r),
+                ),
+                alignment: Alignment.center,
+                child: Text(_selectedIcon, style: TextStyle(fontSize: 28.sp)),
+              ),
+            ),
+            SizedBox(height: 16.h),
             TextField(
               controller: _nameController,
               decoration: const InputDecoration(
@@ -391,35 +559,50 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
             ),
             SizedBox(height: 16.h),
             Text(
-              'Pilih Icon',
+              'Pilih Ikon',
               style: GoogleFonts.inter(fontWeight: FontWeight.w600),
             ),
             SizedBox(height: 8.h),
-            Wrap(
-              spacing: 8.w,
-              runSpacing: 8.h,
-              children: _emojiOptions.map((emoji) {
-                final selected = _selectedIcon == emoji;
-                return InkWell(
-                  onTap: () => setState(() => _selectedIcon = emoji),
-                  borderRadius: BorderRadius.circular(8.r),
-                  child: Container(
-                    width: 40.w,
-                    height: 40.w,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? AppColors.primary.withValues(alpha: 0.18)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(8.r),
-                      border: Border.all(
-                        color: selected ? AppColors.primary : AppColors.border,
+            Container(
+              height: 190.h,
+              padding: EdgeInsets.all(8.w),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12.r),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: GridView.builder(
+                itemCount: _emojiOptions.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 6,
+                  crossAxisSpacing: 8.w,
+                  mainAxisSpacing: 8.h,
+                ),
+                itemBuilder: (context, index) {
+                  final emoji = _emojiOptions[index];
+                  final selected = _selectedIcon == emoji;
+                  return InkWell(
+                    onTap: () => setState(() => _selectedIcon = emoji),
+                    borderRadius: BorderRadius.circular(8.r),
+                    child: Container(
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? _parseHexColor(
+                                _selectedColor,
+                              ).withValues(alpha: 0.16)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8.r),
+                        border: Border.all(
+                          color: selected
+                              ? _parseHexColor(_selectedColor)
+                              : AppColors.border,
+                        ),
                       ),
+                      child: Text(emoji, style: TextStyle(fontSize: 22.sp)),
                     ),
-                    child: Text(emoji, style: TextStyle(fontSize: 22.sp)),
-                  ),
-                );
-              }).toList(),
+                  );
+                },
+              ),
             ),
             SizedBox(height: 16.h),
             Text(
@@ -501,5 +684,14 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
       type: widget.category?.type ?? widget.type,
     );
     Navigator.pop(context, category);
+  }
+
+  Color _parseHexColor(String rawHex) {
+    try {
+      final hex = rawHex.replaceFirst('#', '');
+      return Color(int.parse('FF$hex', radix: 16));
+    } catch (_) {
+      return AppColors.primary;
+    }
   }
 }

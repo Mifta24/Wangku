@@ -419,11 +419,17 @@ class HiveManager {
   Future<void> saveBudgetNotificationSettings(
     String userId, {
     required bool enabled,
+    double threshold = 0.8,
+    String title = 'Anggaran mendekati limit',
+    String body = 'Sudah terpakai {percent}%. Sisa {remaining}.',
   }) async {
     try {
       final box = _budgetBoxInstance ?? await Hive.openBox<dynamic>(_budgetBox);
       await box.put('${userId}_budget_notification', {
         'enabled': enabled,
+        'threshold': threshold,
+        'title': title,
+        'body': body,
         'updatedAt': DateTime.now().toIso8601String(),
       });
     } catch (e) {

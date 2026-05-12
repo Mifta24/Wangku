@@ -86,7 +86,14 @@ void main() async {
               budgetProvider ?? BudgetProvider(txnProvider: txnProvider),
         ),
         ChangeNotifierProvider(create: (_) => ReminderProvider()),
-        ChangeNotifierProvider(create: (_) => ReportProvider()),
+        ChangeNotifierProxyProvider<TransactionProvider, ReportProvider>(
+          create: (_) => ReportProvider(),
+          update: (_, txnProvider, reportProvider) {
+            final provider = reportProvider ?? ReportProvider();
+            provider.attachTransactionProvider(txnProvider);
+            return provider;
+          },
+        ),
       ],
       child: const WangkuApp(),
     ),

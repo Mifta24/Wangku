@@ -14,6 +14,7 @@ class AppTextField extends StatelessWidget {
     this.keyboardType,
     this.obscureText = false,
     this.suffixIcon,
+    this.onChanged,
   });
 
   final TextEditingController controller;
@@ -23,6 +24,7 @@ class AppTextField extends StatelessWidget {
   final TextInputType? keyboardType;
   final bool obscureText;
   final Widget? suffixIcon;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +34,7 @@ class AppTextField extends StatelessWidget {
       obscureText: obscureText,
       style: GoogleFonts.inter(fontSize: 14.sp),
       validator: validator,
+      onChanged: onChanged,
       decoration: InputDecoration(
         hintText: hintText,
         hintStyle: GoogleFonts.inter(color: AppColors.hint),
