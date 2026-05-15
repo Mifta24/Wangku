@@ -452,6 +452,17 @@ class HiveManager {
     }
   }
 
+  /// Delete category budget
+  Future<void> deleteCategoryBudget(String userId, String categoryId) async {
+    try {
+      final box = _budgetBoxInstance ?? await Hive.openBox<dynamic>(_budgetBox);
+      await box.delete('${userId}_category_budget_$categoryId');
+    } catch (e) {
+      debugPrint('Error deleting category budget: $e');
+      rethrow;
+    }
+  }
+
   Future<void> deleteCategory(String id) async {
     try {
       final box = _catBox ?? await Hive.openBox<dynamic>(_categoriesBox);

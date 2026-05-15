@@ -187,7 +187,6 @@ class TransactionService {
           .from(_categoriesTable)
           .update(data)
           .eq('id', category.id)
-          .eq('user_id', category.userId!)
           .select()
           .single();
 

@@ -165,6 +165,7 @@ class TransactionRepository implements ITransactionRepository {
       await _hiveManager.saveCategory(updated);
       return updated;
     } catch (e) {
+      // Fallback: update di Hive saja (offline)
       await _hiveManager.saveCategory(category);
       return category;
     }

@@ -59,8 +59,6 @@ class NotificationService {
   Future<void> showBudgetWarning({
     required double percent,
     required double remaining,
-    String title = 'Anggaran mendekati limit',
-    String? body,
   }) async {
     if (!_initialized) return;
 
@@ -74,11 +72,16 @@ class NotificationService {
       iOS: const DarwinNotificationDetails(),
     );
 
+    final isOver = percent >= 1.0;
+    final title = isOver ? 'Anggaran Habis!' : 'Peringatan Anggaran!';
+    final body = isOver
+        ? 'Total pengeluaran kamu sudah melebihi batas anggaran! Yuk, evaluasi lagi.'
+        : 'Total pengeluaran kamu sudah mencapai ${(percent * 100).toStringAsFixed(0)}% dari anggaran. Hemat-hemat ya.';
+
     await _plugin.show(
       id: _budgetAlertId,
       title: title,
-      body: body ??
-          'Sudah terpakai ${(percent * 100).toStringAsFixed(0)}%. Sisa Rp ${remaining.toStringAsFixed(0)}.',
+      body: body,
       notificationDetails: details,
     );
   }
@@ -135,8 +138,6 @@ class NotificationService {
     required double percent,
     required double remaining,
     required String categoryId,
-    String? title,
-    String? body,
   }) async {
     if (!_initialized) return;
 
@@ -151,14 +152,33 @@ class NotificationService {
     );
 
     final notifId = 3000 + (categoryId.hashCode.abs() % 1000);
+    final isOver = percent >= 1.0;
+    final title = isOver ? 'Anggaran Habis!' : 'Peringatan Anggaran!';
+    final body = isOver
+        ? 'Wah, pengeluaranmu di $categoryName sudah melebihi batas! Yuk, evaluasi lagi.'
+        : 'Wah, Anggaran Kategori $categoryName kamu sisa ${_formatRupiah(remaining)} lagi, hemat-hemat ya.';
 
     await _plugin.show(
       id: notifId,
-      title: title ?? 'Batas anggaran $categoryName',
-      body: body ??
-          'Sudah terpakai ${(percent * 100).toStringAsFixed(0)}%. Sisa anggaran Rp ${remaining.toStringAsFixed(0)}.',
+      title: title,
+      body: body,
       notificationDetails: details,
     );
+  }
+
+  String _formatRupiah(double amount) {
+    final absAmount = amount.abs().toStringAsFixed(0);
+    String result = '';
+    int count = 0;
+    for (int i = absAmount.length - 1; i >= 0; i--) {
+      result = absAmount[i] + result;
+      count++;
+      if (count == 3 && i > 0) {
+        result = '.$result';
+        count = 0;
+      }
+    }
+    return 'Rp $result';
   }
 
   Future<void> cancelDailyReminder() async {

@@ -19,7 +19,6 @@ import '../../../reports/presentation/providers/report_provider.dart';
 import '../../../transactions/presentation/providers/transaction_provider.dart';
 import '../../../transactions/domain/models/transaction_model.dart';
 import '../../../transactions/domain/models/category_model.dart';
-import '../../../transactions/domain/models/shortcut_model.dart';
 import '../../../transactions/presentation/widgets/manage_categories_sheet.dart';
 import '../../../transactions/presentation/pages/transaction_list_page.dart';
 import '../../../reports/presentation/pages/reports_page.dart';
@@ -49,7 +48,6 @@ class _DashboardPageState extends State<DashboardPage> {
   void initState() {
     super.initState();
 
-    // Initialize transaction provider when dashboard loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final authProvider = context.read<AuthProvider>();
@@ -73,7 +71,6 @@ class _DashboardPageState extends State<DashboardPage> {
     super.dispose();
   }
 
-  /// Format currency ke Rupiah
   String _formatCurrency(double amount) {
     final formatter = NumberFormat.currency(
       locale: 'id_ID',
@@ -92,8 +89,7 @@ class _DashboardPageState extends State<DashboardPage> {
     final txnProvider = context.read<TransactionProvider>();
     final authProvider = context.read<AuthProvider>();
     final parentContext = context;
-    
-    // Bersihkan form
+
     _amountController.text = initialAmount == null
         ? ''
         : initialAmount.toStringAsFixed(initialAmount.truncateToDouble() == initialAmount ? 0 : 2);
@@ -106,365 +102,576 @@ class _DashboardPageState extends State<DashboardPage> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.surface,
+      backgroundColor: Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
       ),
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 20.w,
-            right: 20.w,
-            top: 20.h,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 20.h,
-          ),
+        return SizedBox(
+          height: MediaQuery.of(context).size.height * 0.82,
           child: StatefulBuilder(
             builder: (context, setSheetState) {
-              // Filter kategori berdasarkan tipe
               final categories = selectedType == 'income'
                   ? txnProvider.incomeCategories
                   : txnProvider.expenseCategories;
+              final frequent =
+                  txnProvider.getFrequentCategories(selectedType, limit: 4);
+              final showForm = _selectedCategoryId != null;
+              final selectedCat = showForm
+                  ? categories.cast<CategoryModel?>().firstWhere(
+                      (c) => c?.id == _selectedCategoryId,
+                      orElse: () => null)
+                  : null;
               final amount = double.tryParse(_amountController.text.trim());
-              final canSave =
-                  !isSaving && amount != null && amount > 0 && _selectedCategoryId != null;
+              final canSave = !isSaving && amount != null && amount > 0;
 
-              return SingleChildScrollView(
+              Widget catItem(CategoryModel cat) {
+                final isSelected = _selectedCategoryId == cat.id;
+                final color = Color(int.parse(
+                    'FF${cat.color.replaceFirst('#', '')}',
+                    radix: 16));
+                return GestureDetector(
+                  onTap: () =>
+                      setSheetState(() => _selectedCategoryId = cat.id),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        width: 56.w,
+                        height: 56.w,
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? color
+                              : color.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            cat.icon.isNotEmpty ? cat.icon : '?',
+                            style: TextStyle(fontSize: 22.sp),
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 5.h),
+                      Text(
+                        cat.name,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 11.sp,
+                          color: isSelected ? color : AppColors.textPrimary,
+                          fontWeight: isSelected
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              return Padding(
+                padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(context).viewInsets.bottom),
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      'Quick Add Transaksi',
-                      style: GoogleFonts.inter(
-                        fontSize: 18.sp,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    SizedBox(height: 16.h),
-                    // Type selector (Income/Expense)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () {
-                              setSheetState(() {
-                                selectedType = 'expense';
-                                _selectedCategoryId = null;
-                              });
-                            },
-                            style: OutlinedButton.styleFrom(
-                              backgroundColor: selectedType == 'expense'
-                                  ? AppColors.expense.withValues(alpha: 0.2)
-                                  : Colors.transparent,
-                              side: BorderSide(
-                                color: selectedType == 'expense'
-                                    ? AppColors.expense
-                                    : Colors.grey,
-                              ),
-                            ),
-                            child: Text(
-                              'Pengeluaran',
-                              style: TextStyle(
-                                color: selectedType == 'expense'
-                                    ? AppColors.expense
-                                    : Colors.grey,
-                              ),
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: 12.w),
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () {
-                              setSheetState(() {
-                                selectedType = 'income';
-                                _selectedCategoryId = null;
-                              });
-                            },
-                            style: OutlinedButton.styleFrom(
-                              backgroundColor: selectedType == 'income'
-                                  ? AppColors.income.withValues(alpha: 0.2)
-                                  : Colors.transparent,
-                              side: BorderSide(
-                                color: selectedType == 'income'
-                                    ? AppColors.income
-                                    : Colors.grey,
-                              ),
-                            ),
-                            child: Text(
-                              'Pemasukan',
-                              style: TextStyle(
-                                color: selectedType == 'income'
-                                    ? AppColors.income
-                                    : Colors.grey,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 16.h),
-                    // Sering Digunakan
-                    Builder(
-                      builder: (context) {
-                        final frequentCategories = txnProvider.getFrequentCategories(selectedType, limit: 4);
-                        if (frequentCategories.isEmpty) return const SizedBox.shrink();
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Sering Digunakan',
-                              style: GoogleFonts.inter(
-                                fontSize: 12.sp,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                            SizedBox(height: 8.h),
-                            Wrap(
-                              spacing: 8.w,
-                              runSpacing: 8.h,
-                              children: [
-                                for (final cat in frequentCategories)
-                                  _buildCategoryChip(cat, _selectedCategoryId, (id) {
-                                    setSheetState(() => _selectedCategoryId = id);
-                                  }),
-                              ],
-                            ),
-                            SizedBox(height: 16.h),
-                          ],
-                        );
-                      }
-                    ),
-                    // Category selector
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Semua Kategori',
-                          style: GoogleFonts.inter(
-                            fontSize: 12.sp,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        SizedBox(height: 8.h),
-                        Wrap(
-                          spacing: 8.w,
-                          runSpacing: 8.h,
-                          children: [
-                            if (categories.isNotEmpty)
-                              for (final cat in categories)
-                                _buildCategoryChip(cat, _selectedCategoryId, (id) {
-                                  setSheetState(() => _selectedCategoryId = id);
-                                }),
-                            
-                            // Tambah Kategori Baru
-                            GestureDetector(
-                              onTap: () async {
-                                final result = await showDialog<CategoryModel>(
-                                  context: context,
-                                  builder: (context) => AddCategoryDialog(type: selectedType),
-                                );
-                                if (result != null) {
-                                  setSheetState(() => _selectedCategoryId = result.id);
-                                }
-                              },
-                              child: Container(
-                                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(20.r),
-                                  border: Border.all(color: AppColors.primary),
-                                  color: AppColors.primary.withValues(alpha: 0.1),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.add, size: 14.sp, color: AppColors.primary),
-                                    SizedBox(width: 4.w),
-                                    Text(
-                                      'Baru',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 12.sp,
-                                        fontWeight: FontWeight.w500,
-                                        color: AppColors.primary,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 16.h),
-                      ],
-                    ),
-                    // Amount input
-                    AppTextField(
-                      controller: _amountController,
-                      hintText: 'Jumlah (Rp)',
-                      prefixIcon: LucideIcons.wallet,
-                      keyboardType: TextInputType.number,
-                      onChanged: (_) => setSheetState(() {}),
-                    ),
-                    SizedBox(height: 12.h),
-                    // Note input
-                    AppTextField(
-                      controller: _noteController,
-                      hintText: 'Catatan (opsional)',
-                      prefixIcon: Icons.note_alt_outlined,
-                    ),
-                    SizedBox(height: 16.h),
-                    OutlinedButton(
-                      onPressed: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: selectedDate,
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime.now().add(
-                            const Duration(days: 365),
-                          ),
-                          helpText: 'Pilih Tanggal Transaksi',
-                          cancelText: 'Batal',
-                          confirmText: 'Pilih',
-                        );
-                        if (picked == null) return;
-                        setSheetState(() => selectedDate = picked);
-                      },
-                      style: OutlinedButton.styleFrom(
-                        alignment: Alignment.centerLeft,
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 14.w,
-                          vertical: 14.h,
-                        ),
-                        side: const BorderSide(color: AppColors.border),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12.r),
+                    // ── Drag handle ──
+                    Center(
+                      child: Container(
+                        margin: EdgeInsets.only(top: 12.h, bottom: 8.h),
+                        width: 40.w,
+                        height: 4.h,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(2.r),
                         ),
                       ),
+                    ),
+
+                    // ── Header ──
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20.w),
                       child: Row(
                         children: [
-                          Icon(
-                            Icons.calendar_today_outlined,
-                            size: 18.sp,
-                            color: AppColors.textSecondary,
-                          ),
-                          SizedBox(width: 12.w),
+                          if (showForm)
+                            GestureDetector(
+                              onTap: () => setSheetState(
+                                  () => _selectedCategoryId = null),
+                              child: Container(
+                                padding: EdgeInsets.all(6.w),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.withValues(alpha: 0.12),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(Icons.arrow_back,
+                                    size: 18.sp,
+                                    color: AppColors.textSecondary),
+                              ),
+                            )
+                          else
+                            SizedBox(width: 30.w),
                           Expanded(
                             child: Text(
-                              DateFormat(
-                                'd MMMM yyyy',
-                                'id_ID',
-                              ).format(selectedDate),
+                              showForm
+                                  ? (selectedCat != null
+                                      ? '${selectedCat.icon}  ${selectedCat.name}'
+                                      : 'Tambah Transaksi')
+                                  : 'Pilih Kategori',
+                              textAlign: TextAlign.center,
                               style: GoogleFonts.inter(
-                                fontSize: 14.sp,
-                                fontWeight: FontWeight.w500,
+                                fontSize: 16.sp,
+                                fontWeight: FontWeight.w700,
                                 color: AppColors.textPrimary,
                               ),
                             ),
                           ),
-                          Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            color: AppColors.textSecondary,
-                            size: 20.sp,
+                          GestureDetector(
+                            onTap: () => Navigator.pop(context),
+                            child: Container(
+                              padding: EdgeInsets.all(6.w),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.withValues(alpha: 0.12),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(Icons.close,
+                                  size: 18.sp,
+                                  color: AppColors.textSecondary),
+                            ),
                           ),
                         ],
                       ),
                     ),
                     SizedBox(height: 16.h),
-                    // Save button
-                    AppButton(
-                      label: isSaving ? 'Menyimpan...' : 'Simpan Cepat',
-                      icon: LucideIcons.plus,
-                      isLoading: isSaving,
-                      onPressed: canSave ? () async {
-                        if (isSaving) return;
-                        final amount = double.tryParse(_amountController.text);
-                        if (amount == null || amount <= 0) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Jumlah harus lebih dari 0'),
-                              backgroundColor: AppColors.error,
-                            ),
-                          );
-                          return;
-                        }
 
-                        if (_selectedCategoryId == null) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Pilih kategori terlebih dahulu'),
-                              backgroundColor: AppColors.error,
-                            ),
-                          );
-                          return;
-                        }
+                    // ── Toggle Pemasukan / Pengeluaran ──
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20.w),
+                      child: Container(
+                        padding: EdgeInsets.all(3.w),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(24.r),
+                        ),
+                        child: Row(
+                          children: [
+                            for (final entry in const {
+                              'income': 'Pemasukan',
+                              'expense': 'Pengeluaran',
+                            }.entries)
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => setSheetState(() {
+                                    selectedType = entry.key;
+                                    _selectedCategoryId = null;
+                                  }),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    padding:
+                                        EdgeInsets.symmetric(vertical: 10.h),
+                                    decoration: BoxDecoration(
+                                      color: selectedType == entry.key
+                                          ? (entry.key == 'income'
+                                              ? AppColors.income
+                                              : AppColors.expense)
+                                          : Colors.transparent,
+                                      borderRadius:
+                                          BorderRadius.circular(20.r),
+                                    ),
+                                    child: Text(
+                                      entry.value,
+                                      textAlign: TextAlign.center,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 14.sp,
+                                        fontWeight: FontWeight.w600,
+                                        color: selectedType == entry.key
+                                            ? Colors.white
+                                            : AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 12.h),
 
-                        setSheetState(() => isSaving = true);
-                        try {
-                          final newTxn = TransactionModel(
-                            id: '', // Will be generated by repository
-                            userId: authProvider.currentUser!.id,
-                            categoryId: _selectedCategoryId!,
-                            amount: amount,
-                            note: _noteController.text,
-                            date: DateTime(
-                              selectedDate.year,
-                              selectedDate.month,
-                              selectedDate.day,
-                              DateTime.now().hour,
-                              DateTime.now().minute,
-                              DateTime.now().second,
-                            ),
-                            type: selectedType,
-                          );
+                    // ── Content: grid or form ──
+                    Expanded(
+                      child: showForm
+                          // ── Form view ──
+                          ? SingleChildScrollView(
+                              padding: EdgeInsets.symmetric(horizontal: 20.w),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  SizedBox(height: 4.h),
+                                  // Jumlah
+                                  Text(
+                                    'Jumlah',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13.sp,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  SizedBox(height: 6.h),
+                                  AppTextField(
+                                    controller: _amountController,
+                                    hintText: 'Rp 0',
+                                    prefixIcon: LucideIcons.wallet,
+                                    keyboardType: TextInputType.number,
+                                    onChanged: (_) => setSheetState(() {}),
+                                  ),
+                                  SizedBox(height: 16.h),
 
-                          await txnProvider.addTransaction(
-                            newTxn,
-                            authProvider.currentUser!.id,
-                          );
-                          parentContext
-                              .read<ReportProvider>()
-                              .refreshFromTransactions(txnProvider.transactions);
+                                  // Catatan
+                                  Text(
+                                    'Catatan (opsional)',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13.sp,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  SizedBox(height: 6.h),
+                                  AppTextField(
+                                    controller: _noteController,
+                                    hintText: 'Tulis catatan...',
+                                    prefixIcon: Icons.note_alt_outlined,
+                                  ),
+                                  SizedBox(height: 16.h),
 
-                          // Cek notifikasi anggaran kategori jika pengeluaran
-                          if (selectedType == 'expense' && _selectedCategoryId != null) {
-                            final cat = txnProvider.categories
-                                .cast<CategoryModel?>()
-                                .firstWhere(
-                                  (c) => c?.id == _selectedCategoryId,
-                                  orElse: () => null,
-                                );
-                            if (cat != null) {
-                              await _budgetProvider.checkCategoryWarningAfterTransaction(
-                                _selectedCategoryId!,
-                                cat.name,
-                              );
-                            }
-                          }
+                                  // Tanggal
+                                  Text(
+                                    'Tanggal',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13.sp,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  SizedBox(height: 6.h),
+                                  GestureDetector(
+                                    onTap: () async {
+                                      final picked = await showDatePicker(
+                                        context: context,
+                                        initialDate: selectedDate,
+                                        firstDate: DateTime(2000),
+                                        lastDate: DateTime.now()
+                                            .add(const Duration(days: 365)),
+                                        helpText: 'Pilih Tanggal Transaksi',
+                                        cancelText: 'Batal',
+                                        confirmText: 'Pilih',
+                                      );
+                                      if (picked == null) return;
+                                      setSheetState(
+                                          () => selectedDate = picked);
+                                    },
+                                    child: Container(
+                                      padding: EdgeInsets.symmetric(
+                                          horizontal: 14.w, vertical: 14.h),
+                                      decoration: BoxDecoration(
+                                        border: Border.all(
+                                            color: AppColors.border),
+                                        borderRadius:
+                                            BorderRadius.circular(12.r),
+                                        color: Colors.white,
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              DateFormat(
+                                                      'd MMMM yyyy', 'id_ID')
+                                                  .format(selectedDate),
+                                              style: GoogleFonts.inter(
+                                                fontSize: 14.sp,
+                                                fontWeight: FontWeight.w500,
+                                                color: AppColors.textPrimary,
+                                              ),
+                                            ),
+                                          ),
+                                          Icon(Icons.calendar_today_outlined,
+                                              size: 18.sp,
+                                              color: AppColors.textSecondary),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(height: 24.h),
 
-                          if (!parentContext.mounted) return;
-                          Navigator.pop(parentContext);
-                          ScaffoldMessenger.of(parentContext).showSnackBar(
-                            const SnackBar(
-                              content: Text('Transaksi berhasil ditambahkan'),
-                              backgroundColor: AppColors.success,
+                                  // Save button
+                                  AppButton(
+                                    label: 'Simpan Transaksi',
+                                    isLoading: isSaving,
+                                    onPressed: canSave
+                                        ? () async {
+                                            if (isSaving) return;
+                                            final amount = double.tryParse(
+                                                _amountController.text);
+                                            if (amount == null || amount <= 0) {
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                      'Jumlah harus lebih dari 0'),
+                                                  backgroundColor:
+                                                      AppColors.error,
+                                                ),
+                                              );
+                                              return;
+                                            }
+                                            if (_selectedCategoryId == null) {
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                      'Pilih kategori terlebih dahulu'),
+                                                  backgroundColor:
+                                                      AppColors.error,
+                                                ),
+                                              );
+                                              return;
+                                            }
+                                            setSheetState(
+                                                () => isSaving = true);
+                                            try {
+                                              final newTxn = TransactionModel(
+                                                id: '',
+                                                userId: authProvider
+                                                    .currentUser!.id,
+                                                categoryId:
+                                                    _selectedCategoryId!,
+                                                amount: amount,
+                                                note: _noteController.text,
+                                                date: DateTime(
+                                                  selectedDate.year,
+                                                  selectedDate.month,
+                                                  selectedDate.day,
+                                                  DateTime.now().hour,
+                                                  DateTime.now().minute,
+                                                  DateTime.now().second,
+                                                ),
+                                                type: selectedType,
+                                              );
+                                              await txnProvider.addTransaction(
+                                                  newTxn,
+                                                  authProvider.currentUser!.id);
+                                              if (!parentContext.mounted) {
+                                                return;
+                                              }
+                                              parentContext
+                                                  .read<ReportProvider>()
+                                                  .refreshFromTransactions(
+                                                      txnProvider.transactions);
+                                              if (selectedType == 'expense' &&
+                                                  _selectedCategoryId != null) {
+                                                final cat = txnProvider
+                                                    .categories
+                                                    .cast<CategoryModel?>()
+                                                    .firstWhere(
+                                                      (c) =>
+                                                          c?.id ==
+                                                          _selectedCategoryId,
+                                                      orElse: () => null,
+                                                    );
+                                                if (cat != null) {
+                                                  await _budgetProvider
+                                                      .checkCategoryWarningAfterTransaction(
+                                                    _selectedCategoryId!,
+                                                    cat.name,
+                                                  );
+                                                }
+                                              }
+                                              if (!parentContext.mounted) {
+                                                return;
+                                              }
+                                              Navigator.pop(parentContext);
+                                              ScaffoldMessenger.of(parentContext)
+                                                  .showSnackBar(
+                                                const SnackBar(
+                                                  content: Text(
+                                                      'Transaksi berhasil ditambahkan'),
+                                                  backgroundColor:
+                                                      AppColors.success,
+                                                ),
+                                              );
+                                            } catch (e) {
+                                              if (context.mounted) {
+                                                setSheetState(
+                                                    () => isSaving = false);
+                                              }
+                                              if (!parentContext.mounted) {
+                                                return;
+                                              }
+                                              ScaffoldMessenger.of(parentContext)
+                                                  .showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                      'Error: ${e.toString()}'),
+                                                  backgroundColor:
+                                                      AppColors.error,
+                                                ),
+                                              );
+                                            }
+                                          }
+                                        : null,
+                                  ),
+                                  SizedBox(height: 16.h),
+                                ],
+                              ),
+                            )
+                          // ── Category grid view ──
+                          : CustomScrollView(
+                              slivers: [
+                                // Sering Digunakan
+                                if (frequent.isNotEmpty) ...[
+                                  SliverToBoxAdapter(
+                                    child: Padding(
+                                      padding: EdgeInsets.symmetric(
+                                          horizontal: 20.w),
+                                      child: Text(
+                                        'Sering Digunakan',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 12.sp,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  SliverToBoxAdapter(
+                                      child: SizedBox(height: 10.h)),
+                                  SliverToBoxAdapter(
+                                    child: Padding(
+                                      padding: EdgeInsets.symmetric(
+                                          horizontal: 20.w),
+                                      child: GridView.count(
+                                        crossAxisCount: 4,
+                                        shrinkWrap: true,
+                                        physics:
+                                            const NeverScrollableScrollPhysics(),
+                                        mainAxisSpacing: 12.h,
+                                        crossAxisSpacing: 8.w,
+                                        childAspectRatio: 0.78,
+                                        children:
+                                            frequent.map(catItem).toList(),
+                                      ),
+                                    ),
+                                  ),
+                                  SliverToBoxAdapter(
+                                      child: SizedBox(height: 16.h)),
+                                  SliverToBoxAdapter(
+                                    child: Divider(
+                                      color: AppColors.border,
+                                      height: 1.h,
+                                      indent: 20.w,
+                                      endIndent: 20.w,
+                                    ),
+                                  ),
+                                  SliverToBoxAdapter(
+                                      child: SizedBox(height: 16.h)),
+                                ],
+
+                                // Semua Kategori label
+                                SliverToBoxAdapter(
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(
+                                        horizontal: 20.w),
+                                    child: Text(
+                                      'Semua Kategori',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12.sp,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                SliverToBoxAdapter(
+                                    child: SizedBox(height: 10.h)),
+
+                                // 4-column grid
+                                SliverPadding(
+                                  padding: EdgeInsets.symmetric(
+                                      horizontal: 20.w),
+                                  sliver: SliverGrid(
+                                    gridDelegate:
+                                        SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 4,
+                                      mainAxisSpacing: 12.h,
+                                      crossAxisSpacing: 8.w,
+                                      childAspectRatio: 0.78,
+                                    ),
+                                    delegate: SliverChildBuilderDelegate(
+                                      (context, index) {
+                                        if (index == categories.length) {
+                                          return GestureDetector(
+                                            onTap: () async {
+                                              final result = await showDialog<
+                                                  CategoryModel>(
+                                                context: context,
+                                                builder: (ctx) =>
+                                                    AddCategoryDialog(
+                                                        type: selectedType),
+                                              );
+                                              if (result != null) {
+                                                setSheetState(() =>
+                                                    _selectedCategoryId =
+                                                        result.id);
+                                              }
+                                            },
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Container(
+                                                  width: 56.w,
+                                                  height: 56.w,
+                                                  decoration: BoxDecoration(
+                                                    color: AppColors.primary
+                                                        .withValues(alpha: 0.1),
+                                                    shape: BoxShape.circle,
+                                                    border: Border.all(
+                                                      color: AppColors.primary,
+                                                      width: 1.5,
+                                                    ),
+                                                  ),
+                                                  child: Center(
+                                                    child: Icon(Icons.add,
+                                                        size: 22.sp,
+                                                        color:
+                                                            AppColors.primary),
+                                                  ),
+                                                ),
+                                                SizedBox(height: 5.h),
+                                                Text(
+                                                  'Tambah',
+                                                  textAlign: TextAlign.center,
+                                                  style: GoogleFonts.inter(
+                                                    fontSize: 11.sp,
+                                                    color: AppColors.primary,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        }
+                                        return catItem(categories[index]);
+                                      },
+                                      childCount: categories.length + 1,
+                                    ),
+                                  ),
+                                ),
+                                SliverToBoxAdapter(
+                                    child: SizedBox(height: 20.h)),
+                              ],
                             ),
-                          );
-                        } catch (e) {
-                          if (context.mounted) {
-                            setSheetState(() => isSaving = false);
-                          }
-                          if (!parentContext.mounted) return;
-                          ScaffoldMessenger.of(parentContext).showSnackBar(
-                            SnackBar(
-                              content: Text('Error: ${e.toString()}'),
-                              backgroundColor: AppColors.error,
-                            ),
-                          );
-                        }
-                      } : null,
                     ),
                   ],
                 ),
@@ -482,46 +689,13 @@ class _DashboardPageState extends State<DashboardPage> {
     context.goNamed('login');
   }
 
-  Widget _buildCategoryChip(CategoryModel cat, String? selectedId, Function(String) onSelect) {
-    final isSelected = selectedId == cat.id;
-    final color = Color(int.parse('FF${cat.color.replaceFirst('#', '')}', radix: 16));
-    
-    return GestureDetector(
-      onTap: () => onSelect(cat.id),
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20.r),
-          color: isSelected ? color : Colors.grey.withValues(alpha: 0.2),
-          border: Border.all(
-            color: isSelected ? color : Colors.transparent,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(cat.icon, style: TextStyle(fontSize: 14.sp)),
-            SizedBox(width: 4.w),
-            Text(
-              cat.name,
-              style: GoogleFonts.inter(
-                fontSize: 12.sp,
-                fontWeight: FontWeight.w500,
-                color: isSelected ? Colors.white : AppColors.textPrimary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final pages = [
       _HomeTab(
         onQuickAdd: _showQuickAddSheet,
         formatCurrency: _formatCurrency,
+        onNavigateToTab: (index) => setState(() => _currentIndex = index),
       ),
       const TransactionListPage(),
       const ReportsPage(),
@@ -530,53 +704,47 @@ class _DashboardPageState extends State<DashboardPage> {
     ];
 
     return Scaffold(
-        appBar: AppBar(
-          title: Text(
-            'Wangku',
-            style: GoogleFonts.inter(fontWeight: FontWeight.w700),
-          ),
-          centerTitle: true,
-        ),
-        body: pages[_currentIndex],
-        floatingActionButton: _currentIndex == 0
-            ? FloatingActionButton.extended(
-                onPressed: _showQuickAddSheet,
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                icon: const Icon(LucideIcons.plus),
-                label: Text(
-                  'Quick Add',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-                ),
-              )
-            : null,
-        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-        bottomNavigationBar: NavigationBar(
-          backgroundColor: Colors.white,
-          selectedIndex: _currentIndex,
-          destinations: const [
-            NavigationDestination(icon: Icon(Icons.home_rounded), label: 'Home'),
-            NavigationDestination(
-                icon: Icon(Icons.receipt_long_rounded), label: 'Transaksi'),
-            NavigationDestination(
-                icon: Icon(Icons.pie_chart_rounded), label: 'Analisis'),
-            NavigationDestination(
-                icon: Icon(Icons.account_balance_wallet_rounded),
-                label: 'Anggaran'),
-            NavigationDestination(icon: Icon(Icons.person_rounded), label: 'Profil'),
-          ],
-          onDestinationSelected: (index) {
-            setState(() => _currentIndex = index);
-          },
-        ),
-      );
+      appBar: AppBar(toolbarHeight: 0, elevation: 0, backgroundColor: Colors.white),
+      body: pages[_currentIndex],
+      floatingActionButton: _currentIndex == 1
+          ? FloatingActionButton(
+              onPressed: _showQuickAddSheet,
+              backgroundColor: AppColors.primary,
+              child: const Icon(Icons.add_rounded, color: Colors.white),
+            )
+          : null,
+      bottomNavigationBar: NavigationBar(
+        backgroundColor: Colors.white,
+        selectedIndex: _currentIndex,
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.home_rounded), label: 'Home'),
+          NavigationDestination(
+              icon: Icon(Icons.receipt_long_rounded), label: 'Transaksi'),
+          NavigationDestination(
+              icon: Icon(Icons.pie_chart_rounded), label: 'Analisis'),
+          NavigationDestination(
+              icon: Icon(Icons.account_balance_wallet_rounded),
+              label: 'Anggaran'),
+          NavigationDestination(
+              icon: Icon(Icons.person_rounded), label: 'Profil'),
+        ],
+        onDestinationSelected: (index) {
+          setState(() => _currentIndex = index);
+        },
+      ),
+    );
   }
 }
+
+// ─────────────────────────────────────────────────────────────
+// Home Tab
+// ─────────────────────────────────────────────────────────────
 
 class _HomeTab extends StatelessWidget {
   const _HomeTab({
     required this.onQuickAdd,
     required this.formatCurrency,
+    required this.onNavigateToTab,
   });
 
   final void Function({
@@ -586,61 +754,38 @@ class _HomeTab extends StatelessWidget {
     String? initialNote,
   }) onQuickAdd;
   final String Function(double) formatCurrency;
+  final void Function(int) onNavigateToTab;
 
-  Widget _buildShortcutChip(
-    TransactionShortcutPreset preset,
-    VoidCallback onTap,
-  ) {
-    final cat = preset.category;
-    final color = Color(int.parse('FF${cat.color.replaceFirst('#', '')}', radix: 16));
-    final amount = preset.shortcut.amount;
-    final note = preset.shortcut.note.trim();
-    
+  Widget _buildMenuButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20.r),
-          color: Colors.white,
-          border: Border.all(color: Colors.grey.shade200),
-          boxShadow: [
-             BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 4, offset: const Offset(0, 2))
-          ]
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: EdgeInsets.all(4.w),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(6.r),
-              ),
-              child: Text(cat.icon, style: TextStyle(fontSize: 10.sp)),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 58.w,
+            height: 58.w,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(18.r),
             ),
-            SizedBox(width: 8.w),
-            Text(
-              cat.name,
-              style: GoogleFonts.inter(
-                fontSize: 12.sp,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
+            child: Icon(icon, color: color, size: 26.sp),
+          ),
+          SizedBox(height: 8.h),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 12.sp,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textSecondary,
             ),
-            if (amount != null || note.isNotEmpty) ...[
-              SizedBox(width: 8.w),
-              Text(
-                amount != null ? formatCurrency(amount) : note,
-                style: GoogleFonts.inter(
-                  fontSize: 11.sp,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -649,220 +794,356 @@ class _HomeTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer2<DashboardProvider, TransactionProvider>(
       builder: (context, dashboardProvider, txnProvider, _) {
+        final authProvider = context.watch<AuthProvider>();
         final metrics = dashboardProvider.metrics;
+        final monthYear = DateFormat('MMMM yyyy', 'id_ID').format(DateTime.now());
+
+        final meta = authProvider.currentUser?.userMetadata;
+        final rawName = (meta?['name'] ?? meta?['full_name']) as String?;
+        final displayName = (rawName?.isNotEmpty == true)
+            ? rawName!
+            : (authProvider.currentUser?.email?.split('@').first ?? 'Pengguna');
 
         return ListView(
-          padding: EdgeInsets.all(16.w),
+          padding: EdgeInsets.zero,
           children: [
-            // Balance card
+            // ── Greeting Header ──
             Container(
-              padding: EdgeInsets.all(20.w),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(20.r),
-                gradient: const LinearGradient(
-                  colors: [AppColors.primary, AppColors.primaryDark],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+              color: Colors.white,
+              padding: EdgeInsets.fromLTRB(
+                20.w,
+                MediaQuery.of(context).padding.top + 16.h,
+                20.w,
+                20.h,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Total Saldo',
-                    style: GoogleFonts.inter(
-                      color: Colors.white.withValues(alpha: 0.9),
-                      fontSize: 13.sp,
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Selamat Datang,',
+                        style: GoogleFonts.inter(
+                          fontSize: 13.sp,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      Text(
+                        displayName,
+                        style: GoogleFonts.inter(
+                          fontSize: 20.sp,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
                   ),
-                  SizedBox(height: 8.h),
-                  Text(
-                    metrics != null
-                        ? formatCurrency(metrics.balance)
-                        : 'Rp 0',
-                    style: GoogleFonts.inter(
-                      color: Colors.white,
-                      fontSize: 30.sp,
-                      fontWeight: FontWeight.w800,
+                  Container(
+                    width: 44.w,
+                    height: 44.w,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12.r),
                     ),
-                  ),
-                  SizedBox(height: 14.h),
-                  AppButton(
-                    label: 'Tambah Transaksi Cepat',
-                    icon: LucideIcons.plus,
-                    onPressed: onQuickAdd,
+                    child: Icon(
+                      Icons.notifications_outlined,
+                      color: AppColors.primary,
+                      size: 22.sp,
+                    ),
                   ),
                 ],
               ),
             ),
-            SizedBox(height: 16.h),
-            // Income & Expense cards
-            Row(
-              children: [
-                Expanded(
-                  child: AppCard(
-                    child: _MetricTile(
-                      title: 'Pemasukan',
-                      value: metrics != null
-                          ? formatCurrency(metrics.totalIncome)
-                          : 'Rp 0',
-                      color: AppColors.income,
-                      icon: LucideIcons.arrowDownLeft,
-                    ),
-                  ),
-                ),
-                SizedBox(width: 12.w),
-                Expanded(
-                  child: AppCard(
-                    child: _MetricTile(
-                      title: 'Pengeluaran',
-                      value: metrics != null
-                          ? formatCurrency(metrics.totalExpense)
-                          : 'Rp 0',
-                      color: AppColors.expense,
-                      icon: LucideIcons.arrowUpRight,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 16.h),
-            
-            // Akses Cepat
-            Builder(
-              builder: (context) {
-                final shortcuts = txnProvider.customShortcutPresets;
-                
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Akses Cepat',
-                          style: GoogleFonts.inter(
-                            fontSize: 14.sp,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        InkWell(
-                          onTap: () {
-                            showModalBottomSheet(
-                              context: context,
-                              isScrollControlled: true,
-                              backgroundColor: Colors.transparent,
-                              builder: (context) => const ManageShortcutsSheet(),
-                            );
-                          },
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                            child: Text(
-                              'Kelola',
-                              style: GoogleFonts.inter(
-                                fontSize: 12.sp,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.primary,
+
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.w),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(height: 4.h),
+
+                  // ── Balance Card ──
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(20.r),
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        color: AppColors.primary,
+                      ),
+                      child: Stack(
+                        children: [
+                          // Decorative circles top-right
+                          Positioned(
+                            top: -30,
+                            right: -20,
+                            child: Container(
+                              width: 130.w,
+                              height: 130.w,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white.withValues(alpha: 0.10),
                               ),
                             ),
                           ),
-                        ),
-                      ],
+                          Positioned(
+                            top: 20,
+                            right: 30,
+                            child: Container(
+                              width: 90.w,
+                              height: 90.w,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white.withValues(alpha: 0.10),
+                              ),
+                            ),
+                          ),
+                          // Card content
+                          Padding(
+                            padding: EdgeInsets.all(20.w),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Total Saldo',
+                                  style: GoogleFonts.inter(
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                    fontSize: 14.sp,
+                                  ),
+                                ),
+                                SizedBox(height: 6.h),
+                                Text(
+                                  metrics != null
+                                      ? formatCurrency(metrics.balance)
+                                      : 'Rp 0',
+                                  style: GoogleFonts.inter(
+                                    color: Colors.white,
+                                    fontSize: 32.sp,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                SizedBox(height: 4.h),
+                                // Text(
+                                //   monthYear,
+                                //   style: GoogleFonts.inter(
+                                //     color: Colors.white.withValues(alpha: 0.75),
+                                //     fontSize: 13.sp,
+                                //   ),
+                                // ),
+                                SizedBox(height: 20.h),
+
+                                // Pemasukan & Pengeluaran sub-cards
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Container(
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: 14.w, vertical: 12.h),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white
+                                              .withValues(alpha: 0.18),
+                                          borderRadius:
+                                              BorderRadius.circular(14.r),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Icon(
+                                                    Icons.arrow_downward_rounded,
+                                                    color: Colors.white,
+                                                    size: 14.sp),
+                                                SizedBox(width: 4.w),
+                                                Text(
+                                                  'Pemasukan',
+                                                  style: GoogleFonts.inter(
+                                                    color: Colors.white
+                                                        .withValues(alpha: 0.9),
+                                                    fontSize: 12.sp,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            SizedBox(height: 6.h),
+                                            Text(
+                                              metrics != null
+                                                  ? formatCurrency(
+                                                      metrics.totalIncome)
+                                                  : 'Rp 0',
+                                              style: GoogleFonts.inter(
+                                                color: Colors.white,
+                                                fontSize: 14.sp,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(width: 12.w),
+                                    Expanded(
+                                      child: Container(
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: 14.w, vertical: 12.h),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white
+                                              .withValues(alpha: 0.18),
+                                          borderRadius:
+                                              BorderRadius.circular(14.r),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Icon(Icons.arrow_upward_rounded,
+                                                    color: Colors.white,
+                                                    size: 14.sp),
+                                                SizedBox(width: 4.w),
+                                                Text(
+                                                  'Pengeluaran',
+                                                  style: GoogleFonts.inter(
+                                                    color: Colors.white
+                                                        .withValues(alpha: 0.9),
+                                                    fontSize: 12.sp,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            SizedBox(height: 6.h),
+                                            Text(
+                                              metrics != null
+                                                  ? formatCurrency(
+                                                      metrics.totalExpense)
+                                                  : 'Rp 0',
+                                              style: GoogleFonts.inter(
+                                                color: Colors.white,
+                                                fontSize: 14.sp,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    SizedBox(height: 12.h),
-                    if (shortcuts.isEmpty)
-                       Text(
-                         'Belum ada shortcut. Klik Kelola untuk menambahkan.',
-                         style: GoogleFonts.inter(fontSize: 12.sp, color: AppColors.textSecondary),
-                       )
-                    else
-                       SingleChildScrollView(
-                         scrollDirection: Axis.horizontal,
-                         clipBehavior: Clip.none,
-                         child: Row(
-                           children: shortcuts.map((cat) => Padding(
-                               padding: EdgeInsets.only(right: 8.w),
-                               child: _buildShortcutChip(
-                                 cat,
-                                 () => onQuickAdd(
-                                   initialType: cat.category.type,
-                                   initialCategoryId: cat.category.id,
-                                   initialAmount: cat.shortcut.amount,
-                                   initialNote: cat.shortcut.note,
-                                 ),
-                               ),
-                             )).toList(),
-                         ),
-                       ),
-                    SizedBox(height: 16.h),
-                  ],
-                );
-              }
-            ),
-            
-            // Weekly spending card
-            AppCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+                  ),
+                  SizedBox(height: 24.h),
+
+                  // ── Aksi Cepat ──
                   Text(
-                    'Pengeluaran 7 Hari',
+                    'Aksi Cepat',
                     style: GoogleFonts.inter(
-                      fontSize: 14.sp,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  SizedBox(height: 12.h),
-                  Text(
-                    metrics != null
-                        ? formatCurrency(metrics.weeklyExpense)
-                        : 'Rp 0',
-                    style: GoogleFonts.inter(
-                      fontSize: 22.sp,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.expense,
-                    ),
+                  SizedBox(height: 16.h),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildMenuButton(
+                        icon: Icons.add_rounded,
+                        label: 'Tambah',
+                        color: AppColors.primary,
+                        onTap: () => onQuickAdd(),
+                      ),
+                      _buildMenuButton(
+                        icon: Icons.receipt_long_rounded,
+                        label: 'Riwayat',
+                        color: const Color(0xFF0EA5E9),
+                        onTap: () => onNavigateToTab(1),
+                      ),
+                      _buildMenuButton(
+                        icon: Icons.pie_chart_rounded,
+                        label: 'Laporan',
+                        color: const Color(0xFF8B5CF6),
+                        onTap: () => onNavigateToTab(2),
+                      ),
+                      _buildMenuButton(
+                        icon: Icons.account_balance_wallet_rounded,
+                        label: 'Anggaran',
+                        color: const Color(0xFFF59E0B),
+                        onTap: () => onNavigateToTab(3),
+                      ),
+                    ],
                   ),
+                  SizedBox(height: 24.h),
+
+                  // ── Transaksi Terbaru ──
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Transaksi Terbaru',
+                        style: GoogleFonts.inter(
+                          fontSize: 16.sp,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => onNavigateToTab(1),
+                        child: Text(
+                          'Lihat Semua',
+                          style: GoogleFonts.inter(
+                            fontSize: 13.sp,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 12.h),
+
+                  if (metrics == null || metrics.recentTransactions.isEmpty)
+                    AppCard(
+                      child: Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8.h),
+                          child: Text(
+                            'Belum ada transaksi',
+                            style: GoogleFonts.inter(
+                              fontSize: 12.sp,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    ...metrics.recentTransactions.map(
+                      (txn) => _TransactionTile(
+                        transaction: txn,
+                        formatCurrency: formatCurrency,
+                      ),
+                    ),
+
+                  SizedBox(height: 24.h),
                 ],
               ),
             ),
-            SizedBox(height: 16.h),
-            // Recent transactions
-            Text(
-              'Transaksi Terbaru',
-              style: GoogleFonts.inter(
-                fontSize: 14.sp,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            SizedBox(height: 12.h),
-            if (metrics == null || metrics.recentTransactions.isEmpty)
-              AppCard(
-                child: Center(
-                  child: Text(
-                    'Belum ada transaksi',
-                    style: GoogleFonts.inter(
-                      fontSize: 12.sp,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ),
-              )
-            else
-              ...metrics.recentTransactions
-                  .map((txn) => _TransactionTile(
-                        transaction: txn,
-                        formatCurrency: formatCurrency,
-                      )),
           ],
         );
       },
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────
+// Transaction Tile
+// ─────────────────────────────────────────────────────────────
 
 class _TransactionTile extends StatelessWidget {
   const _TransactionTile({
@@ -895,50 +1176,39 @@ class _TransactionTile extends StatelessWidget {
               ).withValues(alpha: 0.2),
             ),
             child: Center(
-              child: Text(
-                categoryIcon,
-                style: TextStyle(fontSize: 22.sp),
-              ),
+              child: Text(categoryIcon, style: TextStyle(fontSize: 22.sp)),
             ),
           ),
           SizedBox(width: 12.w),
           Expanded(
             child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                hasNote ? note : categoryName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.inter(
-                  fontSize: 12.sp,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  hasNote ? note : categoryName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
-              ),
-              if (hasNote) ...[
-                SizedBox(height: 4.h),
-                Row(
-                  children: [
-                    Text(categoryIcon, style: TextStyle(fontSize: 11.sp)),
-                    SizedBox(width: 4.w),
-                    Expanded(
-                      child: Text(
-                        categoryName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                          fontSize: 10.sp,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
+                if (hasNote) ...[
+                  SizedBox(height: 4.h),
+                  Text(
+                    categoryName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      fontSize: 10.sp,
+                      color: AppColors.textSecondary,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
-        ),
           Text(
             '${isIncome ? '+' : '-'}${formatCurrency(transaction.amount)}',
             style: GoogleFonts.inter(
@@ -953,57 +1223,9 @@ class _TransactionTile extends StatelessWidget {
   }
 }
 
-class _MetricTile extends StatelessWidget {
-  const _MetricTile({
-    required this.title,
-    required this.value,
-    required this.color,
-    required this.icon,
-  });
-
-  final String title;
-  final String value;
-  final Color color;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 40.w,
-          height: 40.w,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10.r),
-            color: color.withValues(alpha: 0.15),
-          ),
-          child: Icon(icon, color: color, size: 20.sp),
-        ),
-        SizedBox(height: 8.h),
-        Text(
-          title,
-          style: GoogleFonts.inter(
-            fontSize: 11.sp,
-            fontWeight: FontWeight.w500,
-            color: AppColors.textSecondary,
-          ),
-        ),
-        SizedBox(height: 4.h),
-        Text(
-          value,
-          style: GoogleFonts.inter(
-            fontSize: 14.sp,
-            fontWeight: FontWeight.w700,
-            color: color,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// _PlaceholderTab removed (replaced by ReportsPage)
+// ─────────────────────────────────────────────────────────────
+// Profile Tab
+// ─────────────────────────────────────────────────────────────
 
 class _ProfileTab extends StatelessWidget {
   const _ProfileTab({required this.onLogout});
@@ -1014,358 +1236,289 @@ class _ProfileTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
     final userId = authProvider.currentUser?.id;
+    final meta = authProvider.currentUser?.userMetadata;
+    final rawName = (meta?['name'] ?? meta?['full_name']) as String?;
+    final displayName = (rawName?.isNotEmpty == true)
+        ? rawName!
+        : (authProvider.currentUser?.email?.split('@').first ?? 'Pengguna');
+    final email = authProvider.currentUser?.email ?? '';
+    final avatarLetter = displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U';
 
     return Consumer<ReminderProvider>(
       builder: (context, reminder, _) {
         return SingleChildScrollView(
-            padding: EdgeInsets.all(24.w),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Icon(Icons.person_rounded, size: 64.sp, color: Colors.grey),
-                SizedBox(height: 16.h),
-                Text(
-                  authProvider.currentUser?.email ?? 'User',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
-                    fontSize: 16.sp,
-                    fontWeight: FontWeight.w600,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ── Green Header ──
+              Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [AppColors.primary, AppColors.primaryDark],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
                 ),
-                SizedBox(height: 32.h),
+                padding: EdgeInsets.fromLTRB(20.w, 24.h, 20.w, 28.h),
+                child: Row(
+                  children: [
+                    // Avatar
+                    Container(
+                      width: 64.w,
+                      height: 64.w,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.25),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: Center(
+                        child: Text(
+                          avatarLetter,
+                          style: GoogleFonts.inter(
+                            fontSize: 26.sp,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 16.w),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            displayName,
+                            style: GoogleFonts.inter(
+                              fontSize: 18.sp,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                          SizedBox(height: 4.h),
+                          Text(
+                            email,
+                            style: GoogleFonts.inter(
+                              fontSize: 12.sp,
+                              color: Colors.white.withValues(alpha: 0.8),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (context) => const AccountProfileSheet(),
+                      ),
+                      child: Container(
+                        padding: EdgeInsets.all(8.w),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(10.r),
+                        ),
+                        child: Icon(Icons.chevron_right_rounded,
+                            color: Colors.white, size: 22.sp),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
-                // Settings Section
-                Text(
+              // ── Pengaturan Section ──
+              Padding(
+                padding: EdgeInsets.fromLTRB(20.w, 20.h, 20.w, 8.h),
+                child: Text(
                   'Pengaturan',
                   style: GoogleFonts.inter(
-                    fontSize: 14.sp,
+                    fontSize: 13.sp,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textSecondary,
+                    letterSpacing: 0.5,
                   ),
                 ),
-                SizedBox(height: 12.h),
+              ),
 
-                Container(
-                  padding: EdgeInsets.all(16.w),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12.r),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 40.w,
-                        height: 40.w,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(10.r),
-                        ),
-                        child: Icon(
-                          Icons.category_outlined,
-                          color: AppColors.primary,
-                          size: 20.sp,
-                        ),
-                      ),
-                      SizedBox(width: 12.w),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Manajemen Kategori',
-                              style: GoogleFonts.inter(
-                                fontSize: 14.sp,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              'Tambah, edit, dan hapus kategori',
-                              style: GoogleFonts.inter(
-                                fontSize: 12.sp,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          showModalBottomSheet(
-                            context: context,
-                            isScrollControlled: true,
-                            backgroundColor: Colors.transparent,
-                            builder: (context) => const ManageCategoriesSheet(),
-                          );
-                        },
-                        child: const Text('Kelola'),
-                      ),
-                    ],
-                  ),
+              // Settings card
+              Container(
+                margin: EdgeInsets.symmetric(horizontal: 16.w),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16.r),
+                  border: Border.all(color: AppColors.border),
                 ),
-                SizedBox(height: 12.h),
+                child: Column(
+                  children: [
+                    _buildSettingTile(
+                      context,
+                      icon: Icons.category_outlined,
+                      iconColor: AppColors.primary,
+                      title: 'Manajemen Kategori',
+                      subtitle: 'Kelola kategori pemasukan & pengeluaran',
+                      onTap: () => showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (context) => const ManageCategoriesSheet(),
+                      ),
+                    ),
+                    _divider(),
+                    _buildSettingTile(
+                      context,
+                      icon: Icons.manage_accounts_outlined,
+                      iconColor: AppColors.primary,
+                      title: 'Akun & Profil',
+                      subtitle: 'Informasi pribadi dan keamanan akun',
+                      onTap: () => showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (context) => const AccountProfileSheet(),
+                      ),
+                    ),
+                    _divider(),
+                    _buildSettingTile(
+                      context,
+                      icon: Icons.flash_on_outlined,
+                      iconColor: AppColors.primary,
+                      title: 'Manajemen Shortcut',
+                      subtitle: 'Atur shortcut transaksi favorit',
+                      onTap: () => showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (context) => const ManageShortcutsSheet(),
+                      ),
+                    ),
+                    _divider(),
+                    _buildSettingTile(
+                      context,
+                      icon: Icons.file_download_outlined,
+                      iconColor: AppColors.primary,
+                      title: 'Export Transaksi',
+                      subtitle: 'Unduh data transaksi ke file',
+                      onTap: () => showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (context) => const ExportTransactionsSheet(),
+                      ),
+                    ),
+                    _divider(),
+                    _buildSettingTile(
+                      context,
+                      icon: Icons.notifications_outlined,
+                      iconColor: AppColors.primary,
+                      title: 'Manajemen Notifikasi',
+                      subtitle: reminder.enabled
+                          ? 'Pengingat ${reminder.time.format(context)} dan anggaran'
+                          : 'Atur pengingat dan notifikasi',
+                      onTap: userId == null
+                          ? null
+                          : () => showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                backgroundColor: Colors.transparent,
+                                builder: (context) =>
+                                    const ManageNotificationsSheet(),
+                              ),
+                    ),
+                  ],
+                ),
+              ),
 
-                Container(
-                  padding: EdgeInsets.all(16.w),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12.r),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 40.w,
-                        height: 40.w,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(10.r),
-                        ),
-                        child: Icon(
-                          Icons.manage_accounts_outlined,
-                          color: AppColors.primary,
-                          size: 20.sp,
-                        ),
-                      ),
-                      SizedBox(width: 12.w),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Akun & Profil',
-                              style: GoogleFonts.inter(
-                                fontSize: 14.sp,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              'Nama profil, email, dan password',
-                              style: GoogleFonts.inter(
-                                fontSize: 12.sp,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          showModalBottomSheet(
-                            context: context,
-                            isScrollControlled: true,
-                            backgroundColor: Colors.transparent,
-                            builder: (context) => const AccountProfileSheet(),
-                          );
-                        },
-                        child: const Text('Kelola'),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 12.h),
+              SizedBox(height: 12.h),
 
-                Container(
-                  padding: EdgeInsets.all(16.w),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12.r),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 40.w,
-                        height: 40.w,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(10.r),
-                        ),
-                        child: Icon(
-                          Icons.flash_on_outlined,
-                          color: AppColors.primary,
-                          size: 20.sp,
-                        ),
-                      ),
-                      SizedBox(width: 12.w),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Manajemen Shortcut',
-                              style: GoogleFonts.inter(
-                                fontSize: 14.sp,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              'Atur kategori, harga, dan catatan preset',
-                              style: GoogleFonts.inter(
-                                fontSize: 12.sp,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          showModalBottomSheet(
-                            context: context,
-                            isScrollControlled: true,
-                            backgroundColor: Colors.transparent,
-                            builder: (context) => const ManageShortcutsSheet(),
-                          );
-                        },
-                        child: const Text('Kelola'),
-                      ),
-                    ],
-                  ),
+              // Logout tile
+              Container(
+                margin: EdgeInsets.symmetric(horizontal: 16.w),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16.r),
+                  border: Border.all(color: AppColors.border),
                 ),
-                SizedBox(height: 12.h),
+                child: _buildSettingTile(
+                  context,
+                  icon: Icons.logout_rounded,
+                  iconColor: AppColors.error,
+                  iconBgColor: AppColors.error.withValues(alpha: 0.1),
+                  title: 'Logout',
+                  subtitle: 'Keluar dari akun Wangku',
+                  titleColor: AppColors.error,
+                  onTap: onLogout,
+                  showChevron: false,
+                ),
+              ),
 
-                Container(
-                  padding: EdgeInsets.all(16.w),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12.r),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 40.w,
-                        height: 40.w,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(10.r),
-                        ),
-                        child: Icon(
-                          Icons.file_download_outlined,
-                          color: AppColors.primary,
-                          size: 20.sp,
-                        ),
-                      ),
-                      SizedBox(width: 12.w),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Export Transaksi',
-                              style: GoogleFonts.inter(
-                                fontSize: 14.sp,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              'CSV, Excel, PDF per bulan',
-                              style: GoogleFonts.inter(
-                                fontSize: 12.sp,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          showModalBottomSheet(
-                            context: context,
-                            isScrollControlled: true,
-                            backgroundColor: Colors.transparent,
-                            builder: (context) => const ExportTransactionsSheet(),
-                          );
-                        },
-                        child: const Text('Export'),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 12.h),
+              SizedBox(height: 32.h),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
-                Container(
-                  padding: EdgeInsets.all(16.w),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12.r),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 40.w,
-                        height: 40.w,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(10.r),
-                        ),
-                        child: Icon(
-                          Icons.notifications_outlined,
-                          color: AppColors.primary,
-                          size: 20.sp,
-                        ),
-                      ),
-                      SizedBox(width: 12.w),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Manajemen Notifikasi',
-                              style: GoogleFonts.inter(
-                                fontSize: 14.sp,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              reminder.enabled
-                                  ? 'Pengingat ${reminder.time.format(context)} dan anggaran'
-                                  : 'Pengingat harian dan anggaran',
-                              style: GoogleFonts.inter(
-                                fontSize: 12.sp,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: userId == null
-                            ? null
-                            : () {
-                                showModalBottomSheet(
-                                  context: context,
-                                  isScrollControlled: true,
-                                  backgroundColor: Colors.transparent,
-                                  builder: (context) =>
-                                      const ManageNotificationsSheet(),
-                                );
-                              },
-                        child: const Text('Kelola'),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 32.h),
+  Widget _divider() => Divider(height: 1, indent: 68.w, color: AppColors.border);
 
-                ElevatedButton(
-                  onPressed: onLogout,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.error,
-                    padding: EdgeInsets.symmetric(vertical: 16.h),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
-                  ),
-                  child: Text(
-                    'Logout',
-                    style: GoogleFonts.inter(color: Colors.white, fontSize: 14.sp, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
+  Widget _buildSettingTile(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback? onTap,
+    Color iconColor = AppColors.primary,
+    Color? iconBgColor,
+    Color? titleColor,
+    bool showChevron = true,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16.r),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+        child: Row(
+          children: [
+            Container(
+              width: 40.w,
+              height: 40.w,
+              decoration: BoxDecoration(
+                color: iconBgColor ?? iconColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10.r),
+              ),
+              child: Icon(icon, color: iconColor, size: 20.sp),
             ),
-          );
-        },
-      );
+            SizedBox(width: 14.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.inter(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w600,
+                      color: titleColor ?? AppColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 2.h),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.inter(
+                      fontSize: 12.sp,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (showChevron)
+              Icon(Icons.chevron_right_rounded,
+                  color: AppColors.hint, size: 20.sp),
+          ],
+        ),
+      ),
+    );
   }
 }

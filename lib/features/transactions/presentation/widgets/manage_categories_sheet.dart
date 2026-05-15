@@ -42,24 +42,28 @@ class _ManageCategoriesSheetState extends State<ManageCategoriesSheet>
       ),
       child: Column(
         children: [
+          // Drag handle
           Padding(
             padding: EdgeInsets.symmetric(vertical: 12.h),
-            child: Container(
-              width: 40.w,
-              height: 4.h,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2.r),
+            child: Center(
+              child: Container(
+                width: 40.w,
+                height: 4.h,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2.r),
+                ),
               ),
             ),
           ),
+          // Header row: title + X close
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20.w),
+            padding: EdgeInsets.fromLTRB(20.w, 0, 8.w, 0),
             child: Row(
               children: [
                 Expanded(
                   child: Text(
-                    'Manajemen Kategori',
+                    'Kelola Kategori',
                     style: GoogleFonts.inter(
                       fontSize: 18.sp,
                       fontWeight: FontWeight.w700,
@@ -68,25 +72,33 @@ class _ManageCategoriesSheetState extends State<ManageCategoriesSheet>
                   ),
                 ),
                 IconButton(
-                  onPressed: () => _showCategoryForm(type: _currentType),
-                  icon: const Icon(Icons.add_circle_outline),
-                  color: AppColors.primary,
-                  tooltip: 'Tambah kategori',
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close_rounded),
+                  color: AppColors.textSecondary,
                 ),
               ],
             ),
           ),
-          TabBar(
-            controller: _tabController,
-            labelColor: AppColors.primary,
-            unselectedLabelColor: AppColors.textSecondary,
-            indicatorColor: AppColors.primary,
-            onTap: (_) => setState(() {}),
-            tabs: const [
-              Tab(text: 'Pengeluaran'),
-              Tab(text: 'Pemasukan'),
-            ],
+          // Filter chips: Pemasukan | Pengeluaran
+          Padding(
+            padding: EdgeInsets.fromLTRB(20.w, 8.h, 20.w, 12.h),
+            child: Row(
+              children: [
+                _FilterChip(
+                  label: 'Pemasukan',
+                  selected: _tabController.index == 1,
+                  onTap: () => setState(() => _tabController.index = 1),
+                ),
+                SizedBox(width: 10.w),
+                _FilterChip(
+                  label: 'Pengeluaran',
+                  selected: _tabController.index == 0,
+                  onTap: () => setState(() => _tabController.index = 0),
+                ),
+              ],
+            ),
           ),
+          // Category list
           Expanded(
             child: TabBarView(
               controller: _tabController,
@@ -94,6 +106,24 @@ class _ManageCategoriesSheetState extends State<ManageCategoriesSheet>
                 _CategoryList(type: 'expense'),
                 _CategoryList(type: 'income'),
               ],
+            ),
+          ),
+          // + Tambah Kategori bottom button
+          Padding(
+            padding: EdgeInsets.fromLTRB(20.w, 8.h, 20.w, 24.h),
+            child: OutlinedButton.icon(
+              onPressed: () => _showCategoryForm(type: _currentType),
+              icon: Icon(Icons.add_rounded, size: 18.sp),
+              label: const Text('Tambah Kategori'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: const BorderSide(color: AppColors.primary),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12.r),
+                ),
+                padding: EdgeInsets.symmetric(vertical: 14.h),
+                minimumSize: Size(double.infinity, 0),
+              ),
             ),
           ),
         ],
@@ -136,6 +166,44 @@ class _ManageCategoriesSheetState extends State<ManageCategoriesSheet>
   }
 }
 
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : Colors.white,
+          borderRadius: BorderRadius.circular(20.r),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.border,
+          ),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 13.sp,
+            fontWeight: FontWeight.w600,
+            color: selected ? Colors.white : AppColors.textSecondary,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _CategoryList extends StatelessWidget {
   const _CategoryList({required this.type});
 
@@ -175,65 +243,56 @@ class _CategoryList extends StatelessWidget {
               int.parse('FF${category.color.replaceFirst('#', '')}', radix: 16),
             );
 
-            return Container(
-              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12.r),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 42.w,
-                    height: 42.w,
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(10.r),
+            return InkWell(
+              onTap: isOwned ? () => _openEdit(context, category) : null,
+              onLongPress: isOwned ? () => _confirmDelete(context, category) : null,
+              borderRadius: BorderRadius.circular(12.r),
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12.r),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 42.w,
+                      height: 42.w,
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(10.r),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(category.icon, style: TextStyle(fontSize: 20.sp)),
                     ),
-                    alignment: Alignment.center,
-                    child: Text(category.icon, style: TextStyle(fontSize: 20.sp)),
-                  ),
-                  SizedBox(width: 12.w),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          category.name,
-                          style: GoogleFonts.inter(
-                            fontSize: 13.sp,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
+                    SizedBox(width: 12.w),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            category.name,
+                            style: GoogleFonts.inter(
+                              fontSize: 13.sp,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
                           ),
-                        ),
-                        Text(
-                          isOwned ? 'Kategori saya' : 'Kategori bawaan',
-                          style: GoogleFonts.inter(
-                            fontSize: 11.sp,
-                            color: AppColors.textSecondary,
+                          Text(
+                            isOwned ? 'Kategori saya' : 'Kategori bawaan',
+                            style: GoogleFonts.inter(
+                              fontSize: 11.sp,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  IconButton(
-                    onPressed: isOwned
-                        ? () => _openEdit(context, category)
-                        : null,
-                    icon: const Icon(Icons.edit_outlined),
-                    color: AppColors.primary,
-                    tooltip: 'Edit kategori',
-                  ),
-                  IconButton(
-                    onPressed: isOwned
-                        ? () => _confirmDelete(context, category)
-                        : null,
-                    icon: const Icon(Icons.delete_outline),
-                    color: AppColors.error,
-                    tooltip: 'Hapus kategori',
-                  ),
-                ],
+                    Icon(Icons.drag_handle_rounded,
+                        color: AppColors.hint, size: 22.sp),
+                  ],
+                ),
               ),
             );
           },
@@ -311,18 +370,15 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
   late final TextEditingController _nameController;
   late String _selectedIcon;
   late String _selectedColor;
+  String? _nameError;
 
   final List<String> _colorOptions = const [
-    '#FF6B6B',
-    '#4ECDC4',
-    '#FFE66D',
-    '#95E1D3',
-    '#F38181',
-    '#A8E6CF',
-    '#6BCB77',
-    '#4D96FF',
-    '#FFD700',
-    '#9C27B0',
+    '#FF6B6B', '#E53935', '#FF5252', '#FF7043', '#F38181',
+    '#FF8C42', '#FFA726', '#FFE66D', '#FFD700', '#FFC107',
+    '#6BCB77', '#4CAF50', '#A8E6CF', '#26A69A', '#4ECDC4',
+    '#95E1D3', '#80CBC4', '#29B6F6', '#4D96FF', '#2196F3',
+    '#5C6BC0', '#7E57C2', '#9C27B0', '#AB47BC', '#CE93D8',
+    '#EC407A', '#F06292', '#E91E63', '#8D6E63', '#607D8B',
   ];
 
   final List<String> _emojiOptions = const [
@@ -552,9 +608,13 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
             SizedBox(height: 16.h),
             TextField(
               controller: _nameController,
-              decoration: const InputDecoration(
+              onChanged: (_) {
+                if (_nameError != null) setState(() => _nameError = null);
+              },
+              decoration: InputDecoration(
                 labelText: 'Nama Kategori',
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
+                errorText: _nameError,
               ),
             ),
             SizedBox(height: 16.h),
@@ -669,9 +729,19 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
   void _submit() {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nama kategori tidak boleh kosong')),
-      );
+      setState(() => _nameError = 'Nama tidak boleh kosong');
+      return;
+    }
+
+    final categoryType = widget.category?.type ?? widget.type;
+    final currentId = widget.category?.id ?? '';
+    final txnProvider = context.read<TransactionProvider>();
+    final isDuplicate = txnProvider.categories.any((c) =>
+        c.id != currentId &&
+        c.type == categoryType &&
+        c.name.toLowerCase() == name.toLowerCase());
+    if (isDuplicate) {
+      setState(() => _nameError = 'Nama kategori sudah digunakan');
       return;
     }
 
@@ -681,7 +751,7 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
       name: name,
       icon: _selectedIcon,
       color: _selectedColor,
-      type: widget.category?.type ?? widget.type,
+      type: categoryType,
     );
     Navigator.pop(context, category);
   }

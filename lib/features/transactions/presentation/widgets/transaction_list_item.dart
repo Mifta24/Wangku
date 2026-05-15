@@ -26,10 +26,6 @@ class TransactionListItem extends StatelessWidget {
     return formatter.format(amount);
   }
 
-  String _formatDate(DateTime date) {
-    return DateFormat('dd MMM yyyy, HH:mm', 'id_ID').format(date);
-  }
-
   Color _parseHexColor(String rawHex) {
     try {
       final hex = rawHex.replaceFirst('#', '');
@@ -85,32 +81,16 @@ class TransactionListItem extends StatelessWidget {
                   ),
                   if (hasNote) ...[
                     SizedBox(height: 4.h),
-                    Row(
-                      children: [
-                        Text(categoryIcon, style: TextStyle(fontSize: 12.sp)),
-                        SizedBox(width: 4.w),
-                        Expanded(
-                          child: Text(
-                            categoryName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(
-                              fontSize: 11.sp,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ),
-                      ],
+                    Text(
+                      categoryName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 11.sp,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ],
-                  SizedBox(height: 4.h),
-                  Text(
-                    _formatDate(transaction.date),
-                    style: GoogleFonts.inter(
-                      fontSize: 10.sp,
-                      color: AppColors.hint,
-                    ),
-                  ),
                 ],
               ),
             ),

@@ -51,8 +51,6 @@ class _LoginPageState extends State<LoginPage> {
           );
         }
       }
-      // Jika success, GoRouter otomatis redirect ke /dashboard
-      // via AuthStateRefreshNotifier yang mendengarkan onAuthStateChange
     }
   }
 
@@ -61,145 +59,122 @@ class _LoginPageState extends State<LoginPage> {
     final isLoading = context.watch<AuthProvider>().isLoading;
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppColors.authGradientTop,
-              AppColors.authGradientMiddle,
-              AppColors.authGradientBottom,
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.symmetric(horizontal: 24.w),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    AuthIllustration(
-                      assetPath: AppAssets.loginIllustration,
-                      semanticLabel: 'Ilustrasi login',
-                      height: 210,
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 16.h),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  AuthIllustration(
+                    assetPath: AppAssets.loginIllustration,
+                    semanticLabel: 'Ilustrasi login',
+                    height: 160,
+                  ),
+                  SizedBox(height: 12.h),
+                  Text(
+                    'Welcome Back!',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      fontSize: 22.sp,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.primary,
                     ),
-                    SizedBox(height: 20.h),
-                    Text(
-                      'Selamat Datang\ndi Wangku',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
-                        fontSize: 28.sp,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                        height: 1.2,
-                      ),
+                  ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    'Silakan login untuk mencatat keuanganmu',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      fontSize: 13.sp,
+                      color: AppColors.textSecondary,
                     ),
-                    SizedBox(height: 8.h),
-                    Text(
-                      'Kelola keuangan pribadimu dengan pintar',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
-                        fontSize: 14.sp,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    SizedBox(height: 48.h),
+                  ),
+                  SizedBox(height: 20.h),
 
-                    // Input Email
-                    AppTextField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      hintText: 'Email',
-                      prefixIcon: LucideIcons.mail,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) return 'Email tidak boleh kosong';
-                        if (!value.contains('@')) return 'Email tidak valid';
-                        return null;
-                      },
+                  // Form fields (no card border)
+                  AppTextField(
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    hintText: 'nama@gmail.com',
+                    prefixIcon: LucideIcons.mail,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return 'Email tidak boleh kosong';
+                      if (!value.contains('@')) return 'Email tidak valid';
+                      return null;
+                    },
+                  ),
+                  SizedBox(height: 12.h),
+                  AppTextField(
+                    controller: _passwordController,
+                    hintText: 'Password',
+                    prefixIcon: LucideIcons.lock,
+                    obscureText: !_isPasswordVisible,
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _isPasswordVisible ? LucideIcons.eyeOff : LucideIcons.eye,
+                        color: AppColors.hint,
+                      ),
+                      onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
                     ),
-                    SizedBox(height: 16.h),
-
-                    // Input Password
-                    AppTextField(
-                      controller: _passwordController,
-                      hintText: 'Password',
-                      prefixIcon: LucideIcons.lock,
-                      obscureText: !_isPasswordVisible,
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _isPasswordVisible ? LucideIcons.eyeOff : LucideIcons.eye,
-                          color: AppColors.hint,
+                    validator: (value) =>
+                        value == null || value.isEmpty ? 'Password tidak boleh kosong' : null,
+                  ),
+                  SizedBox(height: 4.h),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => context.pushNamed('forgot-password'),
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 4.h),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text(
+                        'Lupa Password?',
+                        style: GoogleFonts.inter(
+                          fontSize: 12.sp,
+                          color: AppColors.textSecondary,
                         ),
-                        onPressed: () {
-                          setState(() {
-                            _isPasswordVisible = !_isPasswordVisible;
-                          });
-                        },
                       ),
-                      validator: (value) => value == null || value.isEmpty ? 'Password tidak boleh kosong' : null,
                     ),
-                    SizedBox(height: 8.h),
+                  ),
+                  SizedBox(height: 12.h),
+                  AppButton(
+                    label: 'Login',
+                    isLoading: isLoading,
+                    onPressed: _handleLogin,
+                  ),
+                  SizedBox(height: 20.h),
 
-                    // Lupa Password
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: () {
-                          context.pushNamed('forgot-password');
-                        },
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Belum punya akun? ',
+                        style: GoogleFonts.inter(
+                          fontSize: 13.sp,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => context.pushNamed('register'),
                         child: Text(
-                          'Lupa Password?',
+                          'Daftar Sekarang',
                           style: GoogleFonts.inter(
                             fontSize: 13.sp,
-                            fontWeight: FontWeight.w600,
-                            color: Theme.of(context).primaryColor,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
                           ),
                         ),
                       ),
-                    ),
-                    SizedBox(height: 24.h),
-
-                    // Tombol Login
-                    AppButton(
-                      label: 'Masuk',
-                      isLoading: isLoading,
-                      onPressed: _handleLogin,
-                    ),
-                    SizedBox(height: 24.h),
-
-                    // Register link
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Belum punya akun? ',
-                          style: GoogleFonts.inter(
-                            fontSize: 14.sp,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () {
-                            context.pushNamed('register');
-                          },
-                          child: Text(
-                            'Daftar',
-                            style: GoogleFonts.inter(
-                              fontSize: 14.sp,
-                              fontWeight: FontWeight.w700,
-                              color: Theme.of(context).primaryColor,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),

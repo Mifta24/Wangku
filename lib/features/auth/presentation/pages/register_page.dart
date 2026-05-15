@@ -25,8 +25,10 @@ class _RegisterPageState extends State<RegisterPage> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   bool _isPasswordVisible = false;
+  bool _isConfirmPasswordVisible = false;
   static const int _cooldownDuration = 30;
   int _cooldownSeconds = 0;
   Timer? _cooldownTimer;
@@ -63,6 +65,7 @@ class _RegisterPageState extends State<RegisterPage> {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -120,154 +123,130 @@ class _RegisterPageState extends State<RegisterPage> {
     final isLoading = context.watch<AuthProvider>().isLoading;
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppColors.authGradientTop,
-              AppColors.authGradientMiddle,
-              AppColors.authGradientBottom,
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.symmetric(horizontal: 24.w),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Tombol Kembali
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: IconButton(
-                        icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimary),
-                        onPressed: () => context.pop(),
-                      ),
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 16.h),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  AuthIllustration(
+                    assetPath: AppAssets.registerIllustration,
+                    semanticLabel: 'Ilustrasi register',
+                    height: 140,
+                  ),
+                  SizedBox(height: 12.h),
+                  Text(
+                    'Sign Up',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      fontSize: 22.sp,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.primary,
                     ),
-                    AuthIllustration(
-                      assetPath: AppAssets.registerIllustration,
-                      semanticLabel: 'Ilustrasi register',
-                      height: 210,
-                    ),
-                    SizedBox(height: 16.h),
-                    
-                    Text(
-                      'Buat Akun Baru',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
-                        fontSize: 28.sp,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                        height: 1.2,
-                      ),
-                    ),
-                    SizedBox(height: 8.h),
-                    Text(
-                      'Mulai langkah awal untuk kebebasan finansial',
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
-                        fontSize: 14.sp,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    SizedBox(height: 48.h),
+                  ),
+                  SizedBox(height: 16.h),
 
-                    // Input Nama
-                    AppTextField(
-                      controller: _nameController,
-                      keyboardType: TextInputType.name,
-                      hintText: 'Nama Lengkap',
-                      prefixIcon: LucideIcons.user,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) return 'Nama tidak boleh kosong';
-                        return null;
-                      },
+                  // Form fields (no card border)
+                  AppTextField(
+                    controller: _nameController,
+                    keyboardType: TextInputType.name,
+                    hintText: 'Nama lengkap',
+                    prefixIcon: LucideIcons.user,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return 'Nama tidak boleh kosong';
+                      return null;
+                    },
+                  ),
+                  SizedBox(height: 12.h),
+                  AppTextField(
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    hintText: 'nama@gmail.com',
+                    prefixIcon: LucideIcons.mail,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return 'Email tidak boleh kosong';
+                      if (!value.contains('@')) return 'Email tidak valid';
+                      return null;
+                    },
+                  ),
+                  SizedBox(height: 12.h),
+                  AppTextField(
+                    controller: _passwordController,
+                    hintText: 'Password',
+                    prefixIcon: LucideIcons.lock,
+                    obscureText: !_isPasswordVisible,
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _isPasswordVisible ? LucideIcons.eyeOff : LucideIcons.eye,
+                        color: AppColors.hint,
+                      ),
+                      onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
                     ),
-                    SizedBox(height: 16.h),
-
-                    // Input Email
-                    AppTextField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      hintText: 'Email',
-                      prefixIcon: LucideIcons.mail,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) return 'Email tidak boleh kosong';
-                        if (!value.contains('@')) return 'Email tidak valid';
-                        return null;
-                      },
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return 'Password tidak boleh kosong';
+                      if (value.length < 6) return 'Password minimal 6 karakter';
+                      return null;
+                    },
+                  ),
+                  SizedBox(height: 12.h),
+                  AppTextField(
+                    controller: _confirmPasswordController,
+                    hintText: 'Konfirmasi Password',
+                    prefixIcon: LucideIcons.lock,
+                    obscureText: !_isConfirmPasswordVisible,
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _isConfirmPasswordVisible ? LucideIcons.eyeOff : LucideIcons.eye,
+                        color: AppColors.hint,
+                      ),
+                      onPressed: () => setState(
+                          () => _isConfirmPasswordVisible = !_isConfirmPasswordVisible),
                     ),
-                    SizedBox(height: 16.h),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) return 'Konfirmasi password tidak boleh kosong';
+                      if (value != _passwordController.text) return 'Password tidak cocok';
+                      return null;
+                    },
+                  ),
+                  SizedBox(height: 20.h),
+                  AppButton(
+                    label: _cooldownSeconds > 0
+                        ? 'Coba lagi dalam $_cooldownSeconds dtk'
+                        : 'Daftar',
+                    isLoading: isLoading,
+                    onPressed: (_cooldownSeconds > 0 || isLoading) ? null : _handleRegister,
+                  ),
+                  SizedBox(height: 20.h),
 
-                    // Input Password
-                    AppTextField(
-                      controller: _passwordController,
-                      hintText: 'Password (Minimal 6 karakter)',
-                      prefixIcon: LucideIcons.lock,
-                      obscureText: !_isPasswordVisible,
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _isPasswordVisible ? LucideIcons.eyeOff : LucideIcons.eye,
-                          color: AppColors.hint,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Sudah punya akun? ',
+                        style: GoogleFonts.inter(
+                          fontSize: 13.sp,
+                          color: AppColors.textSecondary,
                         ),
-                        onPressed: () {
-                          setState(() {
-                            _isPasswordVisible = !_isPasswordVisible;
-                          });
-                        },
                       ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) return 'Password tidak boleh kosong';
-                        if (value.length < 6) return 'Password minimal 6 karakter';
-                        return null;
-                      },
-                    ),
-                    SizedBox(height: 32.h),
-
-                    // Tombol Register
-                    AppButton(
-                      label: _cooldownSeconds > 0
-                          ? 'Coba lagi dalam $_cooldownSeconds dtk'
-                          : 'Daftar Sekarang',
-                      isLoading: isLoading,
-                      onPressed: (_cooldownSeconds > 0 || isLoading)
-                          ? null
-                          : _handleRegister,
-                    ),
-                    SizedBox(height: 24.h),
-
-                    // Login link
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Sudah punya akun? ',
+                      GestureDetector(
+                        onTap: () => context.pop(),
+                        child: Text(
+                          'Log in',
                           style: GoogleFonts.inter(
-                            fontSize: 14.sp,
-                            color: AppColors.textSecondary,
+                            fontSize: 13.sp,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
                           ),
                         ),
-                        GestureDetector(
-                          onTap: () => context.pop(),
-                          child: Text(
-                            'Masuk',
-                            style: GoogleFonts.inter(
-                              fontSize: 14.sp,
-                              fontWeight: FontWeight.w700,
-                              color: Theme.of(context).primaryColor,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),

@@ -16,15 +16,14 @@ class ExportTransactionsSheet extends StatefulWidget {
   const ExportTransactionsSheet({super.key});
 
   @override
-  State<ExportTransactionsSheet> createState() =>
-      _ExportTransactionsSheetState();
+  State<ExportTransactionsSheet> createState() => _ExportTransactionsSheetState();
 }
 
 class _ExportTransactionsSheetState extends State<ExportTransactionsSheet> {
   final ReportExportService _exportService = ReportExportService();
 
   DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
-  String _selectedType = 'all';
+  String _selectedFormat = 'csv';
   bool _isExporting = false;
 
   @override
@@ -39,11 +38,12 @@ class _ExportTransactionsSheetState extends State<ExportTransactionsSheet> {
       child: SafeArea(
         top: false,
         child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 20.h),
+          padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 24.h),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Drag handle
               Center(
                 child: Container(
                   width: 40.w,
@@ -55,54 +55,146 @@ class _ExportTransactionsSheetState extends State<ExportTransactionsSheet> {
                 ),
               ),
               SizedBox(height: 16.h),
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Export Transaksi',
+                    style: GoogleFonts.inter(
+                      fontSize: 18.sp,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded),
+                    color: AppColors.textSecondary,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+              SizedBox(height: 24.h),
+              // Periode section
               Text(
-                'Export Transaksi',
+                'Periode',
                 style: GoogleFonts.inter(
-                  fontSize: 18.sp,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
                 ),
               ),
-              SizedBox(height: 16.h),
-              OutlinedButton.icon(
-                onPressed: _pickMonth,
-                icon: const Icon(Icons.calendar_month_outlined),
-                label: Text(monthLabel),
+              SizedBox(height: 8.h),
+              GestureDetector(
+                onTap: _pickMonth,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12.r),
+                    border: Border.all(color: AppColors.border),
+                    color: Colors.white,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.calendar_month_outlined,
+                          color: AppColors.primary, size: 20.sp),
+                      SizedBox(width: 10.w),
+                      Expanded(
+                        child: Text(
+                          monthLabel,
+                          style: GoogleFonts.inter(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      Icon(Icons.keyboard_arrow_down_rounded,
+                          color: AppColors.textSecondary, size: 20.sp),
+                    ],
+                  ),
+                ),
               ),
-              SizedBox(height: 12.h),
-              SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(value: 'all', label: Text('Semua')),
-                  ButtonSegment(value: 'expense', label: Text('Keluar')),
-                  ButtonSegment(value: 'income', label: Text('Masuk')),
+              SizedBox(height: 20.h),
+              // Format File section
+              Text(
+                'Format File',
+                style: GoogleFonts.inter(
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              SizedBox(height: 8.h),
+              Row(
+                children: [
+                  for (final format in ['csv', 'excel', 'pdf'])
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          right: format != 'pdf' ? 8.w : 0,
+                        ),
+                        child: GestureDetector(
+                          onTap: () => setState(() => _selectedFormat = format),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: EdgeInsets.symmetric(vertical: 12.h),
+                            decoration: BoxDecoration(
+                              color: _selectedFormat == format
+                                  ? AppColors.primary
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(10.r),
+                              border: Border.all(
+                                color: _selectedFormat == format
+                                    ? AppColors.primary
+                                    : AppColors.border,
+                              ),
+                            ),
+                            child: Text(
+                              format.toUpperCase(),
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.inter(
+                                fontSize: 13.sp,
+                                fontWeight: FontWeight.w600,
+                                color: _selectedFormat == format
+                                    ? Colors.white
+                                    : AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
-                selected: {_selectedType},
-                onSelectionChanged: (value) {
-                  setState(() => _selectedType = value.first);
-                },
               ),
-              SizedBox(height: 16.h),
-              _ExportButton(
-                icon: Icons.table_chart_outlined,
-                label: 'Export CSV',
-                onPressed: _isExporting ? null : () => _export('csv'),
+              SizedBox(height: 28.h),
+              // Export button
+              SizedBox(
+                height: 48.h,
+                child: ElevatedButton(
+                  onPressed: _isExporting ? null : () => _export(_selectedFormat),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12.r)),
+                  ),
+                  child: _isExporting
+                      ? SizedBox(
+                          height: 20.h,
+                          width: 20.w,
+                          child: const CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2),
+                        )
+                      : Text(
+                          'Export Data',
+                          style: GoogleFonts.inter(
+                              fontSize: 14.sp, fontWeight: FontWeight.w600),
+                        ),
+                ),
               ),
-              SizedBox(height: 8.h),
-              _ExportButton(
-                icon: Icons.grid_on_outlined,
-                label: 'Export Excel',
-                onPressed: _isExporting ? null : () => _export('excel'),
-              ),
-              SizedBox(height: 8.h),
-              _ExportButton(
-                icon: Icons.picture_as_pdf_outlined,
-                label: 'Export PDF',
-                onPressed: _isExporting ? null : () => _export('pdf'),
-              ),
-              if (_isExporting) ...[
-                SizedBox(height: 16.h),
-                const Center(child: CircularProgressIndicator()),
-              ],
             ],
           ),
         ),
@@ -127,10 +219,8 @@ class _ExportTransactionsSheetState extends State<ExportTransactionsSheet> {
                       () => tempDate = DateTime(tempDate.year - 1, tempDate.month),
                     ),
                   ),
-                  Text(
-                    '${tempDate.year}',
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w700),
-                  ),
+                  Text('${tempDate.year}',
+                      style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
                   IconButton(
                     icon: const Icon(Icons.chevron_right),
                     onPressed: () => setDialogState(
@@ -166,8 +256,7 @@ class _ExportTransactionsSheetState extends State<ExportTransactionsSheet> {
                           DateFormat('MMM', 'id_ID').format(DateTime(2024, month)),
                           style: GoogleFonts.inter(
                             color: selected ? Colors.white : AppColors.textPrimary,
-                            fontWeight:
-                                selected ? FontWeight.w700 : FontWeight.w500,
+                            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                           ),
                         ),
                       ),
@@ -180,10 +269,7 @@ class _ExportTransactionsSheetState extends State<ExportTransactionsSheet> {
         );
       },
     );
-
-    if (picked != null) {
-      setState(() => _selectedMonth = picked);
-    }
+    if (picked != null) setState(() => _selectedMonth = picked);
   }
 
   Future<void> _export(String format) async {
@@ -218,7 +304,7 @@ class _ExportTransactionsSheetState extends State<ExportTransactionsSheet> {
         return;
       }
 
-      await Share.shareXFiles([XFile(path)]);
+      await SharePlus.instance.share(ShareParams(files: [XFile(path)]));
       await OpenFilex.open(path);
     } catch (e) {
       if (!mounted) return;
@@ -234,39 +320,10 @@ class _ExportTransactionsSheetState extends State<ExportTransactionsSheet> {
     final provider = context.read<TransactionProvider>();
     final start = DateTime(_selectedMonth.year, _selectedMonth.month);
     final end = DateTime(_selectedMonth.year, _selectedMonth.month + 1);
-
     await provider.loadByDateRange(userId, start, end);
-
     return provider.transactions.where((tx) {
-      final inMonth = tx.date.year == _selectedMonth.year &&
+      return tx.date.year == _selectedMonth.year &&
           tx.date.month == _selectedMonth.month;
-      final matchType = _selectedType == 'all' || tx.type == _selectedType;
-      return inMonth && matchType;
     }).toList();
-  }
-}
-
-class _ExportButton extends StatelessWidget {
-  const _ExportButton({
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: onPressed,
-      icon: Icon(icon),
-      label: Text(label),
-      style: OutlinedButton.styleFrom(
-        padding: EdgeInsets.symmetric(vertical: 14.h),
-        alignment: Alignment.centerLeft,
-      ),
-    );
   }
 }

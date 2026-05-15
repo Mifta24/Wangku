@@ -16,9 +16,8 @@ class BudgetProvider extends ChangeNotifier {
   bool _alertInProgress = false;
   bool _isDisposed = false;
   bool _notificationsEnabled = true;
-  double _warningThreshold = 0.8;
-  String _notificationTitle = 'Anggaran mendekati limit';
-  String _notificationBody = 'Sudah terpakai {percent}%. Sisa {remaining}.';
+
+  static const double _warningThreshold = 0.8;
 
   BudgetProvider({required this.txnProvider}) {
     txnProvider.addListener(_onTransactionsChanged);
@@ -28,13 +27,13 @@ class BudgetProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get notificationsEnabled => _notificationsEnabled;
-  double get warningThreshold => _warningThreshold;
-  String get notificationTitle => _notificationTitle;
-  String get notificationBody => _notificationBody;
 
-  double get monthExpense => txnProvider.monthExpense;
+  double get monthExpense {
+    return txnProvider.monthTransactions
+        .where((t) => t.type == 'expense' && _categoryBudgets.containsKey(t.categoryId))
+        .fold<double>(0.0, (p, e) => p + e.amount);
+  }
 
-  /// Total anggaran = jumlah semua anggaran kategori yang sudah di-set
   double get totalCategoryBudget =>
       _categoryBudgets.values.fold(0.0, (sum, v) => sum + v);
 
@@ -49,8 +48,7 @@ class BudgetProvider extends ChangeNotifier {
   double categoryProgress(String categoryId) {
     final budget = categoryBudget(categoryId);
     if (budget == null || budget <= 0) return 0.0;
-    final ratio = categoryExpense(categoryId) / budget;
-    return ratio.clamp(0.0, 1.0);
+    return (categoryExpense(categoryId) / budget).clamp(0.0, 1.0);
   }
 
   double categoryRemaining(String categoryId) {
@@ -72,15 +70,8 @@ class BudgetProvider extends ChangeNotifier {
     _userId = userId;
     try {
       _lastBudgetAlertDate = await _hiveManager.getBudgetAlertLastDate(userId);
-      final settings =
-          await _hiveManager.getBudgetNotificationSettings(userId);
+      final settings = await _hiveManager.getBudgetNotificationSettings(userId);
       _notificationsEnabled = (settings?['enabled'] as bool?) ?? true;
-      _warningThreshold =
-          ((settings?['threshold'] as num?)?.toDouble() ?? 0.8).clamp(0.1, 1.0);
-      _notificationTitle =
-          (settings?['title'] as String?) ?? 'Anggaran mendekati limit';
-      _notificationBody = (settings?['body'] as String?) ??
-          'Sudah terpakai {percent}%. Sisa {remaining}.';
       notifyListeners();
     } catch (_) {}
   }
@@ -89,38 +80,12 @@ class BudgetProvider extends ChangeNotifier {
     _userId = userId;
     _notificationsEnabled = enabled;
     notifyListeners();
-    await saveNotificationSettings(userId);
-  }
-
-  Future<void> saveNotificationSettings(
-    String userId, {
-    bool? enabled,
-    double? threshold,
-    String? title,
-    String? body,
-  }) async {
-    _userId = userId;
-    if (enabled != null) _notificationsEnabled = enabled;
-    if (threshold != null) _warningThreshold = threshold.clamp(0.1, 1.0);
-    if (title != null && title.trim().isNotEmpty) {
-      _notificationTitle = title.trim();
-    }
-    if (body != null && body.trim().isNotEmpty) {
-      _notificationBody = body.trim();
-    }
-    notifyListeners();
     try {
       await _hiveManager.saveBudgetNotificationSettings(
         userId,
         enabled: _notificationsEnabled,
-        threshold: _warningThreshold,
-        title: _notificationTitle,
-        body: _notificationBody,
       );
-    } catch (e) {
-      _errorMessage = e.toString();
-      notifyListeners();
-    }
+    } catch (_) {}
   }
 
   Future<void> loadCategoryBudgets(String userId) async {
@@ -149,10 +114,7 @@ class BudgetProvider extends ChangeNotifier {
     notifyListeners();
     try {
       await _hiveManager.saveCategoryBudget(userId, categoryId, amount);
-      _categoryBudgets = {
-        ..._categoryBudgets,
-        categoryId: amount,
-      };
+      _categoryBudgets = {..._categoryBudgets, categoryId: amount};
     } catch (e) {
       _errorMessage = e.toString();
     }
@@ -160,25 +122,39 @@ class BudgetProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Dipanggil setelah user input transaksi pengeluaran.
-  /// Jika pemakaian anggaran kategori >= 80%, langsung tampilkan notifikasi.
+  Future<void> deleteCategoryBudget(String userId, String categoryId) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      await _hiveManager.deleteCategoryBudget(userId, categoryId);
+      _categoryBudgets = Map.from(_categoryBudgets)..remove(categoryId);
+    } catch (e) {
+      _errorMessage = e.toString();
+    }
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  /// Cek & kirim notif kategori setelah input transaksi pengeluaran.
   Future<void> checkCategoryWarningAfterTransaction(
     String categoryId,
     String categoryName,
   ) async {
-    final budget = categoryBudget(categoryId);
     if (!_notificationsEnabled) return;
+    final budget = categoryBudget(categoryId);
     if (budget == null || budget <= 0) return;
-    final prog = categoryProgress(categoryId);
-    if (prog < _warningThreshold) return;
+
+    final expense = categoryExpense(categoryId);
+    final ratio = expense / budget; // tidak di-clamp agar bisa detect >= 1.0
+    if (ratio < _warningThreshold) return;
+
     final rem = categoryRemaining(categoryId);
     await NotificationService.instance.showCategoryBudgetWarning(
       categoryName: categoryName,
-      percent: prog,
+      percent: ratio,
       remaining: rem,
       categoryId: categoryId,
-      title: _formatTemplate(_notificationTitle, categoryName, prog, rem),
-      body: _formatTemplate(_notificationBody, categoryName, prog, rem),
     );
   }
 
@@ -208,8 +184,6 @@ class BudgetProvider extends ChangeNotifier {
     await NotificationService.instance.showBudgetWarning(
       percent: progress,
       remaining: remaining,
-      title: _formatTemplate(_notificationTitle, null, progress, remaining),
-      body: _formatTemplate(_notificationBody, null, progress, remaining),
     );
     await _hiveManager.saveBudgetAlertLastDate(userId, now);
     _lastBudgetAlertDate = now;
@@ -219,18 +193,6 @@ class BudgetProvider extends ChangeNotifier {
   bool _isSameDay(DateTime? a, DateTime b) {
     if (a == null) return false;
     return a.year == b.year && a.month == b.month && a.day == b.day;
-  }
-
-  String _formatTemplate(
-    String template,
-    String? categoryName,
-    double percent,
-    double remaining,
-  ) {
-    return template
-        .replaceAll('{category}', categoryName ?? 'Total')
-        .replaceAll('{percent}', (percent * 100).toStringAsFixed(0))
-        .replaceAll('{remaining}', 'Rp ${remaining.toStringAsFixed(0)}');
   }
 
   @override

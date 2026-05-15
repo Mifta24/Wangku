@@ -19,35 +19,67 @@ class AddCategoryDialog extends StatefulWidget {
 }
 
 class _AddCategoryDialogState extends State<AddCategoryDialog> {
-  final _nameController = TextEditingController();
-  final _iconController = TextEditingController(text: '📝');
-  
+  late final TextEditingController _nameController;
+  String _selectedIcon = '📝';
   String _selectedColor = '#4D96FF';
   bool _isLoading = false;
+  String? _nameError;
 
-  final List<String> _colorOptions = [
-    '#FF6B6B', '#4ECDC4', '#FFE66D', '#95E1D3', '#F38181', 
-    '#A8E6CF', '#6BCB77', '#4D96FF', '#FFD700', '#9C27B0'
+  final List<String> _colorOptions = const [
+    '#FF6B6B', '#E53935', '#FF5252', '#FF7043', '#F38181',
+    '#FF8C42', '#FFA726', '#FFE66D', '#FFD700', '#FFC107',
+    '#6BCB77', '#4CAF50', '#A8E6CF', '#26A69A', '#4ECDC4',
+    '#95E1D3', '#80CBC4', '#29B6F6', '#4D96FF', '#2196F3',
+    '#5C6BC0', '#7E57C2', '#9C27B0', '#AB47BC', '#CE93D8',
+    '#EC407A', '#F06292', '#E91E63', '#8D6E63', '#607D8B',
   ];
 
-  final List<String> _emojiOptions = [
-    '🍔', '🚗', '🎬', '🛍️', '⚕️', '💡', '📚', '💰', '🎁', '💻', 
-    '📈', '🏠', '✈️', '🎮', '📱', '👗', '☕', '🛒', '🐾', '📝'
+  final List<String> _emojiOptions = const [
+    '😀', '😄', '😊', '😍', '😎', '🥳', '🤩', '😇', '🤝', '🙏',
+    '💪', '🧠', '👨‍👩‍👧‍👦', '👶', '🧒', '👩', '👨', '👵', '👴', '🐶',
+    '🐱', '🐟', '🐔', '🌱', '🌿', '🌻', '🌙', '⭐', '☀️', '🌧️',
+    '🔥', '💧', '🍚', '🍜', '🍕', '🍔', '🍟', '🌭', '🥪', '🥗',
+    '🍱', '🍲', '🍛', '🍣', '🥘', '🥩', '🍗', '🥚', '🥛', '🍎',
+    '🍌', '🍊', '🍉', '🥑', '🥕', '🍞', '🥐', '🍰', '🍫', '☕',
+    '🍵', '🧃', '🥤', '🚲', '🛵', '🚗', '🚕', '🚌', '🚆', '✈️',
+    '🚢', '⛽', '🅿️', '🛣️', '🏠', '🏡', '🏢', '🏦', '🏥', '🏫',
+    '🏪', '🏨', '🏬', '🛒', '🛍️', '🎟️', '🎬', '🎤', '🎧', '🎮',
+    '🎲', '🎨', '🎭', '⚽', '🏀', '🏸', '🏋️', '🧘', '🏖️', '🏕️',
+    '🎁', '🎂', '🎉', '⚕️', '💊', '💉', '🩺', '🦷', '👓', '🧴',
+    '🧼', '🧹', '🧺', '🛠️', '🔧', '🔌', '💡', '🛏️', '🛋️', '🚿',
+    '🧻', '👕', '👖', '👟', '👗', '💄', '💅', '💈', '📦', '📮',
+    '📚', '✏️', '🖊️', '🖥️', '💻', '⌨️', '🖱️', '📱', '📷', '🖨️',
+    '💾', '🔐', '🌐', '📶', '📞', '📺', '🎓', '💼', '📊', '📈',
+    '📉', '🧾', '📝', '📌', '📅', '⏰', '💰', '💵', '💳', '🏧',
+    '🪙', '💸', '🧮', '✅', '❌', '⚠️', '❤️', '💙', '💚', '💛',
+    '💜', '🤍',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController();
+  }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _iconController.dispose();
     super.dispose();
   }
 
   Future<void> _saveCategory() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nama kategori tidak boleh kosong')),
-      );
+      setState(() => _nameError = 'Nama tidak boleh kosong');
+      return;
+    }
+
+    final txnProvider = context.read<TransactionProvider>();
+    final isDuplicate = txnProvider.categories.any((c) =>
+        c.type == widget.type &&
+        c.name.toLowerCase() == name.toLowerCase());
+    if (isDuplicate) {
+      setState(() => _nameError = 'Nama kategori sudah digunakan');
       return;
     }
 
@@ -56,35 +88,40 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
     try {
       final authProvider = context.read<AuthProvider>();
       final txnProvider = context.read<TransactionProvider>();
-      
+
       final category = CategoryModel(
-        id: const Uuid().v4(), // Placeholder ID
+        id: const Uuid().v4(),
         userId: authProvider.currentUser!.id,
         name: name,
-        icon: _iconController.text,
+        icon: _selectedIcon,
         color: _selectedColor,
         type: widget.type,
       );
 
       await txnProvider.addCustomCategory(category);
-      
+
       if (!mounted) return;
-      
-      // Kembalikan kategori yang baru dibuat
-      // Kita asumsikan kategori terakhir di list sesuai dengan tipe
-      final newCats = widget.type == 'income' 
-          ? txnProvider.incomeCategories 
+
+      final newCats = widget.type == 'income'
+          ? txnProvider.incomeCategories
           : txnProvider.expenseCategories;
-          
+
       Navigator.pop(context, newCats.last);
-      
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
       );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Color _parseHexColor(String rawHex) {
+    try {
+      final hex = rawHex.replaceFirst('#', '');
+      return Color(int.parse('FF$hex', radix: 16));
+    } catch (_) {
+      return AppColors.primary;
     }
   }
 
@@ -92,125 +129,156 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
-      child: Padding(
+      child: SingleChildScrollView(
         padding: EdgeInsets.all(20.w),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Kategori Baru (${widget.type == 'income' ? 'Pemasukan' : 'Pengeluaran'})',
-                style: GoogleFonts.inter(
-                  fontSize: 18.sp,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Kategori Baru',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 18.sp,
+                fontWeight: FontWeight.w700,
               ),
-              SizedBox(height: 20.h),
-              
-              TextField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Nama Kategori',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              SizedBox(height: 16.h),
-              
-              Text('Pilih Icon', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-              SizedBox(height: 8.h),
-              Container(
-                height: 150.h,
-                padding: EdgeInsets.all(8.w),
+            ),
+            SizedBox(height: 20.h),
+            Center(
+              child: Container(
+                width: 56.w,
+                height: 56.w,
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(8.r),
+                  color: _parseHexColor(_selectedColor).withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(14.r),
                 ),
-                child: GridView.builder(
-                  shrinkWrap: true,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 5,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                  ),
-                  itemCount: _emojiOptions.length,
-                  itemBuilder: (context, index) {
-                    final emoji = _emojiOptions[index];
-                    final isSelected = _iconController.text == emoji;
-                    return GestureDetector(
-                      onTap: () => setState(() => _iconController.text = emoji),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: isSelected ? AppColors.primary.withValues(alpha: 0.2) : Colors.transparent,
-                          borderRadius: BorderRadius.circular(8.r),
-                          border: Border.all(
-                            color: isSelected ? AppColors.primary : Colors.transparent,
-                          ),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(emoji, style: TextStyle(fontSize: 24.sp)),
-                      ),
-                    );
-                  },
-                ),
+                alignment: Alignment.center,
+                child: Text(_selectedIcon, style: TextStyle(fontSize: 28.sp)),
               ),
-              
-              SizedBox(height: 16.h),
-              Text('Pilih Warna', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-              SizedBox(height: 8.h),
-              Wrap(
-                spacing: 8.w,
-                runSpacing: 8.h,
-                children: _colorOptions.map((colorStr) {
-                  final color = Color(int.parse('FF${colorStr.replaceFirst('#', '')}', radix: 16));
-                  final isSelected = _selectedColor == colorStr;
-                  return GestureDetector(
-                    onTap: () => setState(() => _selectedColor = colorStr),
+            ),
+            SizedBox(height: 16.h),
+            TextField(
+              controller: _nameController,
+              onChanged: (_) => setState(() => _nameError = null),
+              decoration: InputDecoration(
+                labelText: 'Nama Kategori',
+                border: const OutlineInputBorder(),
+                errorText: _nameError,
+              ),
+            ),
+            SizedBox(height: 16.h),
+            Text(
+              'Pilih Ikon',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+            ),
+            SizedBox(height: 8.h),
+            Container(
+              height: 190.h,
+              padding: EdgeInsets.all(8.w),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12.r),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: GridView.builder(
+                itemCount: _emojiOptions.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 6,
+                  crossAxisSpacing: 8.w,
+                  mainAxisSpacing: 8.h,
+                ),
+                itemBuilder: (context, index) {
+                  final emoji = _emojiOptions[index];
+                  final selected = _selectedIcon == emoji;
+                  return InkWell(
+                    onTap: () => setState(() => _selectedIcon = emoji),
+                    borderRadius: BorderRadius.circular(8.r),
                     child: Container(
-                      width: 36.w,
-                      height: 36.w,
+                      alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
+                        color: selected
+                            ? _parseHexColor(_selectedColor).withValues(alpha: 0.16)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8.r),
                         border: Border.all(
-                          color: isSelected ? Colors.black : Colors.transparent,
-                          width: 2,
+                          color: selected
+                              ? _parseHexColor(_selectedColor)
+                              : AppColors.border,
                         ),
                       ),
-                      child: isSelected 
-                          ? const Icon(Icons.check, color: Colors.white, size: 20) 
-                          : null,
+                      child: Text(emoji, style: TextStyle(fontSize: 22.sp)),
                     ),
                   );
-                }).toList(),
+                },
               ),
-              
-              SizedBox(height: 24.h),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Batal'),
-                    ),
-                  ),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _saveCategory,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
+            ),
+            SizedBox(height: 16.h),
+            Text(
+              'Pilih Warna',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+            ),
+            SizedBox(height: 8.h),
+            Wrap(
+              spacing: 8.w,
+              runSpacing: 8.h,
+              children: _colorOptions.map((colorStr) {
+                final color = Color(
+                  int.parse('FF${colorStr.replaceFirst('#', '')}', radix: 16),
+                );
+                final selected = _selectedColor == colorStr;
+                return GestureDetector(
+                  onTap: () => setState(() => _selectedColor = colorStr),
+                  child: Container(
+                    width: 36.w,
+                    height: 36.w,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: selected ? AppColors.textPrimary : Colors.white,
+                        width: 2,
                       ),
-                      child: _isLoading 
-                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                          : const Text('Simpan'),
                     ),
+                    child: selected
+                        ? const Icon(Icons.check, color: Colors.white, size: 18)
+                        : null,
                   ),
-                ],
-              ),
-            ],
-          ),
+                );
+              }).toList(),
+            ),
+            SizedBox(height: 24.h),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Batal'),
+                  ),
+                ),
+                SizedBox(width: 12.w),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _isLoading || _nameController.text.trim().isEmpty
+                        ? null
+                        : _saveCategory,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text('Simpan'),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

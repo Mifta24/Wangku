@@ -196,13 +196,14 @@ class TransactionProvider extends ChangeNotifier {
       if (index != -1) {
         _categories[index] = updated;
       }
-      _transactions = _transactions
-          .map(
-            (transaction) => transaction.categoryId == updated.id
-                ? transaction.copyWith(category: updated)
-                : transaction,
-          )
-          .toList();
+      // Re-embed ALL categories so color/icon changes propagate everywhere
+      _transactions = _transactions.map((t) {
+        final cat = _categories.cast<CategoryModel?>().firstWhere(
+          (c) => c?.id == t.categoryId,
+          orElse: () => null,
+        );
+        return cat != null ? t.copyWith(category: cat) : t;
+      }).toList();
       notifyListeners();
     } catch (e) {
       _setError('Gagal update kategori: ${e.toString()}');

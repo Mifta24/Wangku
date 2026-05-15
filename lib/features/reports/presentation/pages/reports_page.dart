@@ -23,27 +23,24 @@ class _ReportsPageState extends State<ReportsPage> {
   );
 
   String? _selectedCategoryId;
-  TransactionType? _selectedCashflowType;
   int? _selectedTrendIndex;
-  bool _showTrendChart = false;
 
   String _formatCurrency(double amount) => _currencyFormatter.format(amount);
 
   CategoryDistribution? _selectedCategory(ReportProvider report) {
     final selectedId = _selectedCategoryId;
     if (selectedId == null) return null;
-
     for (final category in report.categories) {
       if (category.categoryId == selectedId) return category;
     }
-
     return null;
   }
 
   void _selectCategory(CategoryDistribution category) {
     setState(() {
-      _selectedCategoryId =
-          _selectedCategoryId == category.categoryId ? null : category.categoryId;
+      _selectedCategoryId = _selectedCategoryId == category.categoryId
+          ? null
+          : category.categoryId;
     });
   }
 
@@ -56,74 +53,66 @@ class _ReportsPageState extends State<ReportsPage> {
 
     return Consumer<ReportProvider>(
       builder: (context, report, _) {
-          return SafeArea(
-            child: Column(
-              children: [
-                _buildHeader(report),
-                _buildTabs(report),
-                _buildDateNavigator(report),
-                Expanded(
-                  child: report.isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : SingleChildScrollView(
-                          padding: const EdgeInsets.all(20),
-                          child: Column(
-                            children: [
-                              _buildCashflowSummary(report),
-                              const SizedBox(height: 24),
-                              _buildDonutChart(report),
-                              const SizedBox(height: 16),
-                              _buildSelectedCategoryInfo(report),
-                              _buildSelectedCategoryTransactions(report),
-                              const SizedBox(height: 32),
-                              _buildCategoryList(report),
-                            ],
-                          ),
+        return SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildHeader(),
+              _buildTabs(report),
+              _buildDateNavigator(report),
+              const Divider(height: 1, color: Color(0xFFE5E7EB)),
+              Expanded(
+                child: report.isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildSurplusCard(report),
+                            const SizedBox(height: 16),
+                            _buildTrendSection(report),
+                            const SizedBox(height: 16),
+                            _buildBreakdownSection(report),
+                          ],
                         ),
-                ),
-              ],
-            ),
-          );
-        },
-      );
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
-  Widget _buildHeader(ReportProvider report) {
+  // ── Header ──────────────────────────────────────────────────────────────────
+
+  Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          DropdownButtonHideUnderline(
-            child: DropdownButton<TransactionType>(
-              value: report.transactionType,
-              icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textPrimary),
-              style: GoogleFonts.inter(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
-              items: const [
-                DropdownMenuItem(value: TransactionType.expense, child: Text('Pengeluaran')),
-                DropdownMenuItem(value: TransactionType.income, child: Text('Pemasukan')),
-              ],
-              onChanged: (val) {
-                if (val != null) report.setTransactionType(val);
-              },
-            ),
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Center(
+        child: Text(
+          'Analisis',
+          style: GoogleFonts.inter(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
           ),
-        ],
+        ),
       ),
     );
   }
 
+  // ── Period Tabs ──────────────────────────────────────────────────────────────
+
   Widget _buildTabs(ReportProvider report) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       child: Container(
+        padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
-          color: Colors.grey.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
+          color: Colors.grey.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(24),
         ),
         child: Row(
           children: [
@@ -141,14 +130,12 @@ class _ReportsPageState extends State<ReportsPage> {
     return Expanded(
       child: GestureDetector(
         onTap: () => report.setPeriodType(type),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 9),
           decoration: BoxDecoration(
-            color: isSelected ? Colors.white : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: isSelected
-                ? [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]
-                : [],
+            color: isSelected ? AppColors.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(20),
           ),
           child: Text(
             title,
@@ -156,7 +143,7 @@ class _ReportsPageState extends State<ReportsPage> {
             style: GoogleFonts.inter(
               fontSize: 13,
               fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-              color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
+              color: isSelected ? Colors.white : AppColors.textSecondary,
             ),
           ),
         ),
@@ -164,64 +151,153 @@ class _ReportsPageState extends State<ReportsPage> {
     );
   }
 
+  // ── Date Navigator ───────────────────────────────────────────────────────────
+
   Widget _buildDateNavigator(ReportProvider report) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           IconButton(
             icon: const Icon(Icons.chevron_left),
             onPressed: report.previousPeriod,
+            color: AppColors.textSecondary,
           ),
           Text(
             report.periodLabel,
-            style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
           ),
+          // const Icon(
+          //   Icons.keyboard_arrow_down_rounded,
+          //   size: 18,
+          //   color: AppColors.textSecondary,
+          // ),
           IconButton(
             icon: const Icon(Icons.chevron_right),
             onPressed: report.nextPeriod,
+            color: AppColors.textSecondary,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCashflowSummary(ReportProvider report) {
+  // ── Surplus Card ─────────────────────────────────────────────────────────────
+
+  Widget _buildSurplusCard(ReportProvider report) {
     final isSurplus = report.netAmount >= 0;
     final netColor = isSurplus ? AppColors.income : AppColors.expense;
-    final selectedType = _selectedCashflowType;
-    final selectedAmount = selectedType == TransactionType.income
-        ? report.incomeTotal
-        : selectedType == TransactionType.expense
-        ? report.expenseTotal
-        : report.netAmount.abs();
-    final maxAmount = [
-      report.incomeTotal,
-      report.expenseTotal,
-      1.0,
-    ].reduce((a, b) => a > b ? a : b);
-    final trendPoints = report.trendPoints;
-    final selectedTrendIndex = (_selectedTrendIndex != null &&
-            _selectedTrendIndex! >= 0 &&
-            _selectedTrendIndex! < trendPoints.length)
-        ? _selectedTrendIndex!
-        : trendPoints.isEmpty
-            ? 0
-            : trendPoints.length - 1;
+    final label = isSurplus ? 'Surplus Bulan Ini' : 'Defisit Bulan Ini';
 
     return Container(
-      width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.border),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _formatCurrency(report.netAmount.abs()),
+            style: GoogleFonts.inter(
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
+              color: netColor,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _buildSummaryChip(
+                'Pemasukan',
+                report.incomeTotal,
+                AppColors.income,
+              ),
+              const SizedBox(width: 16),
+              _buildSummaryChip(
+                'Pengeluaran',
+                report.expenseTotal,
+                AppColors.expense,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryChip(String label, double amount, Color color) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            Text(
+              _formatCurrency(amount),
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // ── Trend Cashflow Section ───────────────────────────────────────────────────
+
+  Widget _buildTrendSection(ReportProvider report) {
+    final points = report.trendPoints;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -229,321 +305,192 @@ class _ReportsPageState extends State<ReportsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isSurplus ? 'Surplus periode ini' : 'Defisit periode ini',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${isSurplus ? '+' : '-'}${_formatCurrency(report.netAmount.abs())}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.inter(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: netColor,
-                      ),
-                    ),
-                  ],
+              Text(
+                'Tren Cashflow',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
                 ),
               ),
-              Material(
-                color: netColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(8),
-                  onTap: () {
-                    setState(() {
-                      _showTrendChart = !_showTrendChart;
-                    });
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    child: Icon(
-                      _showTrendChart
-                          ? Icons.bar_chart_rounded
-                          : Icons.trending_up_rounded,
-                      color: netColor,
-                      size: 20,
-                    ),
-                  ),
-                ),
+              Row(
+                children: [
+                  _buildTrendLegend(AppColors.income, 'Pemasukan'),
+                  const SizedBox(width: 12),
+                  _buildTrendLegend(AppColors.expense, 'Pengeluaran'),
+                ],
               ),
             ],
           ),
-          const SizedBox(height: 18),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
-            child: _showTrendChart
-                ? _buildTrendChart(report, key: const ValueKey('trend-chart'))
-                : _buildCashflowBars(
-                    report: report,
-                    maxAmount: maxAmount,
-                    selectedType: selectedType,
-                    key: const ValueKey('cashflow-bars'),
-                  ),
-          ),
-          const SizedBox(height: 14),
-          _showTrendChart && trendPoints.isNotEmpty
-              ? _buildTrendDetail(trendPoints[selectedTrendIndex])
-              : _buildCashflowDetail(
-                  selectedType: selectedType,
-                  selectedAmount: selectedAmount,
-                  report: report,
+          const SizedBox(height: 16),
+          if (points.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Text(
+                  'Tidak ada data untuk periode ini',
+                  style: GoogleFonts.inter(color: AppColors.hint),
                 ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCashflowBars({
-    required Key key,
-    required ReportProvider report,
-    required double maxAmount,
-    required TransactionType? selectedType,
-  }) {
-    return SizedBox(
-      key: key,
-      height: 180,
-      child: BarChart(
-        BarChartData(
-          maxY: maxAmount * 1.2,
-          alignment: BarChartAlignment.spaceAround,
-          gridData: FlGridData(
-            show: true,
-            drawVerticalLine: false,
-            getDrawingHorizontalLine: (value) => FlLine(
-              color: AppColors.border.withValues(alpha: 0.55),
-              strokeWidth: 1,
-            ),
-          ),
-          borderData: FlBorderData(show: false),
-          titlesData: FlTitlesData(
-            topTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            rightTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            leftTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
-            ),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 32,
-                getTitlesWidget: (value, meta) {
-                  final label = value.toInt() == 0 ? 'Masuk' : 'Keluar';
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      label,
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  );
-                },
               ),
+            )
+          else
+            SizedBox(
+              height: 200,
+              child: LineChart(_buildTrendChartData(points)),
             ),
-          ),
-          barTouchData: BarTouchData(
-            enabled: true,
-            touchTooltipData: BarTouchTooltipData(
-              getTooltipColor: (_) => AppColors.textPrimary,
-              getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                final type = group.x == 0
-                    ? TransactionType.income
-                    : TransactionType.expense;
-                final label =
-                    type == TransactionType.income ? 'Pemasukan' : 'Pengeluaran';
-                return BarTooltipItem(
-                  '$label\n${_formatCurrency(rod.toY)}',
-                  GoogleFonts.inter(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                );
-              },
-            ),
-            touchCallback: (event, response) {
-              if (!event.isInterestedForInteractions || response?.spot == null) {
-                return;
-              }
-
-              final type = response!.spot!.touchedBarGroup.x == 0
-                  ? TransactionType.income
-                  : TransactionType.expense;
-              setState(() {
-                _selectedCashflowType =
-                    _selectedCashflowType == type ? null : type;
-              });
-            },
-          ),
-          barGroups: [
-            _buildCashflowBar(
-              x: 0,
-              amount: report.incomeTotal,
-              color: AppColors.income,
-              isSelected: selectedType == TransactionType.income,
-            ),
-            _buildCashflowBar(
-              x: 1,
-              amount: report.expenseTotal,
-              color: AppColors.expense,
-              isSelected: selectedType == TransactionType.expense,
+          if (points.isNotEmpty && _selectedTrendIndex != null) ...[
+            const SizedBox(height: 12),
+            _buildTrendDetail(
+              points[_selectedTrendIndex!.clamp(0, points.length - 1)],
             ),
           ],
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildTrendChart(ReportProvider report, {required Key key}) {
-    final points = report.trendPoints;
-    if (points.isEmpty) return const SizedBox.shrink();
-
-    final maxAmount = points.fold<double>(1, (max, point) {
-      final pointMax = point.income > point.expense ? point.income : point.expense;
+  LineChartData _buildTrendChartData(List<TrendPoint> points) {
+    final maxAmount = points.fold<double>(1, (max, p) {
+      final pointMax = p.income > p.expense ? p.income : p.expense;
       return pointMax > max ? pointMax : max;
     });
-    return SizedBox(
-      key: key,
-      height: 210,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            _buildTrendLegend(AppColors.income, 'Masuk'),
-            const SizedBox(width: 10),
-            _buildTrendLegend(AppColors.expense, 'Keluar'),
-          ]),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 178,
-            child: LineChart(
-              LineChartData(
-                minX: 0,
-                maxX: (points.length - 1).toDouble(),
-                minY: 0,
-                maxY: maxAmount * 1.2,
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: false,
-                  getDrawingHorizontalLine: (value) => FlLine(
-                    color: AppColors.border.withValues(alpha: 0.55),
-                    strokeWidth: 1,
-                  ),
-                ),
-                borderData: FlBorderData(show: false),
-                titlesData: FlTitlesData(
-                  topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  leftTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 32,
-                      interval: 1,
-                      getTitlesWidget: (value, meta) {
-                        final index = value.round();
-                        if (index < 0 || index >= points.length) {
-                          return const SizedBox.shrink();
-                        }
 
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(
-                            points[index].label,
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-                lineTouchData: LineTouchData(
-                  enabled: true,
-                  touchTooltipData: LineTouchTooltipData(
-                    getTooltipColor: (_) => AppColors.textPrimary,
-                    getTooltipItems: (spots) {
-                      return spots.map((spot) {
-                        final isIncome = spot.barIndex == 0;
-                        final label = isIncome ? 'Pemasukan' : 'Pengeluaran';
-                        return LineTooltipItem(
-                          '$label\n${_formatCurrency(spot.y)}',
-                          GoogleFonts.inter(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        );
-                      }).toList();
-                    },
-                  ),
-                  touchCallback: (event, response) {
-                    if (!event.isInterestedForInteractions ||
-                        response?.lineBarSpots == null ||
-                        response!.lineBarSpots!.isEmpty) {
-                      return;
-                    }
+    String formatY(double value) {
+      if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(0)}jt';
+      if (value >= 1000) return '${(value / 1000).toStringAsFixed(0)}rb';
+      return value.toStringAsFixed(0);
+    }
 
-                    setState(() {
-                      _selectedTrendIndex =
-                          response.lineBarSpots!.first.x.round();
-                    });
-                  },
+    return LineChartData(
+      minX: 0,
+      maxX: (points.length - 1).toDouble(),
+      minY: 0,
+      maxY: maxAmount * 1.25,
+      gridData: FlGridData(
+        show: true,
+        drawVerticalLine: false,
+        getDrawingHorizontalLine: (value) => FlLine(
+          color: AppColors.border.withValues(alpha: 0.5),
+          strokeWidth: 1,
+        ),
+      ),
+      borderData: FlBorderData(show: false),
+      titlesData: FlTitlesData(
+        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        rightTitles: const AxisTitles(
+          sideTitles: SideTitles(showTitles: false),
+        ),
+        leftTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            reservedSize: 36,
+            getTitlesWidget: (value, meta) {
+              if (value == meta.max) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: Text(
+                  formatY(value),
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
-                lineBarsData: [
-                  _buildTrendLine(
-                    points
-                        .asMap()
-                        .entries
-                        .map((entry) => FlSpot(
-                              entry.key.toDouble(),
-                              entry.value.income,
-                            ))
-                        .toList(),
-                    AppColors.income,
-                  ),
-                  _buildTrendLine(
-                    points
-                        .asMap()
-                        .entries
-                        .map((entry) => FlSpot(
-                              entry.key.toDouble(),
-                              entry.value.expense,
-                            ))
-                        .toList(),
-                    AppColors.expense,
-                  ),
-                ],
-              ),
-            ),
+              );
+            },
           ),
-        ],
+        ),
+        bottomTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            reservedSize: 28,
+            interval: 1,
+            getTitlesWidget: (value, meta) {
+              final index = value.round();
+              if (index < 0 || index >= points.length)
+                return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  points[index].label,
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+      lineTouchData: LineTouchData(
+        enabled: true,
+        touchTooltipData: LineTouchTooltipData(
+          getTooltipColor: (_) => AppColors.textPrimary,
+          getTooltipItems: (spots) => spots.map((spot) {
+            final isIncome = spot.barIndex == 0;
+            return LineTooltipItem(
+              '${isIncome ? 'Pemasukan' : 'Pengeluaran'}\n${_formatCurrency(spot.y)}',
+              GoogleFonts.inter(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            );
+          }).toList(),
+        ),
+        touchCallback: (event, response) {
+          if (!event.isInterestedForInteractions ||
+              response?.lineBarSpots == null ||
+              response!.lineBarSpots!.isEmpty) {
+            return;
+          }
+          setState(() {
+            _selectedTrendIndex = response.lineBarSpots!.first.x.round();
+          });
+        },
+      ),
+      lineBarsData: [
+        _buildTrendLine(
+          points
+              .asMap()
+              .entries
+              .map((e) => FlSpot(e.key.toDouble(), e.value.income))
+              .toList(),
+          AppColors.income,
+        ),
+        _buildTrendLine(
+          points
+              .asMap()
+              .entries
+              .map((e) => FlSpot(e.key.toDouble(), e.value.expense))
+              .toList(),
+          AppColors.expense,
+        ),
+      ],
+    );
+  }
+
+  LineChartBarData _buildTrendLine(List<FlSpot> spots, Color color) {
+    return LineChartBarData(
+      spots: spots,
+      isCurved: true,
+      color: color,
+      barWidth: 2.5,
+      isStrokeCapRound: true,
+      dotData: FlDotData(
+        show: true,
+        getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
+          radius: index == _selectedTrendIndex ? 4.5 : 2.5,
+          color: Colors.white,
+          strokeWidth: 2,
+          strokeColor: color,
+        ),
+      ),
+      belowBarData: BarAreaData(
+        show: true,
+        color: color.withValues(alpha: 0.07),
       ),
     );
   }
@@ -562,34 +509,11 @@ class _ReportsPageState extends State<ReportsPage> {
           label,
           style: GoogleFonts.inter(
             fontSize: 11,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w500,
             color: AppColors.textSecondary,
           ),
         ),
       ],
-    );
-  }
-
-  LineChartBarData _buildTrendLine(List<FlSpot> spots, Color color) {
-    return LineChartBarData(
-      spots: spots,
-      isCurved: true,
-      color: color,
-      barWidth: 3,
-      isStrokeCapRound: true,
-      dotData: FlDotData(
-        show: true,
-        getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
-          radius: index == _selectedTrendIndex ? 4.5 : 3,
-          color: Colors.white,
-          strokeWidth: 2,
-          strokeColor: color,
-        ),
-      ),
-      belowBarData: BarAreaData(
-        show: true,
-        color: color.withValues(alpha: 0.08),
-      ),
     );
   }
 
@@ -597,256 +521,267 @@ class _ReportsPageState extends State<ReportsPage> {
     final net = point.income - point.expense;
     final isSurplus = net >= 0;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Wrap(
+      spacing: 12,
+      runSpacing: 4,
       children: [
         Text(
           point.label,
           style: GoogleFonts.inter(
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
             color: AppColors.textPrimary,
           ),
         ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 10,
-          runSpacing: 6,
-          children: [
-            Text(
-              'Masuk ${_formatCurrency(point.income)}',
-              style: GoogleFonts.inter(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: AppColors.income,
-              ),
-            ),
-            Text(
-              'Keluar ${_formatCurrency(point.expense)}',
-              style: GoogleFonts.inter(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: AppColors.expense,
-              ),
-            ),
-            Text(
-              '${isSurplus ? '+' : '-'}${_formatCurrency(net.abs())}',
-              style: GoogleFonts.inter(
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                color: isSurplus ? AppColors.income : AppColors.expense,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  BarChartGroupData _buildCashflowBar({
-    required int x,
-    required double amount,
-    required Color color,
-    required bool isSelected,
-  }) {
-    return BarChartGroupData(
-      x: x,
-      barRods: [
-        BarChartRodData(
-          toY: amount,
-          width: isSelected ? 42 : 34,
-          color: color,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
-          backDrawRodData: BackgroundBarChartRodData(
-            show: true,
-            toY: amount <= 0 ? 1 : amount,
-            color: color.withValues(alpha: 0.1),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCashflowDetail({
-    required TransactionType? selectedType,
-    required double selectedAmount,
-    required ReportProvider report,
-  }) {
-    final title = selectedType == TransactionType.income
-        ? 'Pemasukan'
-        : selectedType == TransactionType.expense
-        ? 'Pengeluaran'
-        : 'Selisih bersih';
-    final color = selectedType == TransactionType.income
-        ? AppColors.income
-        : selectedType == TransactionType.expense
-        ? AppColors.expense
-        : report.netAmount >= 0
-        ? AppColors.income
-        : AppColors.expense;
-    final comparisonBase = report.incomeTotal + report.expenseTotal;
-    final percentage = comparisonBase == 0
-        ? 0.0
-        : (selectedAmount / comparisonBase * 100).clamp(0, 100);
-
-    return Row(
-      children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            title,
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
+        Text(
+          'Masuk ${_formatCurrency(point.income)}',
+          style: GoogleFonts.inter(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: AppColors.income,
           ),
         ),
         Text(
-          '${percentage.toStringAsFixed(1)}%  ${_formatCurrency(selectedAmount)}',
+          'Keluar ${_formatCurrency(point.expense)}',
           style: GoogleFonts.inter(
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: FontWeight.w600,
-            color: AppColors.textSecondary,
+            color: AppColors.expense,
+          ),
+        ),
+        Text(
+          '${isSurplus ? '+' : '-'}${_formatCurrency(net.abs())}',
+          style: GoogleFonts.inter(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            color: isSurplus ? AppColors.income : AppColors.expense,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildDonutChart(ReportProvider report) {
-    if (report.categories.isEmpty) {
-      _selectedCategoryId = null;
-      return Container(
-        height: 200,
-        alignment: Alignment.center,
-        child: Text(
-          'Tidak ada data transaksi',
-          style: GoogleFonts.inter(color: AppColors.textSecondary),
-        ),
-      );
-    }
+  // ── Breakdown Kategori ───────────────────────────────────────────────────────
 
+  Widget _buildBreakdownSection(ReportProvider report) {
+    final typeLabel = report.transactionType == TransactionType.expense
+        ? 'Pengeluaran'
+        : 'Pemasukan';
     final selectedCategory = _selectedCategory(report);
 
-    return SizedBox(
-      height: 240,
-      child: Stack(
-        alignment: Alignment.center,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          PieChart(
-            PieChartData(
-              pieTouchData: PieTouchData(
-                touchCallback: (event, response) {
-                  if (!event.isInterestedForInteractions ||
-                      response?.touchedSection == null) {
-                    return;
-                  }
-
-                  final index = response!.touchedSection!.touchedSectionIndex;
-                  if (index < 0 || index >= report.categories.length) return;
-                  _selectCategory(report.categories[index]);
-                },
-              ),
-              sectionsSpace: 3,
-              centerSpaceRadius: 75,
-              startDegreeOffset: 270,
-              sections: report.categories.map((c) {
-                final isZero = report.totalAmount == 0;
-                final isSelected = c.categoryId == _selectedCategoryId;
-                return PieChartSectionData(
-                  color: Color(int.parse('FF${c.color.replaceFirst('#', '')}', radix: 16)),
-                  value: isZero ? 1 : c.total,
-                  title: '',
-                  radius: isSelected ? 30 : 22,
-                );
-              }).toList(),
-            ),
-          ),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 180),
-            child: selectedCategory == null
-                ? _buildChartCenter(
-                    key: const ValueKey('total'),
-                    title: report.transactionType == TransactionType.expense
-                        ? 'Total Pengeluaran'
-                        : 'Total Pemasukan',
-                    amount: _formatCurrency(report.totalAmount),
-                    subtitle: '${report.categories.length} kategori',
-                  )
-                : _buildChartCenter(
-                    key: ValueKey(selectedCategory.categoryId),
-                    title: selectedCategory.name,
-                    amount: _formatCurrency(selectedCategory.total),
-                    subtitle:
-                        '${(selectedCategory.percentage * 100).toStringAsFixed(1)}% dari total',
+          // Section title + toggle
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  'Distribusi $typeLabel',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
                   ),
+                ),
+              ),
+              GestureDetector(
+                onTap: () {
+                  setState(() => _selectedCategoryId = null);
+                  report.setTransactionType(
+                    report.transactionType == TransactionType.expense
+                        ? TransactionType.income
+                        : TransactionType.expense,
+                  );
+                },
+                child: const Icon(
+                  Icons.swap_horiz_rounded,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
+              ),
+            ],
           ),
+          const SizedBox(height: 16),
+
+          if (report.categories.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Text(
+                  'Tidak ada data transaksi',
+                  style: GoogleFonts.inter(color: AppColors.textSecondary),
+                ),
+              ),
+            )
+          else ...[
+            // Donut chart - centered
+            Center(
+              child: SizedBox(
+                width: 160,
+                height: 160,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    PieChart(
+                      PieChartData(
+                        pieTouchData: PieTouchData(
+                          touchCallback: (event, response) {
+                            if (!event.isInterestedForInteractions ||
+                                response?.touchedSection == null) {
+                              return;
+                            }
+                            final index =
+                                response!.touchedSection!.touchedSectionIndex;
+                            if (index < 0 ||
+                                index >= report.categories.length) {
+                              return;
+                            }
+                            _selectCategory(report.categories[index]);
+                          },
+                        ),
+                        sectionsSpace: 2,
+                        centerSpaceRadius: 50,
+                        startDegreeOffset: 270,
+                        sections: report.categories.map((c) {
+                          final isZero = report.totalAmount == 0;
+                          final isSelected =
+                              c.categoryId == _selectedCategoryId;
+                          final color = Color(
+                            int.parse(
+                              'FF${c.color.replaceFirst('#', '')}',
+                              radix: 16,
+                            ),
+                          );
+                          return PieChartSectionData(
+                            color: color,
+                            value: isZero ? 1 : c.total,
+                            title: '',
+                            radius: isSelected ? 28 : 22,
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          selectedCategory != null
+                              ? _formatCurrency(selectedCategory.total)
+                              : _formatCurrency(report.totalAmount),
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          'Total',
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Category legend - below chart
+            ...report.categories.take(6).map((cat) {
+              final color = Color(
+                int.parse(
+                  'FF${cat.color.replaceFirst('#', '')}',
+                  radix: 16,
+                ),
+              );
+              final percentStr = (cat.percentage * 100).toStringAsFixed(0);
+              final isSelected = cat.categoryId == _selectedCategoryId;
+              return GestureDetector(
+                onTap: () => _selectCategory(cat),
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          cat.name,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: isSelected
+                                ? AppColors.textPrimary
+                                : AppColors.textSecondary,
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.w400,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        '$percentStr%',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: isSelected ? color : AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+
+            // Selected category detail
+            if (selectedCategory != null) ...[
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              const SizedBox(height: 16),
+              _buildSelectedCategoryInfo(report),
+              _buildSelectedCategoryTransactions(report),
+            ],
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildChartCenter({
-    required Key key,
-    required String title,
-    required String amount,
-    required String subtitle,
-  }) {
-    return Column(
-      key: key,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 150),
-          child: Text(
-            title,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary),
-          ),
-        ),
-        const SizedBox(height: 4),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 170),
-          child: Text(
-            amount,
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          subtitle,
-          style: GoogleFonts.inter(fontSize: 11, color: AppColors.hint),
-        ),
-      ],
-    );
-  }
+  // ── Selected Category ────────────────────────────────────────────────────────
 
   Widget _buildSelectedCategoryInfo(ReportProvider report) {
     final selectedCategory = _selectedCategory(report);
-    if (selectedCategory == null) {
-      return Text(
-        'Ketuk diagram atau kategori untuk melihat detail',
-        textAlign: TextAlign.center,
-        style: GoogleFonts.inter(fontSize: 12, color: AppColors.hint),
-      );
-    }
+    if (selectedCategory == null) return const SizedBox.shrink();
 
     final color = Color(
       int.parse('FF${selectedCategory.color.replaceFirst('#', '')}', radix: 16),
     );
-    final remainingAmount = report.totalAmount - selectedCategory.total;
-
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       width: double.infinity,
@@ -874,27 +809,15 @@ class _ReportsPageState extends State<ReportsPage> {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  selectedCategory.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                // const SizedBox(height: 3),
-                // Text(
-                //   'Sisa kategori lain ${_formatCurrency(remainingAmount)}',
-                //   maxLines: 1,
-                //   overflow: TextOverflow.ellipsis,
-                //   style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary),
-                // ),
-              ],
+            child: Text(
+              selectedCategory.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -912,7 +835,10 @@ class _ReportsPageState extends State<ReportsPage> {
               const SizedBox(height: 3),
               Text(
                 _formatCurrency(selectedCategory.total),
-                style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary),
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
               ),
             ],
           ),
@@ -928,14 +854,14 @@ class _ReportsPageState extends State<ReportsPage> {
     final type = report.transactionType == TransactionType.expense
         ? 'expense'
         : 'income';
-    final transactions = report.transactions
-        .where(
-          (transaction) =>
-              transaction.categoryId == selectedCategory.categoryId &&
-              transaction.type == type,
-        )
-        .toList()
-      ..sort((a, b) => b.date.compareTo(a.date));
+    final transactions =
+        report.transactions
+            .where(
+              (t) =>
+                  t.categoryId == selectedCategory.categoryId && t.type == type,
+            )
+            .toList()
+          ..sort((a, b) => b.date.compareTo(a.date));
 
     if (transactions.isEmpty) return const SizedBox.shrink();
 
@@ -945,204 +871,113 @@ class _ReportsPageState extends State<ReportsPage> {
 
     return Padding(
       padding: const EdgeInsets.only(top: 12),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        width: double.infinity,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.receipt_long_outlined, color: color, size: 18),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Rincian ${selectedCategory.name}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-                Text(
-                  '${transactions.length} transaksi',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.receipt_long_outlined, color: color, size: 16),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Rincian ${selectedCategory.name}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.inter(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            ...transactions.take(5).map((transaction) {
-              final note = transaction.note.trim();
-              final title = note.isEmpty ? selectedCategory.name : note;
-              return Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.16),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        selectedCategory.icon.isNotEmpty
-                            ? selectedCategory.icon
-                            : '?',
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            DateFormat('d MMM yyyy, HH:mm', 'id_ID')
-                                .format(transaction.date),
-                            style: GoogleFonts.inter(
-                              fontSize: 10,
-                              color: AppColors.hint,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      _formatCurrency(transaction.amount),
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: color,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
-            if (transactions.length > 5) ...[
-              const SizedBox(height: 10),
+              ),
               Text(
-                '+${transactions.length - 5} transaksi lainnya',
-                textAlign: TextAlign.center,
+                '${transactions.length} transaksi',
                 style: GoogleFonts.inter(
                   fontSize: 11,
-                  fontWeight: FontWeight.w600,
                   color: AppColors.textSecondary,
                 ),
               ),
             ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCategoryList(ReportProvider report) {
-    if (report.categories.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      children: report.categories.map((cat) {
-        final color = Color(int.parse('FF${cat.color.replaceFirst('#', '')}', radix: 16));
-        final percentStr = (cat.percentage * 100).toStringAsFixed(1);
-        final isSelected = cat.categoryId == _selectedCategoryId;
-        
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 20.0),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(8),
-            onTap: () => _selectCategory(cat),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              padding: EdgeInsets.all(isSelected ? 10 : 0),
-              decoration: BoxDecoration(
-                color: isSelected ? color.withValues(alpha: 0.07) : Colors.transparent,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: isSelected ? color.withValues(alpha: 0.28) : Colors.transparent,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+          ),
+          const SizedBox(height: 10),
+          ...transactions.take(5).map((transaction) {
+            final note = transaction.note.trim();
+            final title = note.isEmpty ? selectedCategory.name : note;
+            return Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: color.withValues(alpha: isSelected ? 0.22 : 0.15),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Center(
-                          child: Text(
-                            cat.icon.isNotEmpty ? cat.icon : '?',
-                            style: const TextStyle(fontSize: 18),
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      selectedCategory.icon.isNotEmpty
+                          ? selectedCategory.icon
+                          : '?',
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          cat.name,
-                          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600),
+                        const SizedBox(height: 2),
+                        Text(
+                          DateFormat(
+                            'd MMM yyyy, HH:mm',
+                            'id_ID',
+                          ).format(transaction.date),
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            color: AppColors.hint,
+                          ),
                         ),
-                      ),
-                      Text(
-                        '$percentStr%',
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          color: isSelected ? color : AppColors.textSecondary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Text(
-                        _formatCurrency(cat.total),
-                        style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 10),
-                  LinearProgressIndicator(
-                    value: cat.percentage,
-                    backgroundColor: Colors.grey.withValues(alpha: 0.15),
-                    valueColor: AlwaysStoppedAnimation<Color>(color),
-                    minHeight: isSelected ? 8 : 6,
-                    borderRadius: BorderRadius.circular(4),
+                  const SizedBox(width: 10),
+                  Text(
+                    _formatCurrency(transaction.amount),
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: color,
+                    ),
                   ),
                 ],
               ),
+            );
+          }),
+          if (transactions.length > 5) ...[
+            const SizedBox(height: 10),
+            Text(
+              '+${transactions.length - 5} transaksi lainnya',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
             ),
-          ),
-        );
-      }).toList(),
+          ],
+        ],
+      ),
     );
   }
 }

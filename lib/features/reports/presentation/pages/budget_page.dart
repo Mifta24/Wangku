@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 
 import '../../presentation/providers/budget_provider.dart';
@@ -28,7 +29,7 @@ class _BudgetPageState extends State<BudgetPage> {
     decimalDigits: 0,
   );
 
-  BudgetFilter _budgetFilter = BudgetFilter.budgeted;
+  final BudgetFilter _budgetFilter = BudgetFilter.budgeted;
   BudgetSort _budgetSort = BudgetSort.spentDesc;
 
   String _formatCurrency(double amount) => _currencyFormatter.format(amount);
@@ -43,9 +44,8 @@ class _BudgetPageState extends State<BudgetPage> {
         .toList();
 
     if (_budgetFilter == BudgetFilter.warning) {
-      filtered = filtered
-          .where((c) => budget.categoryProgress(c.id) >= 0.8)
-          .toList();
+      filtered =
+          filtered.where((c) => budget.categoryProgress(c.id) >= 0.8).toList();
     }
 
     filtered.sort((a, b) {
@@ -53,13 +53,9 @@ class _BudgetPageState extends State<BudgetPage> {
         case BudgetSort.nameAsc:
           return a.name.compareTo(b.name);
         case BudgetSort.remainingAsc:
-          final aRemain = budget.categoryRemaining(a.id);
-          final bRemain = budget.categoryRemaining(b.id);
-          return aRemain.compareTo(bRemain);
+          return budget.categoryRemaining(a.id).compareTo(budget.categoryRemaining(b.id));
         case BudgetSort.spentDesc:
-          final aSpent = budget.categoryExpense(a.id);
-          final bSpent = budget.categoryExpense(b.id);
-          return bSpent.compareTo(aSpent);
+          return budget.categoryExpense(b.id).compareTo(budget.categoryExpense(a.id));
       }
     });
 
@@ -77,6 +73,7 @@ class _BudgetPageState extends State<BudgetPage> {
     final parentContext = context;
     BuildContext? sheetContext;
     bool isSaving = false;
+    var amountText = (budgetProvider.categoryBudget(category.id))?.toStringAsFixed(0) ?? '';
 
     try {
       await showModalBottomSheet<void>(
@@ -90,7 +87,7 @@ class _BudgetPageState extends State<BudgetPage> {
           sheetContext = context;
           return StatefulBuilder(
             builder: (context, setSheetState) {
-              final raw = controller.text.replaceAll(RegExp(r'[^0-9]'), '');
+              final raw = amountText.replaceAll(RegExp(r'[^0-9]'), '');
               final amount = double.tryParse(raw);
               final canSave =
                   !isSaving && !budgetProvider.isLoading && amount != null && amount > 0;
@@ -98,10 +95,10 @@ class _BudgetPageState extends State<BudgetPage> {
               return SingleChildScrollView(
                 child: Padding(
                   padding: EdgeInsets.only(
-                    left: 20,
-                    right: 20,
-                    top: 20,
-                    bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                    left: 20.w,
+                    right: 20.w,
+                    top: 20.h,
+                    bottom: MediaQuery.of(context).viewInsets.bottom + 20.h,
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -110,19 +107,17 @@ class _BudgetPageState extends State<BudgetPage> {
                       Text(
                         'Anggaran ${category.name}',
                         style: GoogleFonts.inter(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
+                            fontSize: 16.sp, fontWeight: FontWeight.w700),
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: 12.h),
                       AppTextField(
                         controller: controller,
                         hintText: 'Masukkan anggaran kategori (Rp)',
                         prefixIcon: Icons.savings_outlined,
                         keyboardType: TextInputType.number,
-                        onChanged: (_) => setSheetState(() {}),
+                        onChanged: (v) => setSheetState(() => amountText = v),
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: 16.h),
                       AppButton(
                         label: isSaving ? 'Menyimpan...' : 'Simpan Anggaran',
                         onPressed: canSave
@@ -130,17 +125,14 @@ class _BudgetPageState extends State<BudgetPage> {
                                 setSheetState(() => isSaving = true);
                                 try {
                                   await budgetProvider.saveCategoryBudget(
-                                    userId,
-                                    category.id,
-                                    amount!,
-                                  );
+                                      userId, category.id, amount);
                                   if (sheetContext?.mounted != true) return;
                                   Navigator.pop(sheetContext!);
                                   if (!parentContext.mounted) return;
                                   ScaffoldMessenger.of(parentContext).showSnackBar(
                                     SnackBar(
-                                      content:
-                                          Text('Anggaran ${category.name} disimpan'),
+                                      content: Text(
+                                          'Anggaran ${category.name} disimpan'),
                                       backgroundColor: AppColors.success,
                                     ),
                                   );
@@ -154,6 +146,66 @@ class _BudgetPageState extends State<BudgetPage> {
                         isLoading: isSaving || budgetProvider.isLoading,
                         icon: Icons.check_circle_outline,
                       ),
+                      if ((budgetProvider.categoryBudget(category.id) ?? 0) > 0) ...[
+                        SizedBox(height: 8.h),
+                        TextButton.icon(
+                          onPressed: isSaving || budgetProvider.isLoading
+                              ? null
+                              : () async {
+                                  if (sheetContext?.mounted != true) return;
+                                  final confirm = await showDialog<bool>(
+                                    context: sheetContext!,
+                                    builder: (ctx) => AlertDialog(
+                                      title: const Text('Hapus Anggaran?'),
+                                      content: Text(
+                                          'Anggaran kategori ${category.name} akan dihapus.'),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(ctx, false),
+                                          child: const Text('Batal'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(ctx, true),
+                                          child: const Text('Hapus'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirm != true) return;
+                                  setSheetState(() => isSaving = true);
+                                  try {
+                                    await budgetProvider.deleteCategoryBudget(
+                                        userId, category.id);
+                                    if (sheetContext?.mounted != true) return;
+                                    Navigator.pop(sheetContext!);
+                                    if (!parentContext.mounted) return;
+                                    ScaffoldMessenger.of(parentContext)
+                                        .showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                            'Anggaran ${category.name} dihapus'),
+                                        backgroundColor: AppColors.warning,
+                                      ),
+                                    );
+                                  } catch (_) {
+                                    if (context.mounted) {
+                                      setSheetState(() => isSaving = false);
+                                    }
+                                  }
+                                },
+                          icon: const Icon(Icons.delete_outline_rounded,
+                              color: AppColors.error),
+                          label: Text(
+                            'Hapus Anggaran',
+                            style: GoogleFonts.inter(
+                              color: AppColors.error,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -187,6 +239,7 @@ class _BudgetPageState extends State<BudgetPage> {
     BuildContext? sheetContext;
     CategoryModel? selected = categories.first;
     bool isSaving = false;
+    var amountText = '';
 
     try {
       await showModalBottomSheet<void>(
@@ -200,7 +253,7 @@ class _BudgetPageState extends State<BudgetPage> {
           sheetContext = context;
           return StatefulBuilder(
             builder: (context, setSheetState) {
-              final raw = controller.text.replaceAll(RegExp(r'[^0-9]'), '');
+              final raw = amountText.replaceAll(RegExp(r'[^0-9]'), '');
               final amount = double.tryParse(raw);
               final canSave = !isSaving &&
                   !budgetProvider.isLoading &&
@@ -211,10 +264,10 @@ class _BudgetPageState extends State<BudgetPage> {
               return SingleChildScrollView(
                 child: Padding(
                   padding: EdgeInsets.only(
-                    left: 20,
-                    right: 20,
-                    top: 20,
-                    bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                    left: 20.w,
+                    right: 20.w,
+                    top: 20.h,
+                    bottom: MediaQuery.of(context).viewInsets.bottom + 20.h,
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -223,60 +276,51 @@ class _BudgetPageState extends State<BudgetPage> {
                       Text(
                         'Tambah Anggaran Kategori',
                         style: GoogleFonts.inter(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
+                            fontSize: 16.sp, fontWeight: FontWeight.w700),
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: 12.h),
                       DropdownButtonFormField<CategoryModel>(
                         initialValue: selected,
                         isExpanded: true,
                         items: categories.map((cat) {
-                          final color = Color(
-                            int.parse(
+                          final color = Color(int.parse(
                               'FF${cat.color.replaceFirst('#', '')}',
-                              radix: 16,
-                            ),
-                          );
+                              radix: 16));
                           return DropdownMenuItem(
                             value: cat,
                             child: Row(
                               children: [
                                 Container(
-                                  width: 32,
-                                  height: 32,
+                                  width: 32.w,
+                                  height: 32.w,
                                   decoration: BoxDecoration(
                                     color: color.withValues(alpha: 0.16),
-                                    borderRadius: BorderRadius.circular(9),
+                                    borderRadius: BorderRadius.circular(9.r),
                                   ),
                                   alignment: Alignment.center,
-                                  child: Text(
-                                    _displayIcon(cat.icon),
-                                    style: const TextStyle(fontSize: 16),
-                                  ),
+                                  child: Text(_displayIcon(cat.icon),
+                                      style: TextStyle(fontSize: 16.sp)),
                                 ),
-                                const SizedBox(width: 8),
+                                SizedBox(width: 8.w),
                                 Expanded(child: Text(cat.name)),
                               ],
                             ),
                           );
                         }).toList(),
-                        onChanged: (value) {
-                          setSheetState(() => selected = value);
-                        },
-                        decoration: const InputDecoration(
-                          labelText: 'Pilih kategori',
-                        ),
+                        onChanged: (value) =>
+                            setSheetState(() => selected = value),
+                        decoration:
+                            const InputDecoration(labelText: 'Pilih kategori'),
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: 12.h),
                       AppTextField(
                         controller: controller,
                         hintText: 'Masukkan anggaran kategori (Rp)',
                         prefixIcon: Icons.savings_outlined,
                         keyboardType: TextInputType.number,
-                        onChanged: (_) => setSheetState(() {}),
+                        onChanged: (v) => setSheetState(() => amountText = v),
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: 16.h),
                       AppButton(
                         label: isSaving ? 'Menyimpan...' : 'Simpan Anggaran',
                         onPressed: canSave
@@ -285,17 +329,14 @@ class _BudgetPageState extends State<BudgetPage> {
                                 setSheetState(() => isSaving = true);
                                 try {
                                   await budgetProvider.saveCategoryBudget(
-                                    userId,
-                                    category.id,
-                                    amount!,
-                                  );
+                                      userId, category.id, amount);
                                   if (sheetContext?.mounted != true) return;
                                   Navigator.pop(sheetContext!);
                                   if (!parentContext.mounted) return;
                                   ScaffoldMessenger.of(parentContext).showSnackBar(
                                     SnackBar(
-                                      content:
-                                          Text('Anggaran ${category.name} disimpan'),
+                                      content: Text(
+                                          'Anggaran ${category.name} disimpan'),
                                       backgroundColor: AppColors.success,
                                     ),
                                   );
@@ -331,303 +372,400 @@ class _BudgetPageState extends State<BudgetPage> {
       builder: (context, budget, txnProvider, _) {
         final totalBudget = budget.totalCategoryBudget;
         final hasBudget = totalBudget > 0;
-        final progressColor = budget.progress >= 0.8 ? AppColors.warning : AppColors.primary;
         final expenseCategories = txnProvider.expenseCategories;
-        final filteredCategories = _filterAndSortCategories(expenseCategories, budget);
+        final filteredCategories =
+            _filterAndSortCategories(expenseCategories, budget);
 
-        return ListView(
-          padding: const EdgeInsets.all(16),
+        return Column(
           children: [
-            Text(
-              'Anggaran & Pengingat',
-              style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 12),
-
-            // Ringkasan total anggaran dari semua kategori
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Total Anggaran Bulan Ini',
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 4),
-                    if (!hasBudget)
-                      Text(
-                        'Belum ada anggaran kategori yang diset',
-                        style: GoogleFonts.inter(
-                          color: AppColors.textSecondary,
-                          fontSize: 12,
-                        ),
-                      )
-                    else ...[
-                      Text(
-                        'Terpakai ${_formatCurrency(budget.monthExpense)} dari ${_formatCurrency(totalBudget)}',
-                        style: GoogleFonts.inter(fontSize: 12),
-                      ),
-                      if (budget.progress >= 0.8)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 6),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppColors.warning.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              'Total pengeluaran mendekati limit',
-                              style: GoogleFonts.inter(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.warning,
-                              ),
-                            ),
-                          ),
-                        ),
-                      const SizedBox(height: 8),
-                      LinearProgressIndicator(
-                        value: budget.progress,
-                        backgroundColor: AppColors.border,
-                        valueColor: AlwaysStoppedAnimation<Color>(progressColor),
-                        minHeight: 8,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Sisa ${_formatCurrency(budget.remaining)}',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ],
+            // ── Green Header ──
+            Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppColors.primary, AppColors.primaryDark],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-
-            // Anggaran per Kategori
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Anggaran per Kategori',
-                          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+              padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 20.h),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Title Row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Anggaran',
+                        style: GoogleFonts.inter(
+                          fontSize: 18.sp,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
                         ),
-                        TextButton.icon(
-                          onPressed: userId == null || expenseCategories.isEmpty
-                              ? null
-                              : () => _openCategoryBudgetPickerSheet(budget, userId, expenseCategories),
-                          icon: const Icon(Icons.add, size: 16),
-                          label: const Text('Tambah'),
-                        ),
-                      ],
-                    ),
-
-                    if (filteredCategories.isNotEmpty || _budgetFilter == BudgetFilter.warning) ...[
-                      // const SizedBox(height: 8),
-                      // Wrap(
-                      //   spacing: 8,
-                      //   runSpacing: 6,
-                      //   children: [
-                      //     ChoiceChip(
-                      //       label: const Text('Semua'),
-                      //       selected: _budgetFilter == BudgetFilter.budgeted,
-                      //       onSelected: (_) => setState(() => _budgetFilter = BudgetFilter.budgeted),
-                      //     ),
-                      //     ChoiceChip(
-                      //       label: const Text('>= 80%'),
-                      //       selected: _budgetFilter == BudgetFilter.warning,
-                      //       onSelected: (_) => setState(() => _budgetFilter = BudgetFilter.warning),
-                      //     ),
-                      //   ],
-                      // ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Text('Urutkan:', style: GoogleFonts.inter(fontSize: 12)),
-                          const SizedBox(width: 8),
-                          DropdownButton<BudgetSort>(
-                            value: _budgetSort,
-                            underline: const SizedBox(),
-                            items: const [
-                              DropdownMenuItem(value: BudgetSort.spentDesc, child: Text('Terpakai terbanyak')),
-                              DropdownMenuItem(value: BudgetSort.remainingAsc, child: Text('Sisa paling sedikit')),
-                              DropdownMenuItem(value: BudgetSort.nameAsc, child: Text('Nama (A-Z)')),
-                            ],
-                            onChanged: (value) {
-                              if (value == null) return;
-                              setState(() => _budgetSort = value);
-                            },
+                      ),
+                      GestureDetector(
+                        onTap: userId == null || expenseCategories.isEmpty
+                            ? null
+                            : () => _openCategoryBudgetPickerSheet(
+                                budget, userId, expenseCategories),
+                        child: Container(
+                          width: 36.w,
+                          height: 36.w,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10.r),
                           ),
-                        ],
+                          child: Icon(Icons.add_rounded,
+                              color: AppColors.primary, size: 22.sp),
+                        ),
                       ),
                     ],
+                  ),
+                  SizedBox(height: 16.h),
 
-                    const SizedBox(height: 8),
-
-                    if (budget.categoryBudgets.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 24),
-                        child: Column(
-                          children: [
-                            const Text('💰', style: TextStyle(fontSize: 40)),
-                            const SizedBox(height: 12),
-                            Text(
-                              'Belum ada anggaran kategori',
-                              style: GoogleFonts.inter(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              'Ketuk tombol "Tambah" di atas untuk\nmenetapkan anggaran per kategori.',
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            if (userId != null && expenseCategories.isNotEmpty)
-                              OutlinedButton.icon(
-                                onPressed: () => _openCategoryBudgetPickerSheet(
-                                  budget,
-                                  userId,
-                                  expenseCategories,
-                                ),
-                                icon: const Icon(Icons.add_circle_outline, size: 18),
-                                label: const Text('Tambah Anggaran Kategori'),
-                              ),
-                            if (expenseCategories.isEmpty)
-                              Text(
-                                'Tambahkan transaksi pengeluaran terlebih dahulu\nuntuk membuat kategori.',
-                                textAlign: TextAlign.center,
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                          ],
-                        ),
-                      )
-                    else if (filteredCategories.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        child: Text(
-                          'Tidak ada kategori yang mendekati limit.',
+                  // Total Budget Summary Card
+                  Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.all(16.w),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(14.r),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Total Anggaran Bulan Ini',
                           style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
+                            fontSize: 12.sp,
+                            color: Colors.white.withValues(alpha: 0.85),
                           ),
                         ),
-                      )
-                    else
-                      ...filteredCategories.map((cat) {
-                        final catBudget = budget.categoryBudget(cat.id);
-                        final spent = budget.categoryExpense(cat.id);
-                        final progress = budget.categoryProgress(cat.id);
-                        final color = Color(int.parse('FF${cat.color.replaceFirst('#', '')}', radix: 16));
-                        final isWarning = progress >= 0.8 && (catBudget ?? 0) > 0;
-
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                        SizedBox(height: 6.h),
+                        if (!hasBudget)
+                          Text(
+                            'Belum ada anggaran',
+                            style: GoogleFonts.inter(
+                              fontSize: 16.sp,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          )
+                        else ...[
+                          Text(
+                            _formatCurrency(budget.monthExpense),
+                            style: GoogleFonts.inter(
+                              fontSize: 22.sp,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                          SizedBox(height: 4.h),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 36,
-                                    height: 36,
-                                    decoration: BoxDecoration(
-                                      color: color.withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Center(
-                                      child: Text(_displayIcon(cat.icon), style: const TextStyle(fontSize: 18)),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          cat.name,
-                                          style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
-                                        ),
-                                        if (catBudget == null || catBudget <= 0)
-                                          Text(
-                                            'Belum ada anggaran',
-                                            style: GoogleFonts.inter(fontSize: 11, color: AppColors.textSecondary),
-                                          )
-                                        else
-                                          Text(
-                                            'Terpakai ${_formatCurrency(spent)} / ${_formatCurrency(catBudget)}',
-                                            style: GoogleFonts.inter(fontSize: 11),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                  if (isWarning)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.warning.withValues(alpha: 0.15),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        '${(progress * 100).toStringAsFixed(0)}%',
-                                        style: GoogleFonts.inter(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w600,
-                                          color: AppColors.warning,
-                                        ),
-                                      ),
-                                    ),
-                                  TextButton(
-                                    onPressed: userId == null
-                                        ? null
-                                        : () => _openCategoryBudgetSheet(budget, userId, cat),
-                                    child: const Text('Ubah'),
+                              Text(
+                                'dari ${_formatCurrency(totalBudget)}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12.sp,
+                                  color: Colors.white.withValues(alpha: 0.8),
+                                ),
+                              ),
+                              Text(
+                                '${(budget.progress * 100).toStringAsFixed(0)}%',
+                                style: GoogleFonts.inter(
+                                  fontSize: 14.sp,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 8.h),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4.r),
+                            child: LinearProgressIndicator(
+                              value: budget.progress,
+                              backgroundColor:
+                                  Colors.white.withValues(alpha: 0.3),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                budget.progress >= 0.8
+                                    ? AppColors.warning
+                                    : Colors.white,
+                              ),
+                              minHeight: 6.h,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Category List ──
+            Expanded(
+              child: budget.categoryBudgets.isEmpty
+                  ? _buildEmptyState(
+                      userId: userId,
+                      expenseCategories: expenseCategories,
+                      budget: budget,
+                    )
+                  : ListView(
+                      padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 24.h),
+                      children: [
+                        // Sort row
+                        if (filteredCategories.isNotEmpty)
+                          Padding(
+                            padding: EdgeInsets.only(bottom: 12.h),
+                            child: Row(
+                              children: [
+                                Text(
+                                  'Urutkan:',
+                                  style: GoogleFonts.inter(
+                                      fontSize: 12.sp,
+                                      color: AppColors.textSecondary),
+                                ),
+                                SizedBox(width: 8.w),
+                                DropdownButton<BudgetSort>(
+                                  value: _budgetSort,
+                                  underline: const SizedBox(),
+                                  style: GoogleFonts.inter(
+                                      fontSize: 12.sp,
+                                      color: AppColors.textPrimary),
+                                  items: const [
+                                    DropdownMenuItem(
+                                        value: BudgetSort.spentDesc,
+                                        child: Text('Terpakai terbanyak')),
+                                    DropdownMenuItem(
+                                        value: BudgetSort.remainingAsc,
+                                        child: Text('Sisa paling sedikit')),
+                                    DropdownMenuItem(
+                                        value: BudgetSort.nameAsc,
+                                        child: Text('Nama (A-Z)')),
+                                  ],
+                                  onChanged: (value) {
+                                    if (value == null) return;
+                                    setState(() => _budgetSort = value);
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+
+                        // Category Cards
+                        ...filteredCategories.map((cat) {
+                          final catBudget = budget.categoryBudget(cat.id);
+                          final spent = budget.categoryExpense(cat.id);
+                          final remaining = budget.categoryRemaining(cat.id);
+                          final progress = budget.categoryProgress(cat.id);
+                          final color = Color(int.parse(
+                              'FF${cat.color.replaceFirst('#', '')}',
+                              radix: 16));
+                          final isWarning =
+                              progress >= 0.8 && (catBudget ?? 0) > 0;
+
+                          return GestureDetector(
+                            onTap: userId == null
+                                ? null
+                                : () => _openCategoryBudgetSheet(
+                                    budget, userId, cat),
+                            child: Container(
+                              margin: EdgeInsets.only(bottom: 12.h),
+                              padding: EdgeInsets.all(16.w),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16.r),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.05),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
                                   ),
                                 ],
                               ),
-                              if (catBudget != null && catBudget > 0) ...[
-                                const SizedBox(height: 6),
-                                LinearProgressIndicator(
-                                  value: progress,
-                                  backgroundColor: AppColors.border,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    progress >= 0.8 ? AppColors.warning : AppColors.primary,
+                              child: Column(
+                                children: [
+                                  // Top Row: icon + name + percentage
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: 44.w,
+                                        height: 44.w,
+                                        decoration: BoxDecoration(
+                                          color: color.withValues(alpha: 0.15),
+                                          borderRadius:
+                                              BorderRadius.circular(12.r),
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            _displayIcon(cat.icon),
+                                            style:
+                                                TextStyle(fontSize: 20.sp),
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(width: 12.w),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              cat.name,
+                                              style: GoogleFonts.inter(
+                                                fontSize: 14.sp,
+                                                fontWeight: FontWeight.w600,
+                                                color: AppColors.textPrimary,
+                                              ),
+                                            ),
+                                            SizedBox(height: 2.h),
+                                            Text(
+                                              'Sisa: ${_formatCurrency(remaining)}',
+                                              style: GoogleFonts.inter(
+                                                fontSize: 12.sp,
+                                                color: AppColors.textSecondary,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: 10.w, vertical: 4.h),
+                                        decoration: BoxDecoration(
+                                          color: isWarning
+                                              ? AppColors.warning
+                                                  .withValues(alpha: 0.12)
+                                              : color.withValues(alpha: 0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(20.r),
+                                        ),
+                                        child: Text(
+                                          '${(progress * 100).toStringAsFixed(0)}%',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 13.sp,
+                                            fontWeight: FontWeight.w700,
+                                            color: isWarning
+                                                ? AppColors.warning
+                                                : color,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  minHeight: 6,
-                                ),
-                              ],
-                            ],
-                          ),
-                        );
-                      }),
-                  ],
-                ),
-              ),
+
+                                  if (catBudget != null && catBudget > 0) ...[
+                                    SizedBox(height: 12.h),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(4.r),
+                                      child: LinearProgressIndicator(
+                                        value: progress,
+                                        backgroundColor:
+                                            AppColors.border,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                          isWarning
+                                              ? AppColors.warning
+                                              : color,
+                                        ),
+                                        minHeight: 7.h,
+                                      ),
+                                    ),
+                                    SizedBox(height: 8.h),
+                                    // Spent / Budget amounts
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          _formatCurrency(spent),
+                                          style: GoogleFonts.inter(
+                                            fontSize: 11.sp,
+                                            fontWeight: FontWeight.w500,
+                                            color: AppColors.textSecondary,
+                                          ),
+                                        ),
+                                        Text(
+                                          _formatCurrency(catBudget),
+                                          style: GoogleFonts.inter(
+                                            fontSize: 11.sp,
+                                            fontWeight: FontWeight.w500,
+                                            color: AppColors.textSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
             ),
           ],
         );
       },
+    );
+  }
+
+  Widget _buildEmptyState({
+    required String? userId,
+    required List<CategoryModel> expenseCategories,
+    required BudgetProvider budget,
+  }) {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(32.w),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('💰', style: TextStyle(fontSize: 48)),
+            SizedBox(height: 16.h),
+            Text(
+              'Belum ada anggaran kategori',
+              style: GoogleFonts.inter(
+                fontSize: 16.sp,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            SizedBox(height: 8.h),
+            Text(
+              'Ketuk tombol "+" di atas untuk\nmenetapkan anggaran per kategori.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 13.sp,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            SizedBox(height: 24.h),
+            if (userId != null && expenseCategories.isNotEmpty)
+              OutlinedButton.icon(
+                onPressed: () => _openCategoryBudgetPickerSheet(
+                    budget, userId, expenseCategories),
+                icon: const Icon(Icons.add_circle_outline, size: 18),
+                label: const Text('Tambah Anggaran Kategori'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: const BorderSide(color: AppColors.primary),
+                ),
+              ),
+            if (expenseCategories.isEmpty)
+              Text(
+                'Tambahkan transaksi pengeluaran terlebih dahulu\nuntuk membuat kategori.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  fontSize: 12.sp,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

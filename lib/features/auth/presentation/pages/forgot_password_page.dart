@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/constants/app_assets.dart';
@@ -29,16 +30,12 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   }
 
   Future<void> _handleSubmit() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
     final authProvider = context.read<AuthProvider>();
     final success = await authProvider.forgotPassword(_emailController.text.trim());
 
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
 
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -64,78 +61,86 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     final isLoading = context.watch<AuthProvider>().isLoading;
 
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppColors.authGradientTop,
-              AppColors.authGradientMiddle,
-              AppColors.authGradientBottom,
-            ],
-          ),
-        ),
-        child: SafeArea(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Center(
           child: SingleChildScrollView(
-            padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 18.h),
+            padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 16.h),
             child: Form(
               key: _formKey,
               child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: IconButton(
-                      icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-                      onPressed: () => context.pop(),
-                    ),
-                  ),
                   AuthIllustration(
                     assetPath: AppAssets.forgotPasswordIllustration,
                     semanticLabel: 'Ilustrasi lupa password',
-                    height: 230,
+                    height: 160,
                   ),
-                  SizedBox(height: 18.h),
+                  SizedBox(height: 12.h),
                   Text(
                     'Lupa Password?',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.inter(
-                      fontSize: 28.sp,
+                      fontSize: 22.sp,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
+                      color: AppColors.primary,
                     ),
                   ),
-                  SizedBox(height: 8.h),
+                  SizedBox(height: 6.h),
                   Text(
-                    'Masukkan email akun kamu, kami akan kirim link reset password.',
+                    'Masukan alamat email yang terdaftar\nuntuk mereset password baru anda',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.inter(
-                      fontSize: 14.sp,
+                      fontSize: 13.sp,
                       color: AppColors.textSecondary,
+                      height: 1.5,
                     ),
                   ),
-                  SizedBox(height: 24.h),
+                  SizedBox(height: 20.h),
+
+                  // Form fields (no card border)
                   AppTextField(
                     controller: _emailController,
-                    hintText: 'Email',
-                    prefixIcon: Icons.email_outlined,
+                    hintText: 'nama@gmail.com',
+                    prefixIcon: LucideIcons.mail,
                     keyboardType: TextInputType.emailAddress,
                     validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Email tidak boleh kosong';
-                      }
-                      if (!value.contains('@')) {
-                        return 'Email tidak valid';
-                      }
+                      if (value == null || value.isEmpty) return 'Email tidak boleh kosong';
+                      if (!value.contains('@')) return 'Email tidak valid';
                       return null;
                     },
                   ),
                   SizedBox(height: 16.h),
                   AppButton(
-                    label: 'Kirim Link Reset',
+                    label: 'Kirim',
                     isLoading: isLoading,
                     onPressed: _handleSubmit,
+                  ),
+                  SizedBox(height: 20.h),
+
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Kembali ke ',
+                        style: GoogleFonts.inter(
+                          fontSize: 13.sp,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => context.pop(),
+                        child: Text(
+                          'Log in',
+                          style: GoogleFonts.inter(
+                            fontSize: 13.sp,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
