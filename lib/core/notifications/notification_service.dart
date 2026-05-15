@@ -184,7 +184,8 @@ class NotificationService {
 
   Future<String> _getDeviceTimezone() async {
     try {
-      return await FlutterTimezone.getLocalTimezone();
+      final info = await FlutterTimezone.getLocalTimezone();
+      return info.identifier;
     } catch (_) {
       return 'Asia/Jakarta';
     }
