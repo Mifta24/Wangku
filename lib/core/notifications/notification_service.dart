@@ -1,4 +1,5 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -25,8 +26,8 @@ class NotificationService {
     if (_initialized) return;
 
     tz.initializeTimeZones();
-    // Defaulting to Asia/Jakarta for now; adjust if app needs dynamic timezone
-    tz.setLocalLocation(tz.getLocation('Asia/Jakarta'));
+    final String timezoneName = await _getDeviceTimezone();
+    tz.setLocalLocation(tz.getLocation(timezoneName));
 
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosSettings = DarwinInitializationSettings(
@@ -127,7 +128,7 @@ class NotificationService {
       body: body,
       scheduledDate: scheduled,
       notificationDetails: details,
-      androidScheduleMode: AndroidScheduleMode.inexact,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       matchDateTimeComponents: DateTimeComponents.time,
     );
     return true;
@@ -179,6 +180,14 @@ class NotificationService {
       }
     }
     return 'Rp $result';
+  }
+
+  Future<String> _getDeviceTimezone() async {
+    try {
+      return await FlutterTimezone.getLocalTimezone();
+    } catch (_) {
+      return 'Asia/Jakarta';
+    }
   }
 
   Future<void> cancelDailyReminder() async {
