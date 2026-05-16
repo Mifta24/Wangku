@@ -104,7 +104,6 @@ class BudgetProvider extends ChangeNotifier {
     }
     _isLoading = false;
     notifyListeners();
-    await _maybeNotifyBudgetWarning();
   }
 
   Future<void> saveCategoryBudget(

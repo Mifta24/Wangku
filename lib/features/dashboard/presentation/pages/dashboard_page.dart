@@ -307,11 +307,11 @@ class _DashboardPageState extends State<DashboardPage> {
 
               Widget formLabel(String text) {
                 return Padding(
-                  padding: EdgeInsets.only(bottom: 8.h),
+                  padding: EdgeInsets.only(bottom: 6.h),
                   child: Text(
                     text,
                     style: GoogleFonts.inter(
-                      fontSize: 14.sp,
+                      fontSize: 13.sp,
                       fontWeight: FontWeight.w800,
                       color: AppColors.textPrimary,
                     ),
@@ -333,7 +333,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   keyboardType: keyboardType,
                   onChanged: (_) => setSheetState(() {}),
                   style: GoogleFonts.inter(
-                    fontSize: 16.sp,
+                    fontSize: 15.sp,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
@@ -341,7 +341,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     hintText: hint,
                     prefixText: prefixText,
                     prefixStyle: GoogleFonts.inter(
-                      fontSize: 16.sp,
+                      fontSize: 15.sp,
                       fontWeight: FontWeight.w600,
                       color: AppColors.textSecondary,
                     ),
@@ -349,17 +349,17 @@ class _DashboardPageState extends State<DashboardPage> {
                     filled: true,
                     fillColor: Colors.white,
                     contentPadding: EdgeInsets.symmetric(
-                      horizontal: 16.w,
-                      vertical: 18.h,
+                      horizontal: 14.w,
+                      vertical: 13.h,
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(18.r),
+                      borderRadius: BorderRadius.circular(14.r),
                       borderSide: BorderSide(
                         color: AppColors.border.withValues(alpha: 0.75),
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(18.r),
+                      borderRadius: BorderRadius.circular(14.r),
                       borderSide: BorderSide(
                         color: AppColors.primary,
                         width: 1.6,
@@ -371,7 +371,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
               Widget dateField() {
                 return InkWell(
-                  borderRadius: BorderRadius.circular(18.r),
+                  borderRadius: BorderRadius.circular(14.r),
                   onTap: () async {
                     final picked = await showDatePicker(
                       context: context,
@@ -387,11 +387,11 @@ class _DashboardPageState extends State<DashboardPage> {
                     setSheetState(() => selectedDate = picked);
                   },
                   child: Container(
-                    height: 62.h,
-                    padding: EdgeInsets.symmetric(horizontal: 16.w),
+                    height: 52.h,
+                    padding: EdgeInsets.symmetric(horizontal: 14.w),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(18.r),
+                      borderRadius: BorderRadius.circular(14.r),
                       border: Border.all(
                         color: AppColors.border.withValues(alpha: 0.75),
                       ),
@@ -403,7 +403,7 @@ class _DashboardPageState extends State<DashboardPage> {
                             DateFormat('d MMMM yyyy', 'id_ID')
                                 .format(selectedDate),
                             style: GoogleFonts.inter(
-                              fontSize: 16.sp,
+                              fontSize: 15.sp,
                               fontWeight: FontWeight.w700,
                               color: AppColors.textPrimary,
                             ),
@@ -412,7 +412,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         Icon(
                           Icons.calendar_month_rounded,
                           color: AppColors.textSecondary,
-                          size: 23.sp,
+                          size: 21.sp,
                         ),
                       ],
                     ),
@@ -425,26 +425,26 @@ class _DashboardPageState extends State<DashboardPage> {
                   onTap: canSave ? () => saveTransaction() : null,
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
-                    height: 58.h,
+                    height: 50.h,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: canSave ? AppColors.primary : AppColors.border,
-                      borderRadius: BorderRadius.circular(18.r),
+                      borderRadius: BorderRadius.circular(14.r),
                       boxShadow: canSave
                           ? [
                               BoxShadow(
                                 color:
                                     AppColors.primary.withValues(alpha: 0.24),
-                                blurRadius: 18,
-                                offset: const Offset(0, 8),
+                                blurRadius: 14,
+                                offset: const Offset(0, 6),
                               ),
                             ]
                           : [],
                     ),
                     child: isSaving
                         ? SizedBox(
-                            width: 20.w,
-                            height: 20.w,
+                            width: 18.w,
+                            height: 18.w,
                             child: const CircularProgressIndicator(
                               strokeWidth: 2,
                               color: Colors.white,
@@ -453,7 +453,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         : Text(
                             'Simpan Transaksi',
                             style: GoogleFonts.inter(
-                              fontSize: 16.sp,
+                              fontSize: 15.sp,
                               fontWeight: FontWeight.w800,
                               color: Colors.white,
                             ),
@@ -614,17 +614,17 @@ class _DashboardPageState extends State<DashboardPage> {
                                     keyboardType: TextInputType.number,
                                     focusNode: amountFocusNode,
                                   ),
-                                  SizedBox(height: 20.h),
+                                  SizedBox(height: 14.h),
                                   formLabel('Catatan (opsional)'),
                                   formField(
                                     controller: _noteController,
                                     hint: 'Tulis catatan...',
                                     icon: Icons.edit_note_rounded,
                                   ),
-                                  SizedBox(height: 20.h),
+                                  SizedBox(height: 14.h),
                                   formLabel('Tanggal'),
                                   dateField(),
-                                  SizedBox(height: 34.h),
+                                  SizedBox(height: 24.h),
                                   saveButton(),
                                 ],
                               ),
