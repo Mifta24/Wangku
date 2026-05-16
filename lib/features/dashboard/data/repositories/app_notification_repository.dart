@@ -1,3 +1,4 @@
+import 'dart:async';
 import '../../../../core/database/hive_manager.dart';
 import '../../../../core/notifications/app_notification_record.dart';
 import '../services/app_notification_service.dart';
@@ -5,6 +6,12 @@ import '../services/app_notification_service.dart';
 class AppNotificationRepository {
   final AppNotificationService _service = AppNotificationService();
   final HiveManager _hiveManager = HiveManager.instance;
+
+  // Stream untuk broadcast notif baru ke semua listener (misal NotificationCenterProvider)
+  static final _newNotificationController =
+      StreamController<AppNotificationRecord>.broadcast();
+  static Stream<AppNotificationRecord> get onNewNotification =>
+      _newNotificationController.stream;
 
   Future<List<AppNotificationRecord>> getNotifications(String userId) async {
     try {
@@ -22,9 +29,12 @@ class AppNotificationRepository {
     try {
       final saved = await _service.createNotification(notification);
       await _hiveManager.saveNotification(saved);
+      // Broadcast ke semua listener
+      _newNotificationController.add(saved);
       return saved;
     } catch (_) {
       await _hiveManager.saveNotification(notification);
+      _newNotificationController.add(notification);
       return notification;
     }
   }

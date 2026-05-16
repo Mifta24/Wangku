@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../../core/notifications/app_notification_record.dart';
@@ -5,6 +6,7 @@ import '../../data/repositories/app_notification_repository.dart';
 
 class NotificationCenterProvider extends ChangeNotifier {
   final AppNotificationRepository _repository = AppNotificationRepository();
+  StreamSubscription<AppNotificationRecord>? _newNotifSub;
 
   List<AppNotificationRecord> _notifications = [];
   bool _isLoading = false;
@@ -14,6 +16,18 @@ class NotificationCenterProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   int get count => _notifications.length;
   String? get userId => _userId;
+
+  NotificationCenterProvider() {
+    // Dengarkan notif baru dari manapun (BudgetProvider, dll)
+    // dan langsung tambahkan ke list tanpa reload dari server
+    _newNotifSub = AppNotificationRepository.onNewNotification.listen((notif) {
+      if (_userId == null || notif.userId != _userId) return;
+      // Cegah duplikat
+      if (_notifications.any((n) => n.id == notif.id)) return;
+      _notifications = [notif, ..._notifications];
+      notifyListeners();
+    });
+  }
 
   Future<void> load(String userId) async {
     _userId = userId;
@@ -28,6 +42,12 @@ class NotificationCenterProvider extends ChangeNotifier {
     final userId = _userId;
     if (userId == null) return;
     await load(userId);
+  }
+
+  @override
+  void dispose() {
+    _newNotifSub?.cancel();
+    super.dispose();
   }
 
   Future<void> delete(String notificationId) async {

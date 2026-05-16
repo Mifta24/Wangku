@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:wangku/core/database/hive_manager.dart';
 import '../../domain/models/transaction_model.dart';
 import '../../domain/models/category_model.dart';
 import '../../domain/models/shortcut_model.dart';
 import '../../data/repositories/transaction_repository.dart';
+import '../../data/repositories/shortcut_repository.dart';
+import '../../../reports/data/repositories/budget_repository.dart';
 
 class TransactionProvider extends ChangeNotifier {
   final TransactionRepository _repository = TransactionRepository();
+  final ShortcutRepository _shortcutRepository = ShortcutRepository();
+  final BudgetRepository _budgetRepository = BudgetRepository();
 
   // State
   List<TransactionModel> _transactions = [];
@@ -222,6 +225,8 @@ class TransactionProvider extends ChangeNotifier {
         );
       }
       await _repository.deleteCategory(category);
+      // Hapus budget kategori ini dari Supabase & Hive supaya tidak ada data orphan
+      await _budgetRepository.deleteCategoryBudget(category.userId!, category.id);
       _categories.removeWhere((c) => c.id == category.id);
       _customShortcuts.removeWhere((shortcut) => shortcut.categoryId == category.id);
       notifyListeners();
@@ -237,8 +242,7 @@ class TransactionProvider extends ChangeNotifier {
 
   /// Load shortcuts
   Future<void> loadShortcuts(String userId) async {
-    final hiveManager = HiveManager.instance;
-    _customShortcuts = await hiveManager.getShortcutPresets(userId);
+    _customShortcuts = await _shortcutRepository.getShortcuts(userId);
     notifyListeners();
   }
 
@@ -256,8 +260,7 @@ class TransactionProvider extends ChangeNotifier {
     String userId,
     List<TransactionShortcut> shortcuts,
   ) async {
-    final hiveManager = HiveManager.instance;
-    await hiveManager.saveShortcutPresets(userId, shortcuts);
+    await _shortcutRepository.saveShortcuts(userId, shortcuts);
     _customShortcuts = shortcuts;
     notifyListeners();
   }

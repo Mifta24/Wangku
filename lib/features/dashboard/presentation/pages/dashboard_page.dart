@@ -54,6 +54,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
       if (authProvider.currentUser != null) {
         final userId = authProvider.currentUser!.id;
+        authProvider.loadProfile();
         context.read<TransactionProvider>().initialize(userId);
         _budgetProvider.loadBudget(userId);
         _budgetProvider.loadCategoryBudgets(userId);
@@ -81,11 +82,16 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _openNotificationsPage() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => const NotificationsPage(),
-      ),
-    );
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute<void>(
+            builder: (_) => const NotificationsPage(),
+          ),
+        )
+        .then((_) {
+      if (!mounted) return;
+      context.read<NotificationCenterProvider>().reload();
+    });
   }
 
   void _showQuickAddSheet({
@@ -928,8 +934,11 @@ class _HomeTab extends StatelessWidget {
         final metrics = dashboardProvider.metrics;
         final monthYear = DateFormat('MMMM yyyy', 'id_ID').format(DateTime.now());
 
+        final profile = authProvider.profile;
         final meta = authProvider.currentUser?.userMetadata;
-        final rawName = (meta?['name'] ?? meta?['full_name']) as String?;
+        final rawName = profile?.name.isNotEmpty == true
+            ? profile!.name
+            : (meta?['name'] ?? meta?['full_name'])?.toString();
         final displayName = (rawName?.isNotEmpty == true)
             ? rawName!
             : (authProvider.currentUser?.email?.split('@').first ?? 'Pengguna');
@@ -1409,8 +1418,11 @@ class _ProfileTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
     final userId = authProvider.currentUser?.id;
+    final profile = authProvider.profile;
     final meta = authProvider.currentUser?.userMetadata;
-    final rawName = (meta?['name'] ?? meta?['full_name']) as String?;
+    final rawName = profile?.name.isNotEmpty == true
+        ? profile!.name
+        : (meta?['name'] ?? meta?['full_name'])?.toString();
     final displayName = (rawName?.isNotEmpty == true)
         ? rawName!
         : (authProvider.currentUser?.email?.split('@').first ?? 'Pengguna');

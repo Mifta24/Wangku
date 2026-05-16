@@ -2,18 +2,27 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/database/hive_manager.dart';
 import '../../data/services/auth_service.dart';
+import '../../data/services/profile_service.dart';
+import '../../domain/models/user_profile.dart';
+import '../../../reports/data/repositories/budget_repository.dart';
+import '../../../transactions/data/repositories/shortcut_repository.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
+  final ProfileService _profileService = ProfileService();
   final HiveManager _hiveManager = HiveManager.instance;
+  final BudgetRepository _budgetRepository = BudgetRepository();
+  final ShortcutRepository _shortcutRepository = ShortcutRepository();
 
   bool _isLoading = false;
   String? _errorMessage;
   bool _needsEmailConfirmation = false;
+  UserProfile? _profile;
 
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get needsEmailConfirmation => _needsEmailConfirmation;
+  UserProfile? get profile => _profile;
 
   // Cek apakah user sudah login atau belum
   User? get currentUser => _authService.currentUser;
@@ -29,6 +38,16 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Load profil dari tabel profiles
+  Future<void> loadProfile() async {
+    final userId = _authService.currentUser?.id;
+    if (userId == null) return;
+    try {
+      _profile = await _profileService.getProfile(userId);
+      notifyListeners();
+    } catch (_) {}
+  }
+
   // Fungsi Login
   Future<bool> login(String email, String password) async {
     _setLoading(true);
@@ -38,13 +57,14 @@ class AuthProvider extends ChangeNotifier {
       final userId = _authService.currentUser?.id;
       if (userId != null) {
         await _hiveManager.saveCurrentUserId(userId);
+        await loadProfile();
       }
       _setLoading(false);
-      return true; // Berhasil
+      return true;
     } catch (e) {
       _setError(e.toString().replaceAll('Exception: ', ''));
       _setLoading(false);
-      return false; // Gagal
+      return false;
     }
   }
 
@@ -65,6 +85,7 @@ class AuthProvider extends ChangeNotifier {
       final userId = response.user?.id;
       if (userId != null) {
         await _hiveManager.saveCurrentUserId(userId);
+        await loadProfile();
       }
       _setLoading(false);
       return true;
@@ -78,8 +99,16 @@ class AuthProvider extends ChangeNotifier {
   // Fungsi Logout
   Future<void> logout() async {
     _setLoading(true);
+    final userId = _authService.currentUser?.id;
     await _authService.signOut();
+    if (userId != null) {
+      await _hiveManager.clearUserData(userId);
+      await _hiveManager.clearNotifications(userId);
+      await _budgetRepository.clearUserBudgets(userId);
+      await _shortcutRepository.clearUserShortcuts(userId);
+    }
     await _hiveManager.clearCurrentUserId();
+    _profile = null;
     _setLoading(false);
   }
 
@@ -102,7 +131,28 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(true);
     _setError(null);
     try {
+      final userId = _authService.currentUser?.id;
+      // Simpan ke Supabase Auth userMetadata (untuk kompatibilitas session)
       await _authService.updateProfileData(data);
+      // Sync ke tabel profiles
+      if (userId != null) {
+        final current = _profile ?? UserProfile(id: userId);
+        final updated = UserProfile(
+          id: userId,
+          name: data['name']?.toString() ?? current.name,
+          phone: data['phone']?.toString() ?? current.phone,
+          bio: data['bio']?.toString() ?? current.bio,
+          job: data['job']?.toString() ?? current.job,
+          city: data['city']?.toString() ?? current.city,
+          gender: data['gender']?.toString().isNotEmpty == true
+              ? data['gender']?.toString()
+              : current.gender,
+          birthDate: data['birth_date'] != null
+              ? DateTime.tryParse(data['birth_date'].toString())
+              : current.birthDate,
+        );
+        _profile = await _profileService.saveProfile(updated);
+      }
       _setLoading(false);
       notifyListeners();
       return true;

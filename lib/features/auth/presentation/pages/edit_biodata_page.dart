@@ -31,20 +31,38 @@ class _EditBiodataPageState extends State<EditBiodataPage> {
   @override
   void initState() {
     super.initState();
-    final meta = context.read<AuthProvider>().currentUser?.userMetadata ?? {};
+    final auth = context.read<AuthProvider>();
+    // Utamakan data dari tabel profiles, fallback ke userMetadata
+    final profile = auth.profile;
+    final meta = auth.currentUser?.userMetadata ?? {};
 
-    _nameController = TextEditingController(text: meta['name']?.toString() ?? '');
-    _phoneController = TextEditingController(text: meta['phone']?.toString() ?? '');
-    _bioController = TextEditingController(text: meta['bio']?.toString() ?? '');
-    _jobController = TextEditingController(text: meta['job']?.toString() ?? '');
-    _cityController = TextEditingController(text: meta['city']?.toString() ?? '');
+    _nameController = TextEditingController(
+        text: profile?.name.isNotEmpty == true
+            ? profile!.name
+            : meta['name']?.toString() ?? '');
+    _phoneController = TextEditingController(
+        text: profile?.phone.isNotEmpty == true
+            ? profile!.phone
+            : meta['phone']?.toString() ?? '');
+    _bioController = TextEditingController(
+        text: profile?.bio.isNotEmpty == true
+            ? profile!.bio
+            : meta['bio']?.toString() ?? '');
+    _jobController = TextEditingController(
+        text: profile?.job.isNotEmpty == true
+            ? profile!.job
+            : meta['job']?.toString() ?? '');
+    _cityController = TextEditingController(
+        text: profile?.city.isNotEmpty == true
+            ? profile!.city
+            : meta['city']?.toString() ?? '');
 
-    final rawDate = meta['birth_date']?.toString();
-    if (rawDate != null && rawDate.isNotEmpty) {
-      _birthDate = DateTime.tryParse(rawDate);
-    }
+    _birthDate = profile?.birthDate ??
+        (meta['birth_date'] != null
+            ? DateTime.tryParse(meta['birth_date'].toString())
+            : null);
 
-    final rawGender = meta['gender']?.toString();
+    final rawGender = profile?.gender ?? meta['gender']?.toString();
     if (rawGender == 'Laki-laki' || rawGender == 'Perempuan') {
       _gender = rawGender;
     }

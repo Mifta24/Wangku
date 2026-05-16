@@ -5,9 +5,11 @@ import '../../../../core/notifications/app_notification_record.dart';
 import '../../../../core/notifications/notification_service.dart';
 import '../../../dashboard/data/repositories/app_notification_repository.dart';
 import '../../../transactions/presentation/providers/transaction_provider.dart';
+import '../../data/repositories/budget_repository.dart';
 
 class BudgetProvider extends ChangeNotifier {
   final TransactionProvider txnProvider;
+  final BudgetRepository _budgetRepository = BudgetRepository();
   final HiveManager _hiveManager = HiveManager.instance;
   final AppNotificationRepository _notificationRepository =
       AppNotificationRepository();
@@ -98,7 +100,10 @@ class BudgetProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
     try {
-      _categoryBudgets = await _hiveManager.getCategoryBudgets(userId);
+      // Supabase utama, Hive fallback (ditangani di repository)
+      _categoryBudgets = await _budgetRepository.getCategoryBudgets(userId);
+      // Reset alert date cache supaya dicek ulang dari Hive
+      _lastBudgetAlertDate = await _hiveManager.getBudgetAlertLastDate(userId);
     } catch (e) {
       _errorMessage = e.toString();
     }
@@ -116,7 +121,7 @@ class BudgetProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
     try {
-      await _hiveManager.saveCategoryBudget(userId, categoryId, amount);
+      await _budgetRepository.saveCategoryBudget(userId, categoryId, amount);
       _categoryBudgets = {..._categoryBudgets, categoryId: amount};
     } catch (e) {
       _errorMessage = e.toString();
@@ -130,7 +135,7 @@ class BudgetProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
     try {
-      await _hiveManager.deleteCategoryBudget(userId, categoryId);
+      await _budgetRepository.deleteCategoryBudget(userId, categoryId);
       _categoryBudgets = Map.from(_categoryBudgets)..remove(categoryId);
     } catch (e) {
       _errorMessage = e.toString();
@@ -149,7 +154,7 @@ class BudgetProvider extends ChangeNotifier {
     if (budget == null || budget <= 0) return;
 
     final expense = categoryExpense(categoryId);
-    final ratio = expense / budget; // tidak di-clamp agar bisa detect >= 1.0
+    final ratio = expense / budget;
     if (ratio < _warningThreshold) return;
 
     final rem = categoryRemaining(categoryId);
@@ -174,6 +179,9 @@ class BudgetProvider extends ChangeNotifier {
         ),
       );
     }
+
+    // Setelah cek kategori, cek juga total anggaran
+    await _maybeNotifyBudgetWarning();
   }
 
   void _onTransactionsChanged() {

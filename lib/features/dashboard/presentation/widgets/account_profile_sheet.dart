@@ -47,17 +47,25 @@ class AccountProfileSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final user = auth.currentUser;
+    final profile = auth.profile;
     final meta = user?.userMetadata ?? {};
-    final rawName = (meta['name'] ?? meta['full_name']) as String?;
+
+    // Utamakan dari tabel profiles, fallback ke userMetadata
+    final rawName = profile?.name.isNotEmpty == true
+        ? profile!.name
+        : (meta['name'] ?? meta['full_name'])?.toString();
     final displayName = (rawName?.isNotEmpty == true)
         ? rawName!
         : (user?.email?.split('@').first ?? 'Pengguna');
     final avatarLetter =
         displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U';
 
-    // Info tambahan dari metadata
-    final job = meta['job']?.toString() ?? '';
-    final city = meta['city']?.toString() ?? '';
+    final job = profile?.job.isNotEmpty == true
+        ? profile!.job
+        : meta['job']?.toString() ?? '';
+    final city = profile?.city.isNotEmpty == true
+        ? profile!.city
+        : meta['city']?.toString() ?? '';
     final subtitle = [job, city].where((s) => s.isNotEmpty).join(' · ');
 
     return Container(
