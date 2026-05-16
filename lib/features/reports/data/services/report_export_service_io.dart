@@ -1,5 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
+import 'package:excel/excel.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
@@ -25,7 +28,8 @@ class ReportExportService {
     final dir = await getApplicationDocumentsDirectory();
     final fileName = _buildFileName('csv');
     final file = File('${dir.path}/$fileName');
-    await file.writeAsString(buffer.toString());
+    // BOM UTF-8 agar Excel baca karakter non-ASCII dengan benar
+    await file.writeAsBytes([0xEF, 0xBB, 0xBF, ...utf8.encode(buffer.toString())]);
     return file.path;
   }
 
@@ -78,30 +82,42 @@ class ReportExportService {
 
   Future<String?> exportExcel({required List<TransactionModel> transactions}) async {
     final dateFmt = DateFormat('yyyy-MM-dd');
-    final buffer = StringBuffer();
-    buffer.writeln('<html><head><meta charset="UTF-8"></head><body>');
-    buffer.writeln('<table border="1">');
-    buffer.writeln('<tr><th>Tanggal</th><th>Tipe</th><th>Kategori</th><th>Catatan</th><th>Jumlah</th></tr>');
+    final excel = Excel.createExcel();
+    final sheet = excel['Laporan'];
 
-    for (final tx in transactions) {
-      final category = tx.category?.name ?? 'Uncategorized';
-      buffer.writeln(
-        '<tr>'
-        '<td>${dateFmt.format(tx.date)}</td>'
-        '<td>${_escapeHtml(tx.type)}</td>'
-        '<td>${_escapeHtml(category)}</td>'
-        '<td>${_escapeHtml(tx.note)}</td>'
-        '<td>${tx.amount.toStringAsFixed(0)}</td>'
-        '</tr>',
-      );
+    // Header
+    final headers = ['Tanggal', 'Tipe', 'Kategori', 'Catatan', 'Jumlah'];
+    for (var i = 0; i < headers.length; i++) {
+      sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0))
+          .value = TextCellValue(headers[i]);
     }
 
-    buffer.writeln('</table></body></html>');
+    // Data rows
+    for (var rowIdx = 0; rowIdx < transactions.length; rowIdx++) {
+      final tx = transactions[rowIdx];
+      final row = rowIdx + 1;
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value =
+          TextCellValue(dateFmt.format(tx.date));
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value =
+          TextCellValue(tx.type);
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value =
+          TextCellValue(tx.category?.name ?? 'Uncategorized');
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value =
+          TextCellValue(tx.note);
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value =
+          DoubleCellValue(tx.amount);
+    }
+
+    // Hapus sheet default 'Sheet1' jika ada
+    excel.delete('Sheet1');
 
     final dir = await getApplicationDocumentsDirectory();
-    final fileName = _buildFileName('xls');
+    final fileName = _buildFileName('xlsx');
     final file = File('${dir.path}/$fileName');
-    await file.writeAsString(buffer.toString());
+    final bytes = excel.encode();
+    if (bytes == null) return null;
+    await file.writeAsBytes(Uint8List.fromList(bytes));
     return file.path;
   }
 
@@ -119,11 +135,4 @@ class ReportExportService {
     return escaped;
   }
 
-  String _escapeHtml(String value) {
-    return value
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;');
-  }
 }

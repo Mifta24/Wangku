@@ -54,7 +54,10 @@ class NotificationService {
     final androidPlugin = _plugin
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     final granted = await androidPlugin?.requestNotificationsPermission();
-    return granted ?? true;
+    if (granted == false) return false;
+
+    final exactAlarmGranted = await androidPlugin?.requestExactAlarmsPermission();
+    return exactAlarmGranted ?? true;
   }
 
   Future<void> showBudgetWarning({

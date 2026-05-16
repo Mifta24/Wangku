@@ -163,6 +163,7 @@ class _ManageNotificationsSheetState extends State<ManageNotificationsSheet> {
                                     body: _bodyController.text,
                                   );
                                   if (!context.mounted) return;
+                                  Navigator.of(context).pop();
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
                                       content:
