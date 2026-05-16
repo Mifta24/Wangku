@@ -22,6 +22,8 @@ class BudgetProvider extends ChangeNotifier {
   bool _alertInProgress = false;
   bool _isDisposed = false;
   bool _notificationsEnabled = true;
+  // Track kapan terakhir notif dikirim per kategori (reset saat budget dihapus/ditambah)
+  final Map<String, DateTime> _lastCategoryAlertDate = {};
 
   static const double _warningThreshold = 0.8;
 
@@ -123,11 +125,24 @@ class BudgetProvider extends ChangeNotifier {
     try {
       await _budgetRepository.saveCategoryBudget(userId, categoryId, amount);
       _categoryBudgets = {..._categoryBudgets, categoryId: amount};
+      // Reset alert date supaya notifikasi bisa muncul lagi setelah budget diset ulang
+      _lastCategoryAlertDate.remove(categoryId);
     } catch (e) {
       _errorMessage = e.toString();
     }
     _isLoading = false;
     notifyListeners();
+
+    // Cek langsung apakah pengeluaran yang sudah ada sudah melewati threshold
+    // Ini penting saat budget dihapus lalu ditambah lagi — tidak perlu tunggu transaksi baru
+    try {
+      final category = txnProvider.categories
+          .where((c) => c.id == categoryId)
+          .firstOrNull;
+      if (category != null) {
+        await checkCategoryWarningAfterTransaction(categoryId, category.name);
+      }
+    } catch (_) {}
   }
 
   Future<void> deleteCategoryBudget(String userId, String categoryId) async {
@@ -137,6 +152,8 @@ class BudgetProvider extends ChangeNotifier {
     try {
       await _budgetRepository.deleteCategoryBudget(userId, categoryId);
       _categoryBudgets = Map.from(_categoryBudgets)..remove(categoryId);
+      // Reset alert date saat budget dihapus
+      _lastCategoryAlertDate.remove(categoryId);
     } catch (e) {
       _errorMessage = e.toString();
     }
@@ -157,27 +174,37 @@ class BudgetProvider extends ChangeNotifier {
     final ratio = expense / budget;
     if (ratio < _warningThreshold) return;
 
-    final rem = categoryRemaining(categoryId);
-    await NotificationService.instance.showCategoryBudgetWarning(
-      categoryName: categoryName,
-      percent: ratio,
-      remaining: rem,
-      categoryId: categoryId,
-    );
+    // Maks 1x per hari per kategori
+    final now = DateTime.now();
+    final lastAlert = _lastCategoryAlertDate[categoryId];
+    if (lastAlert != null && _isSameDay(lastAlert, now)) return;
 
+    final rem = categoryRemaining(categoryId);
     final userId = _userId;
     if (userId != null) {
       final isOver = ratio >= 1.0;
+      final title = isOver ? 'Anggaran Habis!' : 'Peringatan Anggaran!';
+      final body = isOver
+          ? 'Pengeluaranmu di $categoryName sudah melebihi batas anggaran.'
+          : 'Anggaran kategori $categoryName sisa ${_formatRupiah(rem)}.';
+
+      // Simpan ke database dulu
       await _notificationRepository.addNotification(
         AppNotificationRecord.create(
           userId: userId,
-          title: isOver ? 'Anggaran Habis!' : 'Peringatan Anggaran!',
-          body: isOver
-              ? 'Pengeluaranmu di $categoryName sudah melebihi batas anggaran.'
-              : 'Anggaran kategori $categoryName sisa ${_formatRupiah(rem)}.',
+          title: title,
+          body: body,
           type: 'category_budget',
         ),
       );
+      // Baru kirim push notif ke HP — supaya keduanya selalu sinkron
+      await NotificationService.instance.showCategoryBudgetWarning(
+        categoryName: categoryName,
+        percent: ratio,
+        remaining: rem,
+        categoryId: categoryId,
+      );
+      _lastCategoryAlertDate[categoryId] = now;
     }
 
     // Setelah cek kategori, cek juga total anggaran
@@ -207,20 +234,25 @@ class BudgetProvider extends ChangeNotifier {
     if (_isSameDay(last, now)) return;
 
     _alertInProgress = true;
-    await NotificationService.instance.showBudgetWarning(
-      percent: progress,
-      remaining: remaining,
-    );
     final isOver = progress >= 1.0;
+    final title = isOver ? 'Anggaran Habis!' : 'Peringatan Anggaran!';
+    final body = isOver
+        ? 'Total pengeluaran kamu sudah melebihi batas anggaran.'
+        : 'Total pengeluaran kamu sudah mencapai ${(progress * 100).toStringAsFixed(0)}% dari anggaran.';
+
+    // Simpan ke database dulu
     await _notificationRepository.addNotification(
       AppNotificationRecord.create(
         userId: userId,
-        title: isOver ? 'Anggaran Habis!' : 'Peringatan Anggaran!',
-        body: isOver
-            ? 'Total pengeluaran kamu sudah melebihi batas anggaran.'
-            : 'Total pengeluaran kamu sudah mencapai ${(progress * 100).toStringAsFixed(0)}% dari anggaran.',
+        title: title,
+        body: body,
         type: 'budget',
       ),
+    );
+    // Baru kirim push notif ke HP — supaya keduanya selalu sinkron
+    await NotificationService.instance.showBudgetWarning(
+      percent: progress,
+      remaining: remaining,
     );
     await _hiveManager.saveBudgetAlertLastDate(userId, now);
     _lastBudgetAlertDate = now;
