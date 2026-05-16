@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:lucide_icons/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:wangku/features/transactions/presentation/widgets/add_category_dialog.dart';
@@ -102,18 +101,20 @@ class _DashboardPageState extends State<DashboardPage> {
     final txnProvider = context.read<TransactionProvider>();
     final authProvider = context.read<AuthProvider>();
     final parentContext = context;
-    final noteFocusNode = FocusNode();
+    final amountFocusNode = FocusNode();
 
     _amountController.text = initialAmount == null
         ? ''
-        : initialAmount.toStringAsFixed(initialAmount.truncateToDouble() == initialAmount ? 0 : 2);
+        : initialAmount.toStringAsFixed(
+            initialAmount.truncateToDouble() == initialAmount ? 0 : 2,
+          );
     _noteController.text = initialNote ?? '';
     _selectedCategoryId = initialCategoryId;
     String selectedType = initialType ?? 'expense';
     DateTime selectedDate = DateTime.now();
-    bool inputPanelVisible = initialCategoryId != null;
     bool isSaving = false;
     bool isClosing = false;
+    bool shouldFocusAmount = initialCategoryId != null;
 
     showModalBottomSheet<void>(
       context: context,
@@ -135,7 +136,7 @@ class _DashboardPageState extends State<DashboardPage> {
         return WillPopScope(
           onWillPop: () async {
             final keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
-            if (keyboardOpen || noteFocusNode.hasFocus) {
+            if (keyboardOpen) {
               FocusManager.instance.primaryFocus?.unfocus();
               return false;
             }
@@ -151,31 +152,25 @@ class _DashboardPageState extends State<DashboardPage> {
               final frequent =
                   txnProvider.getFrequentCategories(selectedType, limit: 4);
               final hasSelectedCategory = _selectedCategoryId != null;
-              final showForm = hasSelectedCategory && inputPanelVisible;
+              final showForm = hasSelectedCategory;
               final selectedCat = hasSelectedCategory
                   ? categories.cast<CategoryModel?>().firstWhere(
                       (c) => c?.id == _selectedCategoryId,
                       orElse: () => null)
                   : null;
               final amount = double.tryParse(_amountController.text.trim());
-              final canSave = !isSaving && amount != null && amount > 0;
+              final canSave = !isSaving &&
+                  amount != null &&
+                  amount > 0 &&
+                  _selectedCategoryId != null;
 
-              void updateAmount(String value) {
-                final current = _amountController.text.trim();
-                if (value == 'backspace') {
-                  if (current.isEmpty) return;
-                  _amountController.text =
-                      current.substring(0, current.length - 1);
-                } else if (value == 'clear') {
-                  _amountController.clear();
-                } else {
-                  if (current == '0') {
-                    _amountController.text = value;
-                  } else {
-                    _amountController.text = '$current$value';
+              if (showForm && shouldFocusAmount) {
+                shouldFocusAmount = false;
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (context.mounted) {
+                    amountFocusNode.requestFocus();
                   }
-                }
-                setSheetState(() {});
+                });
               }
 
               Future<void> saveTransaction() async {
@@ -263,340 +258,6 @@ class _DashboardPageState extends State<DashboardPage> {
                 }
               }
 
-              Widget keypadButton({
-                required Widget child,
-                required VoidCallback? onTap,
-                Color? backgroundColor,
-              }) {
-                return InkWell(
-                  borderRadius: BorderRadius.circular(12.r),
-                  onTap: onTap,
-                  child: Container(
-                    height: 46.h,
-                    decoration: BoxDecoration(
-                      color: backgroundColor ?? AppColors.background,
-                      borderRadius: BorderRadius.circular(12.r),
-                    ),
-                    alignment: Alignment.center,
-                    child: child,
-                  ),
-                );
-              }
-
-              Widget numberButton(String value) {
-                return keypadButton(
-                  onTap: () => updateAmount(value),
-                  child: Text(
-                    value,
-                    style: GoogleFonts.inter(
-                      fontSize: 20.sp,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                );
-              }
-
-              Widget inputPanel() {
-                final displayAmount = amount == null || amount <= 0
-                    ? 'Rp 0'
-                    : _formatCurrency(amount);
-                final keyboardOpen =
-                    MediaQuery.of(context).viewInsets.bottom > 0;
-                final today = DateTime.now();
-                final isToday = selectedDate.year == today.year &&
-                    selectedDate.month == today.month &&
-                    selectedDate.day == today.day;
-                final dateLabel = isToday
-                    ? 'Hari ini'
-                    : DateFormat('d MMM', 'id_ID').format(selectedDate);
-
-                return Container(
-                  padding: EdgeInsets.fromLTRB(16.w, 14.h, 16.w, 18.h),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius:
-                        BorderRadius.vertical(top: Radius.circular(24.r)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.12),
-                        blurRadius: 24,
-                        offset: const Offset(0, -8),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          SizedBox(width: 40.w),
-                          Expanded(
-                            child: Center(
-                              child: Container(
-                                width: 40.w,
-                                height: 4.h,
-                                decoration: BoxDecoration(
-                                  color: AppColors.border,
-                                  borderRadius: BorderRadius.circular(999.r),
-                                ),
-                              ),
-                            ),
-                          ),
-                          InkWell(
-                            borderRadius: BorderRadius.circular(999.r),
-                            onTap: () {
-                              FocusManager.instance.primaryFocus?.unfocus();
-                              setSheetState(() => inputPanelVisible = false);
-                            },
-                            child: Container(
-                              width: 40.w,
-                              height: 32.h,
-                              alignment: Alignment.center,
-                              child: Icon(
-                                Icons.keyboard_arrow_down_rounded,
-                                color: AppColors.textSecondary,
-                                size: 24.sp,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 12.h),
-                      Row(
-                        children: [
-                          Container(
-                            width: 38.w,
-                            height: 38.w,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(12.r),
-                            ),
-                            child: Icon(
-                              LucideIcons.wallet,
-                              color: AppColors.primary,
-                              size: 18.sp,
-                            ),
-                          ),
-                          SizedBox(width: 12.w),
-                          Expanded(
-                            child: Text(
-                              displayAmount,
-                              textAlign: TextAlign.right,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.inter(
-                                fontSize: 26.sp,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 12.h),
-                      TextField(
-                        controller: _noteController,
-                        focusNode: noteFocusNode,
-                        textInputAction: TextInputAction.done,
-                        onSubmitted: (_) =>
-                            FocusManager.instance.primaryFocus?.unfocus(),
-                        decoration: InputDecoration(
-                          hintText: 'Catatan...',
-                          prefixIcon: const Icon(Icons.note_alt_outlined),
-                          isDense: true,
-                          filled: true,
-                          fillColor: AppColors.background,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12.r),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                      ),
-                      SizedBox(height: 12.h),
-                      if (keyboardOpen) ...[
-                        Row(
-                          children: [
-                            Expanded(
-                              child: keypadButton(
-                                onTap: () async {
-                                  FocusManager.instance.primaryFocus?.unfocus();
-                                  final picked = await showDatePicker(
-                                    context: context,
-                                    initialDate: selectedDate,
-                                    firstDate: DateTime(2000),
-                                    lastDate: DateTime.now()
-                                        .add(const Duration(days: 365)),
-                                    helpText: 'Pilih Tanggal Transaksi',
-                                    cancelText: 'Batal',
-                                    confirmText: 'Pilih',
-                                  );
-                                  if (picked == null) return;
-                                  setSheetState(() => selectedDate = picked);
-                                },
-                                backgroundColor:
-                                    AppColors.primary.withValues(alpha: 0.1),
-                                child: Text(
-                                  dateLabel,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12.sp,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppColors.primary,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            SizedBox(width: 8.w),
-                            Expanded(
-                              flex: 2,
-                              child: keypadButton(
-                                onTap: canSave ? saveTransaction : null,
-                                backgroundColor: canSave
-                                    ? AppColors.primary
-                                    : AppColors.border,
-                                child: isSaving
-                                    ? SizedBox(
-                                        width: 18.w,
-                                        height: 18.w,
-                                        child: const CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.white,
-                                        ),
-                                      )
-                                    : Text(
-                                        'Simpan',
-                                        style: GoogleFonts.inter(
-                                          fontSize: 13.sp,
-                                          fontWeight: FontWeight.w800,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ] else ...[
-                        Row(
-                          children: [
-                            Expanded(child: numberButton('7')),
-                            SizedBox(width: 8.w),
-                            Expanded(child: numberButton('8')),
-                            SizedBox(width: 8.w),
-                            Expanded(child: numberButton('9')),
-                            SizedBox(width: 8.w),
-                            Expanded(
-                              child: keypadButton(
-                                onTap: () async {
-                                  final picked = await showDatePicker(
-                                    context: context,
-                                    initialDate: selectedDate,
-                                    firstDate: DateTime(2000),
-                                    lastDate: DateTime.now()
-                                        .add(const Duration(days: 365)),
-                                    helpText: 'Pilih Tanggal Transaksi',
-                                    cancelText: 'Batal',
-                                    confirmText: 'Pilih',
-                                  );
-                                  if (picked == null) return;
-                                  setSheetState(() => selectedDate = picked);
-                                },
-                                backgroundColor:
-                                    AppColors.primary.withValues(alpha: 0.1),
-                                child: Text(
-                                  dateLabel,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 11.sp,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppColors.primary,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 8.h),
-                        Row(
-                          children: [
-                            Expanded(child: numberButton('4')),
-                            SizedBox(width: 8.w),
-                            Expanded(child: numberButton('5')),
-                            SizedBox(width: 8.w),
-                            Expanded(child: numberButton('6')),
-                            SizedBox(width: 8.w),
-                            Expanded(child: numberButton('000')),
-                          ],
-                        ),
-                        SizedBox(height: 8.h),
-                        Row(
-                          children: [
-                            Expanded(child: numberButton('1')),
-                            SizedBox(width: 8.w),
-                            Expanded(child: numberButton('2')),
-                            SizedBox(width: 8.w),
-                            Expanded(child: numberButton('3')),
-                            SizedBox(width: 8.w),
-                            Expanded(
-                              child: keypadButton(
-                                onTap: () => updateAmount('backspace'),
-                                child: Icon(
-                                  Icons.backspace_outlined,
-                                  color: AppColors.textSecondary,
-                                  size: 20.sp,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 8.h),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: keypadButton(
-                                onTap: () => updateAmount('clear'),
-                                child: Text(
-                                  'C',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 17.sp,
-                                    fontWeight: FontWeight.w800,
-                                    color: AppColors.error,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            SizedBox(width: 8.w),
-                            Expanded(child: numberButton('0')),
-                            SizedBox(width: 8.w),
-                            Expanded(
-                              flex: 2,
-                              child: keypadButton(
-                                onTap: canSave ? saveTransaction : null,
-                                backgroundColor: canSave
-                                    ? AppColors.primary
-                                    : AppColors.border,
-                                child: isSaving
-                                    ? SizedBox(
-                                        width: 18.w,
-                                        height: 18.w,
-                                        child: const CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.white,
-                                        ),
-                                      )
-                                    : Icon(
-                                        Icons.check_rounded,
-                                        color: Colors.white,
-                                        size: 24.sp,
-                                      ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-                );
-              }
-
               Widget catItem(CategoryModel cat) {
                 final isSelected = _selectedCategoryId == cat.id;
                 final color = Color(int.parse(
@@ -604,16 +265,9 @@ class _DashboardPageState extends State<DashboardPage> {
                     radix: 16));
                 return GestureDetector(
                   onTap: () {
-                    FocusManager.instance.primaryFocus?.unfocus();
                     setSheetState(() {
                       _selectedCategoryId = cat.id;
-                      inputPanelVisible = true;
-                    });
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (!context.mounted) return;
-                      if (noteFocusNode.hasFocus) {
-                        FocusManager.instance.primaryFocus?.unfocus();
-                      }
+                      shouldFocusAmount = true;
                     });
                   },
                   child: Column(
@@ -655,6 +309,163 @@ class _DashboardPageState extends State<DashboardPage> {
                 );
               }
 
+              Widget formLabel(String text) {
+                return Padding(
+                  padding: EdgeInsets.only(bottom: 8.h),
+                  child: Text(
+                    text,
+                    style: GoogleFonts.inter(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                );
+              }
+
+              Widget formField({
+                required TextEditingController controller,
+                required String hint,
+                required IconData icon,
+                TextInputType? keyboardType,
+                String? prefixText,
+                FocusNode? focusNode,
+              }) {
+                return TextField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  keyboardType: keyboardType,
+                  onChanged: (_) => setSheetState(() {}),
+                  style: GoogleFonts.inter(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: hint,
+                    prefixText: prefixText,
+                    prefixStyle: GoogleFonts.inter(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
+                    prefixIcon: Icon(icon, color: AppColors.textSecondary),
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 16.w,
+                      vertical: 18.h,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(18.r),
+                      borderSide: BorderSide(
+                        color: AppColors.border.withValues(alpha: 0.75),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(18.r),
+                      borderSide: BorderSide(
+                        color: AppColors.primary,
+                        width: 1.6,
+                      ),
+                    ),
+                  ),
+                );
+              }
+
+              Widget dateField() {
+                return InkWell(
+                  borderRadius: BorderRadius.circular(18.r),
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: selectedDate,
+                      firstDate: DateTime(2000),
+                      lastDate:
+                          DateTime.now().add(const Duration(days: 365)),
+                      helpText: 'Pilih Tanggal Transaksi',
+                      cancelText: 'Batal',
+                      confirmText: 'Pilih',
+                    );
+                    if (picked == null) return;
+                    setSheetState(() => selectedDate = picked);
+                  },
+                  child: Container(
+                    height: 62.h,
+                    padding: EdgeInsets.symmetric(horizontal: 16.w),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18.r),
+                      border: Border.all(
+                        color: AppColors.border.withValues(alpha: 0.75),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            DateFormat('d MMMM yyyy', 'id_ID')
+                                .format(selectedDate),
+                            style: GoogleFonts.inter(
+                              fontSize: 16.sp,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                        Icon(
+                          Icons.calendar_month_rounded,
+                          color: AppColors.textSecondary,
+                          size: 23.sp,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              Widget saveButton() {
+                return GestureDetector(
+                  onTap: canSave ? () => saveTransaction() : null,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    height: 58.h,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: canSave ? AppColors.primary : AppColors.border,
+                      borderRadius: BorderRadius.circular(18.r),
+                      boxShadow: canSave
+                          ? [
+                              BoxShadow(
+                                color:
+                                    AppColors.primary.withValues(alpha: 0.24),
+                                blurRadius: 18,
+                                offset: const Offset(0, 8),
+                              ),
+                            ]
+                          : [],
+                    ),
+                    child: isSaving
+                        ? SizedBox(
+                            width: 20.w,
+                            height: 20.w,
+                            child: const CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Text(
+                            'Simpan Transaksi',
+                            style: GoogleFonts.inter(
+                              fontSize: 16.sp,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                  ),
+                );
+              }
+
               return Padding(
                 padding: EdgeInsets.only(
                     bottom: MediaQuery.of(context).viewInsets.bottom),
@@ -682,7 +493,6 @@ class _DashboardPageState extends State<DashboardPage> {
                           if (showForm)
                             GestureDetector(
                               onTap: () => setSheetState(() {
-                                inputPanelVisible = false;
                                 _selectedCategoryId = null;
                               }),
                               child: Container(
@@ -751,7 +561,6 @@ class _DashboardPageState extends State<DashboardPage> {
                                   onTap: () => setSheetState(() {
                                     selectedType = entry.key;
                                     _selectedCategoryId = null;
-                                    inputPanelVisible = false;
                                   }),
                                   child: AnimatedContainer(
                                     duration: const Duration(milliseconds: 200),
@@ -786,11 +595,45 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                     SizedBox(height: 12.h),
 
-                    // ── Content: category grid + slide-up input ──
+                    // ── Content ──
                     Expanded(
-                      child: Stack(
-                        children: [
-                          CustomScrollView(
+                      child: showForm
+                          ? SingleChildScrollView(
+                              padding: EdgeInsets.fromLTRB(
+                                20.w,
+                                8.h,
+                                20.w,
+                                MediaQuery.of(context).viewInsets.bottom +
+                                    24.h,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  formLabel('Jumlah'),
+                                  formField(
+                                    controller: _amountController,
+                                    hint: '0',
+                                    prefixText: 'Rp ',
+                                    icon: Icons.account_balance_wallet_outlined,
+                                    keyboardType: TextInputType.number,
+                                    focusNode: amountFocusNode,
+                                  ),
+                                  SizedBox(height: 20.h),
+                                  formLabel('Catatan (opsional)'),
+                                  formField(
+                                    controller: _noteController,
+                                    hint: 'Tulis catatan...',
+                                    icon: Icons.edit_note_rounded,
+                                  ),
+                                  SizedBox(height: 20.h),
+                                  formLabel('Tanggal'),
+                                  dateField(),
+                                  SizedBox(height: 34.h),
+                                  saveButton(),
+                                ],
+                              ),
+                            )
+                          : CustomScrollView(
                               slivers: [
                                 // Sering Digunakan
                                 if (frequent.isNotEmpty) ...[
@@ -887,7 +730,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                                 setSheetState(() {
                                                   _selectedCategoryId =
                                                       result.id;
-                                                  inputPanelVisible = true;
+                                                  shouldFocusAmount = true;
                                                 });
                                               }
                                             },
@@ -934,22 +777,9 @@ class _DashboardPageState extends State<DashboardPage> {
                                   ),
                                 ),
                                 SliverToBoxAdapter(
-                                  child: SizedBox(
-                                    height: showForm ? 380.h : 20.h,
-                                  ),
-                                ),
+                                    child: SizedBox(height: 24.h)),
                               ],
                             ),
-                          AnimatedPositioned(
-                            duration: const Duration(milliseconds: 260),
-                            curve: Curves.easeOutCubic,
-                            left: 0,
-                            right: 0,
-                            bottom: showForm ? 0 : -420.h,
-                            child: inputPanel(),
-                          ),
-                        ],
-                      ),
                     ),
                   ],
                 ),
@@ -962,7 +792,7 @@ class _DashboardPageState extends State<DashboardPage> {
     ).whenComplete(() {
       FocusManager.instance.primaryFocus?.unfocus();
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        noteFocusNode.dispose();
+        amountFocusNode.dispose();
       });
     });
   }
