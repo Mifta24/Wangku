@@ -105,17 +105,14 @@ class _NotificationsPageState extends State<NotificationsPage> {
     return Container(
       padding: EdgeInsets.all(18.w),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.primary, AppColors.primaryDark],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.22),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
@@ -125,12 +122,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
             width: 48.w,
             height: 48.w,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.18),
+              color: AppColors.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(14.r),
             ),
             child: Icon(
               Icons.notifications_active_outlined,
-              color: Colors.white,
+              color: AppColors.primary,
               size: 24.sp,
             ),
           ),
@@ -144,7 +141,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                   style: GoogleFonts.inter(
                     fontSize: 19.sp,
                     fontWeight: FontWeight.w800,
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 SizedBox(height: 3.h),
@@ -152,7 +149,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                   'Peringatan dan kabar penting Wangku',
                   style: GoogleFonts.inter(
                     fontSize: 12.sp,
-                    color: Colors.white.withValues(alpha: 0.84),
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],

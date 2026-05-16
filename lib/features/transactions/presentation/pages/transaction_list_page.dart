@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -507,12 +508,14 @@ class _TransactionListPageState extends State<TransactionListPage> {
     final amountController =
         TextEditingController(text: transaction.amount.toStringAsFixed(0));
     final noteController = TextEditingController(text: transaction.note);
+    final noteFocusNode = FocusNode();
 
     var selectedType = transaction.type;
     String? selectedCategoryId = transaction.categoryId;
     var selectedDate = transaction.date;
+    var inputPanelVisible = true;
     bool isSaving = false;
-    var amountText = transaction.amount.toStringAsFixed(0);
+    bool isClosing = false;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -522,166 +525,673 @@ class _TransactionListPageState extends State<TransactionListPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
       ),
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            final categories = selectedType == 'income'
-                ? txnProvider.incomeCategories
-                : txnProvider.expenseCategories;
+        void closeSheet() {
+          if (isClosing) return;
+          isClosing = true;
+          FocusManager.instance.primaryFocus?.unfocus();
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.mounted) Navigator.pop(context);
+          });
+        }
 
-            final parsedAmount = double.tryParse(amountText.trim());
-            final canSave = !isSaving &&
-                parsedAmount != null &&
-                parsedAmount > 0 &&
-                selectedCategoryId != null;
+        return WillPopScope(
+          onWillPop: () async {
+            final keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+            if (keyboardOpen || noteFocusNode.hasFocus) {
+              FocusManager.instance.primaryFocus?.unfocus();
+              return false;
+            }
+            return true;
+          },
+          child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.82,
+          child: StatefulBuilder(
+            builder: (context, setSheetState) {
+              final categories = selectedType == 'income'
+                  ? txnProvider.incomeCategories
+                  : txnProvider.expenseCategories;
+              final selectedCategory = selectedCategoryId == null
+                  ? null
+                  : categories.cast<CategoryModel?>().firstWhere(
+                        (c) => c?.id == selectedCategoryId,
+                        orElse: () => null,
+                      );
+              final parsedAmount =
+                  double.tryParse(amountController.text.trim());
+              final canSave = !isSaving &&
+                  parsedAmount != null &&
+                  parsedAmount > 0 &&
+                  selectedCategoryId != null;
+              final showPanel = selectedCategoryId != null && inputPanelVisible;
 
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 20.w,
-                right: 20.w,
-                top: 20.h,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 20.h,
-              ),
-              child: SingleChildScrollView(
+              void updateAmount(String value) {
+                final current = amountController.text.trim();
+                if (value == 'backspace') {
+                  if (current.isEmpty) return;
+                  amountController.text =
+                      current.substring(0, current.length - 1);
+                } else if (value == 'clear') {
+                  amountController.clear();
+                } else {
+                  amountController.text =
+                      current == '0' ? value : '$current$value';
+                }
+                setSheetState(() {});
+              }
+
+              Future<void> saveChanges() async {
+                if (!canSave || isSaving) return;
+                final amount = double.tryParse(amountController.text.trim());
+                if (amount == null || amount <= 0 || selectedCategoryId == null) {
+                  return;
+                }
+                setSheetState(() => isSaving = true);
+                final updated = transaction.copyWith(
+                  categoryId: selectedCategoryId!,
+                  amount: amount,
+                  note: noteController.text.trim(),
+                  date: DateTime(
+                    selectedDate.year,
+                    selectedDate.month,
+                    selectedDate.day,
+                    transaction.date.hour,
+                    transaction.date.minute,
+                    transaction.date.second,
+                  ),
+                  type: selectedType,
+                  category: txnProvider.categories.firstWhere(
+                    (c) => c.id == selectedCategoryId,
+                    orElse: () => CategoryModel(
+                      id: selectedCategoryId!,
+                      name: transaction.category?.name ?? 'Uncategorized',
+                      icon: transaction.category?.icon ?? 'receipt',
+                      color: transaction.category?.color ?? '#94A3B8',
+                      type: selectedType,
+                    ),
+                  ),
+                );
+                try {
+                  await txnProvider.updateTransaction(transaction.id, updated);
+                  if (context.mounted) {
+                    closeSheet();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Transaksi berhasil diperbarui.'),
+                        backgroundColor: AppColors.success,
+                      ),
+                    );
+                  }
+                } catch (_) {
+                  if (context.mounted) {
+                    setSheetState(() => isSaving = false);
+                  }
+                }
+              }
+
+              Widget keypadButton({
+                required Widget child,
+                required VoidCallback? onTap,
+                Color? backgroundColor,
+              }) {
+                return InkWell(
+                  borderRadius: BorderRadius.circular(12.r),
+                  onTap: onTap,
+                  child: Container(
+                    height: 46.h,
+                    decoration: BoxDecoration(
+                      color: backgroundColor ?? AppColors.background,
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
+                    alignment: Alignment.center,
+                    child: child,
+                  ),
+                );
+              }
+
+              Widget numberButton(String value) {
+                return keypadButton(
+                  onTap: () => updateAmount(value),
+                  child: Text(
+                    value,
+                    style: GoogleFonts.inter(
+                      fontSize: 20.sp,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                );
+              }
+
+              Widget categoryItem(CategoryModel category) {
+                final isSelected = selectedCategoryId == category.id;
+                final color = Color(
+                  int.parse(
+                    'FF${category.color.replaceFirst('#', '')}',
+                    radix: 16,
+                  ),
+                );
+
+                return GestureDetector(
+                  onTap: () {
+                    FocusManager.instance.primaryFocus?.unfocus();
+                    setSheetState(() {
+                      selectedCategoryId = category.id;
+                      inputPanelVisible = true;
+                    });
+                  },
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        width: 56.w,
+                        height: 56.w,
+                        decoration: BoxDecoration(
+                          color:
+                              isSelected ? color : color.withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          category.icon.isNotEmpty ? category.icon : '?',
+                          style: TextStyle(fontSize: 22.sp),
+                        ),
+                      ),
+                      SizedBox(height: 5.h),
+                      Text(
+                        category.name,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 11.sp,
+                          color: isSelected ? color : AppColors.textPrimary,
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.w400,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              Widget inputPanel() {
+                final keyboardOpen =
+                    MediaQuery.of(context).viewInsets.bottom > 0;
+                final displayAmount = parsedAmount == null || parsedAmount <= 0
+                    ? 'Rp 0'
+                    : _formatCurrency(parsedAmount);
+                final today = DateTime.now();
+                final isToday = selectedDate.year == today.year &&
+                    selectedDate.month == today.month &&
+                    selectedDate.day == today.day;
+                final dateLabel = isToday
+                    ? 'Hari ini'
+                    : DateFormat('d MMM', 'id_ID').format(selectedDate);
+
+                return Container(
+                  padding: EdgeInsets.fromLTRB(16.w, 14.h, 16.w, 18.h),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(24.r)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.12),
+                        blurRadius: 24,
+                        offset: const Offset(0, -8),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          SizedBox(width: 40.w),
+                          Expanded(
+                            child: Center(
+                              child: Container(
+                                width: 40.w,
+                                height: 4.h,
+                                decoration: BoxDecoration(
+                                  color: AppColors.border,
+                                  borderRadius: BorderRadius.circular(999.r),
+                                ),
+                              ),
+                            ),
+                          ),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(999.r),
+                            onTap: () {
+                              FocusManager.instance.primaryFocus?.unfocus();
+                              setSheetState(() => inputPanelVisible = false);
+                            },
+                            child: SizedBox(
+                              width: 40.w,
+                              height: 32.h,
+                              child: Icon(
+                                Icons.keyboard_arrow_down_rounded,
+                                color: AppColors.textSecondary,
+                                size: 24.sp,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 12.h),
+                      Row(
+                        children: [
+                          Container(
+                            width: 38.w,
+                            height: 38.w,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12.r),
+                            ),
+                            child: Icon(
+                              Icons.account_balance_wallet_outlined,
+                              color: AppColors.primary,
+                              size: 18.sp,
+                            ),
+                          ),
+                          SizedBox(width: 12.w),
+                          Expanded(
+                            child: Text(
+                              displayAmount,
+                              textAlign: TextAlign.right,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 26.sp,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 12.h),
+                      TextField(
+                        controller: noteController,
+                        focusNode: noteFocusNode,
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (_) =>
+                            FocusManager.instance.primaryFocus?.unfocus(),
+                        decoration: InputDecoration(
+                          hintText: 'Catatan...',
+                          prefixIcon: const Icon(Icons.note_alt_outlined),
+                          isDense: true,
+                          filled: true,
+                          fillColor: AppColors.background,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12.r),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 12.h),
+                      if (keyboardOpen) ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: keypadButton(
+                                onTap: () async {
+                                  FocusManager.instance.primaryFocus?.unfocus();
+                                  final picked = await showDatePicker(
+                                    context: context,
+                                    initialDate: selectedDate,
+                                    firstDate: DateTime(2020),
+                                    lastDate: DateTime.now()
+                                        .add(const Duration(days: 365)),
+                                  );
+                                  if (picked != null) {
+                                    setSheetState(() => selectedDate = picked);
+                                  }
+                                },
+                                backgroundColor:
+                                    AppColors.primary.withValues(alpha: 0.1),
+                                child: Text(
+                                  dateLabel,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12.sp,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 8.w),
+                            Expanded(
+                              flex: 2,
+                              child: keypadButton(
+                                onTap: canSave ? saveChanges : null,
+                                backgroundColor: canSave
+                                    ? AppColors.primary
+                                    : AppColors.border,
+                                child: isSaving
+                                    ? SizedBox(
+                                        width: 18.w,
+                                        height: 18.w,
+                                        child: const CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : Text(
+                                        'Simpan',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 13.sp,
+                                          fontWeight: FontWeight.w800,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ] else ...[
+                        Row(
+                          children: [
+                            Expanded(child: numberButton('7')),
+                            SizedBox(width: 8.w),
+                            Expanded(child: numberButton('8')),
+                            SizedBox(width: 8.w),
+                            Expanded(child: numberButton('9')),
+                            SizedBox(width: 8.w),
+                            Expanded(
+                              child: keypadButton(
+                                onTap: () async {
+                                  final picked = await showDatePicker(
+                                    context: context,
+                                    initialDate: selectedDate,
+                                    firstDate: DateTime(2020),
+                                    lastDate: DateTime.now()
+                                        .add(const Duration(days: 365)),
+                                  );
+                                  if (picked != null) {
+                                    setSheetState(() => selectedDate = picked);
+                                  }
+                                },
+                                backgroundColor:
+                                    AppColors.primary.withValues(alpha: 0.1),
+                                child: Text(
+                                  dateLabel,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11.sp,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 8.h),
+                        Row(
+                          children: [
+                            Expanded(child: numberButton('4')),
+                            SizedBox(width: 8.w),
+                            Expanded(child: numberButton('5')),
+                            SizedBox(width: 8.w),
+                            Expanded(child: numberButton('6')),
+                            SizedBox(width: 8.w),
+                            Expanded(child: numberButton('000')),
+                          ],
+                        ),
+                        SizedBox(height: 8.h),
+                        Row(
+                          children: [
+                            Expanded(child: numberButton('1')),
+                            SizedBox(width: 8.w),
+                            Expanded(child: numberButton('2')),
+                            SizedBox(width: 8.w),
+                            Expanded(child: numberButton('3')),
+                            SizedBox(width: 8.w),
+                            Expanded(
+                              child: keypadButton(
+                                onTap: () => updateAmount('backspace'),
+                                child: Icon(
+                                  Icons.backspace_outlined,
+                                  color: AppColors.textSecondary,
+                                  size: 20.sp,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 8.h),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: keypadButton(
+                                onTap: () => updateAmount('clear'),
+                                child: Text(
+                                  'C',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 17.sp,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.error,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 8.w),
+                            Expanded(child: numberButton('0')),
+                            SizedBox(width: 8.w),
+                            Expanded(
+                              flex: 2,
+                              child: keypadButton(
+                                onTap: canSave ? saveChanges : null,
+                                backgroundColor: canSave
+                                    ? AppColors.primary
+                                    : AppColors.border,
+                                child: isSaving
+                                    ? SizedBox(
+                                        width: 18.w,
+                                        height: 18.w,
+                                        child: const CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : Icon(
+                                        Icons.check_rounded,
+                                        color: Colors.white,
+                                        size: 24.sp,
+                                      ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                );
+              }
+
+              return Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom,
+                ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      'Edit Transaksi',
-                      style: GoogleFonts.inter(
-                        fontSize: 18.sp,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                    Center(
+                      child: Container(
+                        margin: EdgeInsets.only(top: 12.h, bottom: 8.h),
+                        width: 40.w,
+                        height: 4.h,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(2.r),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20.w),
+                      child: Row(
+                        children: [
+                          SizedBox(width: 30.w),
+                          Expanded(
+                            child: Text(
+                              selectedCategory == null
+                                  ? 'Edit Transaksi'
+                                  : '${selectedCategory.icon}  ${selectedCategory.name}',
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 16.sp,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: closeSheet,
+                            child: Container(
+                              padding: EdgeInsets.all(6.w),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.withValues(alpha: 0.12),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.close,
+                                size: 18.sp,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     SizedBox(height: 16.h),
-                    SegmentedButton<String>(
-                      segments: const [
-                        ButtonSegment(value: 'expense', label: Text('Pengeluaran')),
-                        ButtonSegment(value: 'income', label: Text('Pemasukan')),
-                      ],
-                      selected: {selectedType},
-                      onSelectionChanged: (value) {
-                        setSheetState(() {
-                          selectedType = value.first;
-                          selectedCategoryId = null;
-                        });
-                      },
-                    ),
-                    SizedBox(height: 12.h),
-                    DropdownButtonFormField<String>(
-                      initialValue:
-                          categories.any((c) => c.id == selectedCategoryId)
-                              ? selectedCategoryId
-                              : null,
-                      decoration: const InputDecoration(labelText: 'Kategori'),
-                      items: categories
-                          .map((cat) => DropdownMenuItem<String>(
-                                value: cat.id,
-                                child: Text(cat.name),
-                              ))
-                          .toList(),
-                      onChanged: (value) =>
-                          setSheetState(() => selectedCategoryId = value),
-                    ),
-                    SizedBox(height: 12.h),
-                    TextField(
-                      controller: amountController,
-                      keyboardType: TextInputType.number,
-                      onChanged: (v) => setSheetState(() => amountText = v),
-                      decoration: const InputDecoration(
-                          labelText: 'Jumlah', prefixText: 'Rp '),
-                    ),
-                    SizedBox(height: 12.h),
-                    TextField(
-                      controller: noteController,
-                      decoration: const InputDecoration(labelText: 'Catatan'),
-                    ),
-                    SizedBox(height: 12.h),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.calendar_month_rounded),
-                      title: Text(
-                          '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}'),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: selectedDate,
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime.now(),
-                        );
-                        if (picked != null) {
-                          setSheetState(() => selectedDate = picked);
-                        }
-                      },
-                    ),
-                    SizedBox(height: 12.h),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: canSave
-                            ? () async {
-                                setSheetState(() => isSaving = true);
-                                final updated = transaction.copyWith(
-                                  categoryId: selectedCategoryId!,
-                                  amount: parsedAmount,
-                                  note: noteController.text.trim(),
-                                  date: selectedDate,
-                                  type: selectedType,
-                                  category: txnProvider.categories.firstWhere(
-                                    (c) => c.id == selectedCategoryId,
-                                    orElse: () => CategoryModel(
-                                      id: selectedCategoryId!,
-                                      name: transaction.category?.name ??
-                                          'Uncategorized',
-                                      icon: transaction.category?.icon ??
-                                          'receipt',
-                                      color: transaction.category?.color ??
-                                          '#94A3B8',
-                                      type: selectedType,
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20.w),
+                      child: Container(
+                        padding: EdgeInsets.all(3.w),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(24.r),
+                        ),
+                        child: Row(
+                          children: [
+                            for (final entry in const {
+                              'expense': 'Pengeluaran',
+                              'income': 'Pemasukan',
+                            }.entries)
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => setSheetState(() {
+                                    selectedType = entry.key;
+                                    selectedCategoryId = null;
+                                    inputPanelVisible = false;
+                                  }),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    padding:
+                                        EdgeInsets.symmetric(vertical: 10.h),
+                                    decoration: BoxDecoration(
+                                      color: selectedType == entry.key
+                                          ? (entry.key == 'income'
+                                              ? AppColors.income
+                                              : AppColors.expense)
+                                          : Colors.transparent,
+                                      borderRadius:
+                                          BorderRadius.circular(20.r),
+                                    ),
+                                    child: Text(
+                                      entry.value,
+                                      textAlign: TextAlign.center,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 14.sp,
+                                        fontWeight: FontWeight.w600,
+                                        color: selectedType == entry.key
+                                            ? Colors.white
+                                            : AppColors.textSecondary,
+                                      ),
                                     ),
                                   ),
-                                );
-                                try {
-                                  await txnProvider.updateTransaction(
-                                      transaction.id, updated);
-                                  if (context.mounted) {
-                                    Navigator.of(context).pop();
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content:
-                                            Text('Transaksi berhasil diperbarui.'),
-                                        backgroundColor: AppColors.success,
-                                      ),
-                                    );
-                                  }
-                                } catch (_) {
-                                  if (context.mounted) {
-                                    setSheetState(() => isSaving = false);
-                                  }
-                                }
-                              }
-                            : null,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
+                                ),
+                              ),
+                          ],
                         ),
-                        child: Text(
-                            isSaving ? 'Menyimpan...' : 'Simpan Perubahan'),
+                      ),
+                    ),
+                    SizedBox(height: 12.h),
+                    Expanded(
+                      child: Stack(
+                        children: [
+                          CustomScrollView(
+                            slivers: [
+                              SliverToBoxAdapter(
+                                child: Padding(
+                                  padding:
+                                      EdgeInsets.symmetric(horizontal: 20.w),
+                                  child: Text(
+                                    'Pilih Kategori',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12.sp,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              SliverToBoxAdapter(child: SizedBox(height: 10.h)),
+                              SliverPadding(
+                                padding:
+                                    EdgeInsets.symmetric(horizontal: 20.w),
+                                sliver: SliverGrid(
+                                  gridDelegate:
+                                      SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 4,
+                                    mainAxisSpacing: 12.h,
+                                    crossAxisSpacing: 8.w,
+                                    childAspectRatio: 0.78,
+                                  ),
+                                  delegate: SliverChildBuilderDelegate(
+                                    (context, index) =>
+                                        categoryItem(categories[index]),
+                                    childCount: categories.length,
+                                  ),
+                                ),
+                              ),
+                              SliverToBoxAdapter(
+                                child: SizedBox(
+                                  height: showPanel ? 380.h : 20.h,
+                                ),
+                              ),
+                            ],
+                          ),
+                          AnimatedPositioned(
+                            duration: const Duration(milliseconds: 260),
+                            curve: Curves.easeOutCubic,
+                            left: 0,
+                            right: 0,
+                            bottom: showPanel ? 0 : -420.h,
+                            child: inputPanel(),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
+          ),
         );
       },
     );
 
-    amountController.dispose();
-    noteController.dispose();
+    FocusManager.instance.primaryFocus?.unfocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      amountController.dispose();
+      noteController.dispose();
+      noteFocusNode.dispose();
+    });
   }
 
   @override
@@ -851,25 +1361,6 @@ class _TransactionListPageState extends State<TransactionListPage> {
                     ),
                   ),
                 ],
-              ),
-              SizedBox(height: 16.h),
-
-              // Saldo Bulan Ini
-              Text(
-                'Saldo Bulan Ini',
-                style: GoogleFonts.inter(
-                  fontSize: 13.sp,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              SizedBox(height: 4.h),
-              Text(
-                _formatCurrency(totalIncome - totalExpense),
-                style: GoogleFonts.inter(
-                  fontSize: 26.sp,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                ),
               ),
             ],
           ),
