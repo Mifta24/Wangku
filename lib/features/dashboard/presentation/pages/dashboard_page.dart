@@ -81,10 +81,6 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _openNotificationsPage() {
-    final userId = context.read<AuthProvider>().currentUser?.id;
-    if (userId != null) {
-      context.read<NotificationCenterProvider>().load(userId);
-    }
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => const NotificationsPage(),
