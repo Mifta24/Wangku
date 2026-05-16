@@ -6,6 +6,7 @@ import 'package:fl_chart/fl_chart.dart';
 
 import '../../presentation/providers/report_provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../transactions/domain/models/transaction_model.dart';
 import '../../../../core/theme/app_colors.dart';
 
 class ReportsPage extends StatefulWidget {
@@ -74,6 +75,8 @@ class _ReportsPageState extends State<ReportsPage> {
                             _buildTrendSection(report),
                             const SizedBox(height: 16),
                             _buildBreakdownSection(report),
+                            const SizedBox(height: 16),
+                            _buildTopCategoriesSection(report),
                           ],
                         ),
                       ),
@@ -976,6 +979,368 @@ class _ReportsPageState extends State<ReportsPage> {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopCategoriesSection(ReportProvider report) {
+    final typeLabel = report.transactionType == TransactionType.expense
+        ? 'Pengeluaran'
+        : 'Pemasukan';
+    final topCategories = report.categories.take(3).toList();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '3 Kategori Terbesar',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '$typeLabel terbesar periode ${report.periodLabel}',
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 14),
+          if (topCategories.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: Text(
+                  'Tidak ada data kategori',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            )
+          else
+            ...topCategories.map((category) {
+              final color = Color(
+                int.parse(
+                  'FF${category.color.replaceFirst('#', '')}',
+                  radix: 16,
+                ),
+              );
+              final transactions = _categoryTransactions(report, category);
+
+              return InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () => _openCategoryDetailPage(
+                  report: report,
+                  category: category,
+                  transactions: transactions,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          category.icon.isNotEmpty ? category.icon : '?',
+                          style: const TextStyle(fontSize: 17),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              category.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${transactions.length} transaksi',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        _formatCurrency(category.total),
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: color,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        color: AppColors.hint,
+                        size: 18,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
+  List<TransactionModel> _categoryTransactions(
+    ReportProvider report,
+    CategoryDistribution category,
+  ) {
+    final type =
+        report.transactionType == TransactionType.expense ? 'expense' : 'income';
+    return report.transactions
+        .where((t) => t.categoryId == category.categoryId && t.type == type)
+        .toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
+  }
+
+  void _openCategoryDetailPage({
+    required ReportProvider report,
+    required CategoryDistribution category,
+    required List<TransactionModel> transactions,
+  }) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _ReportCategoryDetailPage(
+          category: category,
+          transactions: transactions,
+          transactionType: report.transactionType,
+          periodLabel: report.periodLabel,
+          totalAmount: report.totalAmount,
+        ),
+      ),
+    );
+  }
+}
+
+class _ReportCategoryDetailPage extends StatelessWidget {
+  _ReportCategoryDetailPage({
+    required this.category,
+    required this.transactions,
+    required this.transactionType,
+    required this.periodLabel,
+    required this.totalAmount,
+  });
+
+  final CategoryDistribution category;
+  final List<TransactionModel> transactions;
+  final TransactionType transactionType;
+  final String periodLabel;
+  final double totalAmount;
+
+  final NumberFormat _currencyFormatter = NumberFormat.currency(
+    locale: 'id_ID',
+    symbol: 'Rp ',
+    decimalDigits: 0,
+  );
+
+  String _formatCurrency(double amount) => _currencyFormatter.format(amount);
+
+  Map<DateTime, List<TransactionModel>> _groupTransactionsByDate() {
+    final grouped = <DateTime, List<TransactionModel>>{};
+    for (final transaction in transactions) {
+      final date = transaction.date;
+      final key = DateTime(date.year, date.month, date.day);
+      grouped.putIfAbsent(key, () => []).add(transaction);
+    }
+    return grouped;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Color(
+      int.parse('FF${category.color.replaceFirst('#', '')}', radix: 16),
+    );
+    final metricLabel =
+        transactionType == TransactionType.expense ? 'Spent' : 'Income';
+    final totalLabel = transactionType == TransactionType.expense
+        ? 'total pengeluaran $periodLabel'
+        : 'total pemasukan $periodLabel';
+    final groupedTransactions = _groupTransactionsByDate();
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: Text(
+          category.name,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        centerTitle: true,
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        shadowColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        foregroundColor: AppColors.textPrimary,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Container(
+                  width: 54,
+                  height: 54,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    category.icon.isNotEmpty ? category.icon : '?',
+                    style: const TextStyle(fontSize: 23),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  metricLabel,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${_formatCurrency(category.total)} / ${_formatCurrency(totalAmount)}',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  totalLabel,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          ...groupedTransactions.entries.expand((entry) {
+            final date = entry.key;
+            final dateTransactions = entry.value;
+
+            return [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(2, 6, 2, 8),
+                child: Text(
+                  DateFormat('EEEE, d MMM yyyy', 'id_ID').format(date),
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              ...dateTransactions.map((transaction) {
+                final note = transaction.note.trim();
+                final title = note.isEmpty ? category.name : note;
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFE5E7EB)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          category.icon.isNotEmpty ? category.icon : '?',
+                          style: const TextStyle(fontSize: 17),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        _formatCurrency(transaction.amount),
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: color,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ];
+          }),
         ],
       ),
     );

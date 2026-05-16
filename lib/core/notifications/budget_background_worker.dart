@@ -3,6 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:workmanager/workmanager.dart';
 
 import '../database/hive_manager.dart';
+import 'app_notification_record.dart';
 import 'notification_service.dart';
 
 const String budgetCheckTask = 'budget_check_task';
@@ -57,6 +58,17 @@ Future<void> _runBudgetCheck() async {
   await NotificationService.instance.showBudgetWarning(
     percent: progress,
     remaining: (totalBudget - monthExpense).clamp(0.0, double.infinity),
+  );
+  final isOver = progress >= 1.0;
+  await hive.saveNotification(
+    AppNotificationRecord.create(
+      userId: userId,
+      title: isOver ? 'Anggaran Habis!' : 'Peringatan Anggaran!',
+      body: isOver
+          ? 'Total pengeluaran kamu sudah melebihi batas anggaran.'
+          : 'Total pengeluaran kamu sudah mencapai ${(progress * 100).toStringAsFixed(0)}% dari anggaran.',
+      type: 'budget',
+    ),
   );
   await hive.saveBudgetAlertLastDate(userId, now);
 }

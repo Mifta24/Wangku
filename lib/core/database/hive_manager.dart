@@ -3,6 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../../features/transactions/domain/models/transaction_model.dart';
 import '../../features/transactions/domain/models/category_model.dart';
 import '../../features/transactions/domain/models/shortcut_model.dart';
+import '../notifications/app_notification_record.dart';
 
 class HiveManager {
   static final HiveManager _instance = HiveManager._internal();
@@ -449,6 +450,80 @@ class HiveManager {
     } catch (e) {
       debugPrint('Error getting budget notification settings: $e');
       return null;
+    }
+  }
+
+  Future<List<AppNotificationRecord>> getNotifications(String userId) async {
+    try {
+      final box = _userBoxInstance ?? await Hive.openBox<dynamic>(_userBox);
+      final data = box.get('${userId}_notifications');
+      if (data == null) return [];
+      final rawItems = List<dynamic>.from(data as List);
+      final items = rawItems
+          .map(
+            (item) => AppNotificationRecord.fromJson(
+              Map<String, dynamic>.from(item as Map),
+            ),
+          )
+          .where((item) => item.id.isNotEmpty)
+          .toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return items;
+    } catch (e) {
+      debugPrint('Error getting notifications: $e');
+      return [];
+    }
+  }
+
+  Future<void> cacheNotifications(
+    String userId,
+    List<AppNotificationRecord> notifications,
+  ) async {
+    try {
+      final box = _userBoxInstance ?? await Hive.openBox<dynamic>(_userBox);
+      final sorted = [...notifications]
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      await box.put(
+        '${userId}_notifications',
+        sorted.map((item) => item.toJson()).toList(),
+      );
+    } catch (e) {
+      debugPrint('Error caching notifications: $e');
+    }
+  }
+
+  Future<void> saveNotification(AppNotificationRecord notification) async {
+    try {
+      final current = await getNotifications(notification.userId);
+      final withoutDuplicate =
+          current.where((item) => item.id != notification.id).toList();
+      await cacheNotifications(
+        notification.userId,
+        [notification, ...withoutDuplicate].take(80).toList(),
+      );
+    } catch (e) {
+      debugPrint('Error saving notification: $e');
+    }
+  }
+
+  Future<void> deleteNotification(String userId, String notificationId) async {
+    try {
+      final current = await getNotifications(userId);
+      await cacheNotifications(
+        userId,
+        current.where((item) => item.id != notificationId).toList(),
+      );
+    } catch (e) {
+      debugPrint('Error deleting notification: $e');
+    }
+  }
+
+  Future<void> clearNotifications(String userId) async {
+    try {
+      final box = _userBoxInstance ?? await Hive.openBox<dynamic>(_userBox);
+      await box.put('${userId}_notifications', <Map<String, dynamic>>[]);
+    } catch (e) {
+      debugPrint('Error clearing notifications: $e');
     }
   }
 

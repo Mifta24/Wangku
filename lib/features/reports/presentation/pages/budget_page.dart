@@ -34,6 +34,13 @@ class _BudgetPageState extends State<BudgetPage> {
 
   String _formatCurrency(double amount) => _currencyFormatter.format(amount);
   String _displayIcon(String icon) => icon.isNotEmpty ? icon : '?';
+  Color _budgetProgressColor(double progress) {
+    if (progress > 0.9) return AppColors.error;
+    if (progress > 0.75) return AppColors.warning;
+    return AppColors.success;
+  }
+
+  Color _progressPillBackground(Color color) => color.withValues(alpha: 0.12);
 
   List<CategoryModel> _filterAndSortCategories(
     List<CategoryModel> allCategories,
@@ -255,6 +262,8 @@ class _BudgetPageState extends State<BudgetPage> {
             builder: (context, setSheetState) {
               final raw = amountText.replaceAll(RegExp(r'[^0-9]'), '');
               final amount = double.tryParse(raw);
+              final selectedHasBudget = selected != null &&
+                  (budgetProvider.categoryBudget(selected!.id) ?? 0) > 0;
               final canSave = !isSaving &&
                   !budgetProvider.isLoading &&
                   selected != null &&
@@ -312,6 +321,17 @@ class _BudgetPageState extends State<BudgetPage> {
                         decoration:
                             const InputDecoration(labelText: 'Pilih kategori'),
                       ),
+                      if (selectedHasBudget) ...[
+                        SizedBox(height: 8.h),
+                        Text(
+                          'Tidak bisa tambah kategori anggaran yang sama',
+                          style: GoogleFonts.inter(
+                            fontSize: 12.sp,
+                            color: AppColors.warning,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                       SizedBox(height: 12.h),
                       AppTextField(
                         controller: controller,
@@ -326,6 +346,18 @@ class _BudgetPageState extends State<BudgetPage> {
                         onPressed: canSave
                             ? () async {
                                 final category = selected!;
+                                if ((budgetProvider.categoryBudget(category.id) ?? 0) > 0) {
+                                  ScaffoldMessenger.of(parentContext).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Tidak bisa tambah kategori anggaran yang sama',
+                                      ),
+                                      backgroundColor: AppColors.warning,
+                                    ),
+                                  );
+                                  return;
+                                }
+
                                 setSheetState(() => isSaving = true);
                                 try {
                                   await budgetProvider.saveCategoryBudget(
@@ -375,347 +407,342 @@ class _BudgetPageState extends State<BudgetPage> {
         final expenseCategories = txnProvider.expenseCategories;
         final filteredCategories =
             _filterAndSortCategories(expenseCategories, budget);
-
-        return Column(
-          children: [
-            // ── Green Header ──
-            Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [AppColors.primary, AppColors.primaryDark],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-              padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 20.h),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        return Container(
+          color: AppColors.background,
+          child: ListView(
+            padding: EdgeInsets.fromLTRB(20.w, 22.h, 20.w, 26.h),
+            children: [
+              Row(
                 children: [
-                  // Title Row
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Anggaran',
-                        style: GoogleFonts.inter(
-                          fontSize: 18.sp,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
+                  SizedBox(width: 36.w),
+                  Expanded(
+                    child: Text(
+                      'Anggaran',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.inter(
+                        fontSize: 17.sp,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
                       ),
-                      GestureDetector(
-                        onTap: userId == null || expenseCategories.isEmpty
-                            ? null
-                            : () => _openCategoryBudgetPickerSheet(
-                                budget, userId, expenseCategories),
-                        child: Container(
-                          width: 36.w,
-                          height: 36.w,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10.r),
-                          ),
-                          child: Icon(Icons.add_rounded,
-                              color: AppColors.primary, size: 22.sp),
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 16.h),
-
-                  // Total Budget Summary Card
-                  Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.all(16.w),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(14.r),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Total Anggaran Bulan Ini',
-                          style: GoogleFonts.inter(
-                            fontSize: 12.sp,
-                            color: Colors.white.withValues(alpha: 0.85),
-                          ),
-                        ),
-                        SizedBox(height: 6.h),
-                        if (!hasBudget)
-                          Text(
-                            'Belum ada anggaran',
-                            style: GoogleFonts.inter(
-                              fontSize: 16.sp,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
+                  ),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(18.r),
+                    onTap: userId == null || expenseCategories.isEmpty
+                        ? null
+                        : () => _openCategoryBudgetPickerSheet(
+                              budget,
+                              userId,
+                              expenseCategories,
                             ),
-                          )
-                        else ...[
-                          Text(
-                            _formatCurrency(budget.monthExpense),
-                            style: GoogleFonts.inter(
-                              fontSize: 22.sp,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                            ),
-                          ),
-                          SizedBox(height: 4.h),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'dari ${_formatCurrency(totalBudget)}',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12.sp,
-                                  color: Colors.white.withValues(alpha: 0.8),
-                                ),
-                              ),
-                              Text(
-                                '${(budget.progress * 100).toStringAsFixed(0)}%',
-                                style: GoogleFonts.inter(
-                                  fontSize: 14.sp,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 8.h),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4.r),
-                            child: LinearProgressIndicator(
-                              value: budget.progress,
-                              backgroundColor:
-                                  Colors.white.withValues(alpha: 0.3),
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                budget.progress >= 0.8
-                                    ? AppColors.warning
-                                    : Colors.white,
-                              ),
-                              minHeight: 6.h,
-                            ),
-                          ),
-                        ],
-                      ],
+                    child: SizedBox(
+                      width: 36.w,
+                      height: 36.w,
+                      child: Icon(
+                        Icons.add_rounded,
+                        color: AppColors.textPrimary,
+                        size: 24.sp,
+                      ),
                     ),
                   ),
                 ],
               ),
-            ),
-
-            // ── Category List ──
-            Expanded(
-              child: budget.categoryBudgets.isEmpty
-                  ? _buildEmptyState(
-                      userId: userId,
-                      expenseCategories: expenseCategories,
-                      budget: budget,
-                    )
-                  : ListView(
-                      padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 24.h),
-                      children: [
-                        // Sort row
-                        if (filteredCategories.isNotEmpty)
-                          Padding(
-                            padding: EdgeInsets.only(bottom: 12.h),
-                            child: Row(
-                              children: [
-                                Text(
-                                  'Urutkan:',
-                                  style: GoogleFonts.inter(
-                                      fontSize: 12.sp,
-                                      color: AppColors.textSecondary),
-                                ),
-                                SizedBox(width: 8.w),
-                                DropdownButton<BudgetSort>(
-                                  value: _budgetSort,
-                                  underline: const SizedBox(),
-                                  style: GoogleFonts.inter(
-                                      fontSize: 12.sp,
-                                      color: AppColors.textPrimary),
-                                  items: const [
-                                    DropdownMenuItem(
-                                        value: BudgetSort.spentDesc,
-                                        child: Text('Terpakai terbanyak')),
-                                    DropdownMenuItem(
-                                        value: BudgetSort.remainingAsc,
-                                        child: Text('Sisa paling sedikit')),
-                                    DropdownMenuItem(
-                                        value: BudgetSort.nameAsc,
-                                        child: Text('Nama (A-Z)')),
-                                  ],
-                                  onChanged: (value) {
-                                    if (value == null) return;
-                                    setState(() => _budgetSort = value);
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-
-                        // Category Cards
-                        ...filteredCategories.map((cat) {
-                          final catBudget = budget.categoryBudget(cat.id);
-                          final spent = budget.categoryExpense(cat.id);
-                          final remaining = budget.categoryRemaining(cat.id);
-                          final progress = budget.categoryProgress(cat.id);
-                          final color = Color(int.parse(
-                              'FF${cat.color.replaceFirst('#', '')}',
-                              radix: 16));
-                          final isWarning =
-                              progress >= 0.8 && (catBudget ?? 0) > 0;
-
-                          return GestureDetector(
-                            onTap: userId == null
-                                ? null
-                                : () => _openCategoryBudgetSheet(
-                                    budget, userId, cat),
-                            child: Container(
-                              margin: EdgeInsets.only(bottom: 12.h),
-                              padding: EdgeInsets.all(16.w),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16.r),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.05),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Column(
-                                children: [
-                                  // Top Row: icon + name + percentage
-                                  Row(
-                                    children: [
-                                      Container(
-                                        width: 44.w,
-                                        height: 44.w,
-                                        decoration: BoxDecoration(
-                                          color: color.withValues(alpha: 0.15),
-                                          borderRadius:
-                                              BorderRadius.circular(12.r),
-                                        ),
-                                        child: Center(
-                                          child: Text(
-                                            _displayIcon(cat.icon),
-                                            style:
-                                                TextStyle(fontSize: 20.sp),
-                                          ),
-                                        ),
-                                      ),
-                                      SizedBox(width: 12.w),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              cat.name,
-                                              style: GoogleFonts.inter(
-                                                fontSize: 14.sp,
-                                                fontWeight: FontWeight.w600,
-                                                color: AppColors.textPrimary,
-                                              ),
-                                            ),
-                                            SizedBox(height: 2.h),
-                                            Text(
-                                              'Sisa: ${_formatCurrency(remaining)}',
-                                              style: GoogleFonts.inter(
-                                                fontSize: 12.sp,
-                                                color: AppColors.textSecondary,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      Container(
-                                        padding: EdgeInsets.symmetric(
-                                            horizontal: 10.w, vertical: 4.h),
-                                        decoration: BoxDecoration(
-                                          color: isWarning
-                                              ? AppColors.warning
-                                                  .withValues(alpha: 0.12)
-                                              : color.withValues(alpha: 0.1),
-                                          borderRadius:
-                                              BorderRadius.circular(20.r),
-                                        ),
-                                        child: Text(
-                                          '${(progress * 100).toStringAsFixed(0)}%',
-                                          style: GoogleFonts.inter(
-                                            fontSize: 13.sp,
-                                            fontWeight: FontWeight.w700,
-                                            color: isWarning
-                                                ? AppColors.warning
-                                                : color,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-
-                                  if (catBudget != null && catBudget > 0) ...[
-                                    SizedBox(height: 12.h),
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(4.r),
-                                      child: LinearProgressIndicator(
-                                        value: progress,
-                                        backgroundColor:
-                                            AppColors.border,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                          isWarning
-                                              ? AppColors.warning
-                                              : color,
-                                        ),
-                                        minHeight: 7.h,
-                                      ),
-                                    ),
-                                    SizedBox(height: 8.h),
-                                    // Spent / Budget amounts
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          _formatCurrency(spent),
-                                          style: GoogleFonts.inter(
-                                            fontSize: 11.sp,
-                                            fontWeight: FontWeight.w500,
-                                            color: AppColors.textSecondary,
-                                          ),
-                                        ),
-                                        Text(
-                                          _formatCurrency(catBudget),
-                                          style: GoogleFonts.inter(
-                                            fontSize: 11.sp,
-                                            fontWeight: FontWeight.w500,
-                                            color: AppColors.textSecondary,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          );
-                        }),
-                      ],
-                    ),
-            ),
-          ],
+              SizedBox(height: 18.h),
+              _buildTotalBudgetCard(budget: budget, hasBudget: hasBudget),
+              SizedBox(height: 22.h),
+              Text(
+                'Rincian Anggaran',
+                style: GoogleFonts.inter(
+                  fontSize: 15.sp,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              SizedBox(height: 14.h),
+              if (budget.categoryBudgets.isEmpty)
+                _buildEmptyState(
+                  expenseCategories: expenseCategories,
+                )
+              else
+                ...filteredCategories.map(
+                  (cat) => _buildCategoryBudgetCard(
+                    budget: budget,
+                    userId: userId,
+                    category: cat,
+                  ),
+                ),
+              SizedBox(height: 4.h),
+              _buildAddBudgetButton(
+                enabled: userId != null && expenseCategories.isNotEmpty,
+                onPressed: userId == null || expenseCategories.isEmpty
+                    ? null
+                    : () => _openCategoryBudgetPickerSheet(
+                          budget,
+                          userId,
+                          expenseCategories,
+                        ),
+              ),
+            ],
+          ),
         );
       },
     );
   }
 
-  Widget _buildEmptyState({
-    required String? userId,
-    required List<CategoryModel> expenseCategories,
+  Widget _buildTotalBudgetCard({
     required BudgetProvider budget,
+    required bool hasBudget,
+  }) {
+    final progressColor = _budgetProgressColor(budget.progress);
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(16.w, 17.h, 16.w, 18.h),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF16A34A), Color(0xFF15803D)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(8.r),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Total Anggaran Bulan ini',
+            style: GoogleFonts.inter(
+              fontSize: 12.sp,
+              fontWeight: FontWeight.w500,
+              color: Colors.white.withValues(alpha: 0.9),
+            ),
+          ),
+          SizedBox(height: 6.h),
+          Text(
+            hasBudget ? _formatCurrency(budget.totalCategoryBudget) : 'Rp 0',
+            style: GoogleFonts.inter(
+              fontSize: 27.sp,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+            ),
+          ),
+          SizedBox(height: 12.h),
+          Divider(color: Colors.white.withValues(alpha: 0.22), height: 1.h),
+          SizedBox(height: 12.h),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Sisa ${_formatCurrency(budget.remaining)}',
+                style: GoogleFonts.inter(
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white,
+                ),
+              ),
+              Text(
+                '${(budget.progress * 100).toStringAsFixed(0)}%',
+                style: GoogleFonts.inter(
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 8.h),
+          _buildProgressBar(
+            value: budget.progress,
+            color: hasBudget ? progressColor : Colors.white,
+            backgroundColor: Colors.white.withValues(alpha: 0.35),
+            height: 6.h,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryBudgetCard({
+    required BudgetProvider budget,
+    required String? userId,
+    required CategoryModel category,
+  }) {
+    final categoryBudget = budget.categoryBudget(category.id) ?? 0;
+    final spent = budget.categoryExpense(category.id);
+    final remaining = budget.categoryRemaining(category.id);
+    final progress = budget.categoryProgress(category.id);
+    final progressColor = _budgetProgressColor(progress);
+    final categoryColor = Color(
+      int.parse('FF${category.color.replaceFirst('#', '')}', radix: 16),
+    );
+
+    return GestureDetector(
+      onTap: userId == null
+          ? null
+          : () => _openCategoryBudgetSheet(budget, userId, category),
+      child: Container(
+        margin: EdgeInsets.only(bottom: 14.h),
+        padding: EdgeInsets.all(16.w),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8.r),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 43.w,
+                  height: 43.w,
+                  decoration: BoxDecoration(
+                    color: categoryColor.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    _displayIcon(category.icon),
+                    style: TextStyle(fontSize: 20.sp),
+                  ),
+                ),
+                SizedBox(width: 10.w),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        category.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 12.sp,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      SizedBox(height: 2.h),
+                      Text(
+                        'Sisa : ${_formatCurrency(remaining)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 11.sp,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 12.w, vertical: 5.h),
+                  decoration: BoxDecoration(
+                    color: _progressPillBackground(progressColor),
+                    borderRadius: BorderRadius.circular(999.r),
+                  ),
+                  child: Text(
+                    '${(progress * 100).toStringAsFixed(0)}%',
+                    style: GoogleFonts.inter(
+                      fontSize: 11.sp,
+                      fontWeight: FontWeight.w800,
+                      color: progressColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 14.h),
+            _buildProgressBar(
+              value: progress,
+              color: progressColor,
+              backgroundColor: const Color(0xFFE5E7EB),
+              height: 6.h,
+            ),
+            SizedBox(height: 10.h),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  _formatCurrency(spent),
+                  style: GoogleFonts.inter(
+                    fontSize: 11.sp,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                Text(
+                  _formatCurrency(categoryBudget),
+                  style: GoogleFonts.inter(
+                    fontSize: 11.sp,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProgressBar({
+    required double value,
+    required Color color,
+    required Color backgroundColor,
+    required double height,
+  }) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999.r),
+      child: LinearProgressIndicator(
+        value: value,
+        minHeight: height,
+        backgroundColor: backgroundColor,
+        valueColor: AlwaysStoppedAnimation<Color>(color),
+      ),
+    );
+  }
+
+  Widget _buildAddBudgetButton({
+    required bool enabled,
+    required VoidCallback? onPressed,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      height: 38.h,
+      child: ElevatedButton.icon(
+        onPressed: enabled ? onPressed : null,
+        icon: Icon(Icons.add_rounded, size: 16.sp),
+        label: Text(
+          'Tambah Anggaran',
+          style: GoogleFonts.inter(
+            fontSize: 12.sp,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        style: ElevatedButton.styleFrom(
+          elevation: 0,
+          backgroundColor: AppColors.primary,
+          disabledBackgroundColor: AppColors.border,
+          foregroundColor: Colors.white,
+          disabledForegroundColor: AppColors.textSecondary,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(4.r),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState({
+    required List<CategoryModel> expenseCategories,
   }) {
     return Center(
       child: Padding(
@@ -742,18 +769,8 @@ class _BudgetPageState extends State<BudgetPage> {
                 color: AppColors.textSecondary,
               ),
             ),
-            SizedBox(height: 24.h),
-            if (userId != null && expenseCategories.isNotEmpty)
-              OutlinedButton.icon(
-                onPressed: () => _openCategoryBudgetPickerSheet(
-                    budget, userId, expenseCategories),
-                icon: const Icon(Icons.add_circle_outline, size: 18),
-                label: const Text('Tambah Anggaran Kategori'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                  side: const BorderSide(color: AppColors.primary),
-                ),
-              ),
+            if (expenseCategories.isEmpty)
+              SizedBox(height: 18.h),
             if (expenseCategories.isEmpty)
               Text(
                 'Tambahkan transaksi pengeluaran terlebih dahulu\nuntuk membuat kategori.',

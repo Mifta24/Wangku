@@ -13,6 +13,7 @@ import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../presentation/providers/dashboard_provider.dart';
+import '../../presentation/providers/notification_center_provider.dart';
 import '../../../reports/presentation/providers/budget_provider.dart';
 import '../../../reports/presentation/providers/reminder_provider.dart';
 import '../../../reports/presentation/providers/report_provider.dart';
@@ -23,6 +24,7 @@ import '../../../transactions/presentation/widgets/manage_categories_sheet.dart'
 import '../../../transactions/presentation/pages/transaction_list_page.dart';
 import '../../../reports/presentation/pages/reports_page.dart';
 import '../../../reports/presentation/pages/budget_page.dart';
+import 'notifications_page.dart';
 import '../widgets/account_profile_sheet.dart';
 import '../widgets/export_transactions_sheet.dart';
 import '../widgets/manage_notifications_sheet.dart';
@@ -59,6 +61,7 @@ class _DashboardPageState extends State<DashboardPage> {
         _budgetProvider.loadBudget(userId);
         _budgetProvider.loadCategoryBudgets(userId);
         context.read<ReminderProvider>().load(userId);
+        context.read<NotificationCenterProvider>().load(userId);
         context.read<ReportProvider>().init(userId);
       }
     });
@@ -78,6 +81,18 @@ class _DashboardPageState extends State<DashboardPage> {
       decimalDigits: 0,
     );
     return formatter.format(amount);
+  }
+
+  void _openNotificationsPage() {
+    final userId = context.read<AuthProvider>().currentUser?.id;
+    if (userId != null) {
+      context.read<NotificationCenterProvider>().load(userId);
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const NotificationsPage(),
+      ),
+    );
   }
 
   void _showQuickAddSheet({
@@ -696,6 +711,7 @@ class _DashboardPageState extends State<DashboardPage> {
         onQuickAdd: _showQuickAddSheet,
         formatCurrency: _formatCurrency,
         onNavigateToTab: (index) => setState(() => _currentIndex = index),
+        onNotificationsTap: _openNotificationsPage,
       ),
       const TransactionListPage(),
       const ReportsPage(),
@@ -703,9 +719,26 @@ class _DashboardPageState extends State<DashboardPage> {
       _ProfileTab(onLogout: _handleLogout),
     ];
 
+    final currentPage = pages[_currentIndex];
+    final body = _currentIndex == 4
+        ? currentPage
+        : ColoredBox(
+            color: AppColors.background,
+            child: currentPage,
+          );
+
     return Scaffold(
-      appBar: AppBar(toolbarHeight: 0, elevation: 0, backgroundColor: Colors.white),
-      body: pages[_currentIndex],
+      backgroundColor: _currentIndex == 4 ? Colors.white : AppColors.background,
+      appBar: AppBar(
+        toolbarHeight: 0,
+        elevation: 0,
+        shadowColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        backgroundColor:
+            _currentIndex == 4 ? Colors.white : AppColors.background,
+      ),
+      body: body,
       floatingActionButton: _currentIndex == 1
           ? FloatingActionButton(
               onPressed: _showQuickAddSheet,
@@ -745,6 +778,7 @@ class _HomeTab extends StatelessWidget {
     required this.onQuickAdd,
     required this.formatCurrency,
     required this.onNavigateToTab,
+    required this.onNotificationsTap,
   });
 
   final void Function({
@@ -755,6 +789,7 @@ class _HomeTab extends StatelessWidget {
   }) onQuickAdd;
   final String Function(double) formatCurrency;
   final void Function(int) onNavigateToTab;
+  final VoidCallback onNotificationsTap;
 
   Widget _buildMenuButton({
     required IconData icon,
@@ -809,7 +844,7 @@ class _HomeTab extends StatelessWidget {
           children: [
             // ── Greeting Header ──
             Container(
-              color: Colors.white,
+              color: AppColors.background,
               padding: EdgeInsets.fromLTRB(
                 20.w,
                 MediaQuery.of(context).padding.top + 16.h,
@@ -839,17 +874,60 @@ class _HomeTab extends StatelessWidget {
                       ),
                     ],
                   ),
-                  Container(
-                    width: 44.w,
-                    height: 44.w,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12.r),
-                    ),
-                    child: Icon(
-                      Icons.notifications_outlined,
-                      color: AppColors.primary,
-                      size: 22.sp,
+                  GestureDetector(
+                    onTap: onNotificationsTap,
+                    child: Consumer<NotificationCenterProvider>(
+                      builder: (context, notificationProvider, _) {
+                        final count = notificationProvider.count;
+                        return Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Container(
+                              width: 44.w,
+                              height: 44.w,
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12.r),
+                              ),
+                              child: Icon(
+                                Icons.notifications_outlined,
+                                color: AppColors.primary,
+                                size: 22.sp,
+                              ),
+                            ),
+                            if (count > 0)
+                              Positioned(
+                                right: -4.w,
+                                top: -4.h,
+                                child: Container(
+                                  constraints: BoxConstraints(
+                                    minWidth: 18.w,
+                                    minHeight: 18.w,
+                                  ),
+                                  padding:
+                                      EdgeInsets.symmetric(horizontal: 4.w),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.error,
+                                    borderRadius: BorderRadius.circular(999.r),
+                                    border: Border.all(
+                                      color: AppColors.background,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(
+                                    count > 99 ? '99+' : '$count',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 9.sp,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ],
@@ -1162,6 +1240,8 @@ class _TransactionTile extends StatelessWidget {
     final categoryName = transaction.category?.name ?? 'Uncategorized';
     final note = transaction.note.trim();
     final hasNote = note.isNotEmpty;
+    final transactionDate =
+        DateFormat('d MMM yyyy', 'id_ID').format(transaction.date);
 
     return AppCard(
       child: Row(
@@ -1194,18 +1274,16 @@ class _TransactionTile extends StatelessWidget {
                     color: AppColors.textPrimary,
                   ),
                 ),
-                if (hasNote) ...[
-                  SizedBox(height: 4.h),
-                  Text(
-                    categoryName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(
-                      fontSize: 10.sp,
-                      color: AppColors.textSecondary,
-                    ),
+                SizedBox(height: 4.h),
+                Text(
+                  transactionDate,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    fontSize: 10.sp,
+                    color: AppColors.textSecondary,
                   ),
-                ],
+                ),
               ],
             ),
           ),

@@ -711,9 +711,9 @@ class _TransactionListPageState extends State<TransactionListPage> {
 
     return Column(
       children: [
-        // ── White Header ──
+        // ── Header ──
         Container(
-          color: Colors.white,
+          color: AppColors.background,
           padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 20.h),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

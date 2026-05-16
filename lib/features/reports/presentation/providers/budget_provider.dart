@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/database/hive_manager.dart';
+import '../../../../core/notifications/app_notification_record.dart';
 import '../../../../core/notifications/notification_service.dart';
+import '../../../dashboard/data/repositories/app_notification_repository.dart';
 import '../../../transactions/presentation/providers/transaction_provider.dart';
 
 class BudgetProvider extends ChangeNotifier {
   final TransactionProvider txnProvider;
   final HiveManager _hiveManager = HiveManager.instance;
+  final AppNotificationRepository _notificationRepository =
+      AppNotificationRepository();
 
   Map<String, double> _categoryBudgets = {};
   bool _isLoading = false;
@@ -156,6 +160,21 @@ class BudgetProvider extends ChangeNotifier {
       remaining: rem,
       categoryId: categoryId,
     );
+
+    final userId = _userId;
+    if (userId != null) {
+      final isOver = ratio >= 1.0;
+      await _notificationRepository.addNotification(
+        AppNotificationRecord.create(
+          userId: userId,
+          title: isOver ? 'Anggaran Habis!' : 'Peringatan Anggaran!',
+          body: isOver
+              ? 'Pengeluaranmu di $categoryName sudah melebihi batas anggaran.'
+              : 'Anggaran kategori $categoryName sisa ${_formatRupiah(rem)}.',
+          type: 'category_budget',
+        ),
+      );
+    }
   }
 
   void _onTransactionsChanged() {
@@ -185,9 +204,35 @@ class BudgetProvider extends ChangeNotifier {
       percent: progress,
       remaining: remaining,
     );
+    final isOver = progress >= 1.0;
+    await _notificationRepository.addNotification(
+      AppNotificationRecord.create(
+        userId: userId,
+        title: isOver ? 'Anggaran Habis!' : 'Peringatan Anggaran!',
+        body: isOver
+            ? 'Total pengeluaran kamu sudah melebihi batas anggaran.'
+            : 'Total pengeluaran kamu sudah mencapai ${(progress * 100).toStringAsFixed(0)}% dari anggaran.',
+        type: 'budget',
+      ),
+    );
     await _hiveManager.saveBudgetAlertLastDate(userId, now);
     _lastBudgetAlertDate = now;
     _alertInProgress = false;
+  }
+
+  String _formatRupiah(double amount) {
+    final absAmount = amount.abs().toStringAsFixed(0);
+    String result = '';
+    int count = 0;
+    for (var i = absAmount.length - 1; i >= 0; i--) {
+      result = absAmount[i] + result;
+      count++;
+      if (count == 3 && i > 0) {
+        result = '.$result';
+        count = 0;
+      }
+    }
+    return 'Rp $result';
   }
 
   bool _isSameDay(DateTime? a, DateTime b) {

@@ -217,54 +217,7 @@ class _ManageNotificationsSheetState extends State<ManageNotificationsSheet> {
                             ),
                           ],
                         ),
-                        SizedBox(height: 8.h),
-                        Container(
-                          padding: EdgeInsets.all(12.w),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.06),
-                            borderRadius: BorderRadius.circular(10.r),
-                            border: Border.all(
-                                color: AppColors.primary.withValues(alpha: 0.2)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '80–99%  →  Peringatan Anggaran!',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12.sp,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.warning,
-                                ),
-                              ),
-                              SizedBox(height: 4.h),
-                              Text(
-                                'Wah, Anggaran Kategori [nama] kamu sisa Rp xxx lagi, hemat-hemat ya.',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11.sp,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                              SizedBox(height: 10.h),
-                              Text(
-                                '100%+  →  Anggaran Habis!',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12.sp,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.error,
-                                ),
-                              ),
-                              SizedBox(height: 4.h),
-                              Text(
-                                'Wah, pengeluaranmu di [nama] sudah melebihi batas! Yuk, evaluasi lagi.',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11.sp,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                        
                       ],
                     ),
                   );

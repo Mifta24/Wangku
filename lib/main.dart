@@ -8,6 +8,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'features/auth/presentation/providers/auth_provider.dart';
 import 'features/transactions/presentation/providers/transaction_provider.dart';
 import 'features/dashboard/presentation/providers/dashboard_provider.dart';
+import 'features/dashboard/presentation/providers/notification_center_provider.dart';
 import 'features/reports/presentation/providers/budget_provider.dart';
 import 'features/reports/presentation/providers/reminder_provider.dart';
 import 'features/reports/presentation/providers/report_provider.dart';
@@ -86,6 +87,7 @@ void main() async {
               budgetProvider ?? BudgetProvider(txnProvider: txnProvider),
         ),
         ChangeNotifierProvider(create: (_) => ReminderProvider()),
+        ChangeNotifierProvider(create: (_) => NotificationCenterProvider()),
         ChangeNotifierProxyProvider<TransactionProvider, ReportProvider>(
           create: (_) => ReportProvider(),
           update: (_, txnProvider, reportProvider) {
