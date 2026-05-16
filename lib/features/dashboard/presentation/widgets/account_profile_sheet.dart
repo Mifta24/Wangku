@@ -1,46 +1,64 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../auth/presentation/pages/change_password_page.dart';
+import '../../../auth/presentation/pages/edit_biodata_page.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
-class AccountProfileSheet extends StatefulWidget {
+class AccountProfileSheet extends StatelessWidget {
   const AccountProfileSheet({super.key});
 
-  @override
-  State<AccountProfileSheet> createState() => _AccountProfileSheetState();
-}
-
-class _AccountProfileSheetState extends State<AccountProfileSheet> {
-  late final TextEditingController _nameController;
-
-  @override
-  void initState() {
-    super.initState();
-    final user = context.read<AuthProvider>().currentUser;
-    _nameController = TextEditingController(
-      text: user?.userMetadata?['name']?.toString() ?? '',
+  Future<void> _handleLogout(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+        title: Text('Keluar Akun',
+            style: GoogleFonts.inter(fontWeight: FontWeight.w700)),
+        content: Text(
+          'Yakin ingin keluar dari akun ini?',
+          style: GoogleFonts.inter(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Batal',
+                style: GoogleFonts.inter(color: AppColors.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Keluar',
+                style: GoogleFonts.inter(
+                    color: AppColors.error, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
     );
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    super.dispose();
+    if (confirm != true) return;
+    if (!context.mounted) return;
+    await context.read<AuthProvider>().logout();
   }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final user = auth.currentUser;
-    final meta = user?.userMetadata;
-    final rawName = (meta?['name'] ?? meta?['full_name']) as String?;
+    final meta = user?.userMetadata ?? {};
+    final rawName = (meta['name'] ?? meta['full_name']) as String?;
     final displayName = (rawName?.isNotEmpty == true)
         ? rawName!
         : (user?.email?.split('@').first ?? 'Pengguna');
-    final avatarLetter = displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U';
+    final avatarLetter =
+        displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U';
+
+    // Info tambahan dari metadata
+    final job = meta['job']?.toString() ?? '';
+    final city = meta['city']?.toString() ?? '';
+    final subtitle = [job, city].where((s) => s.isNotEmpty).join(' · ');
 
     return Container(
       decoration: BoxDecoration(
@@ -49,13 +67,8 @@ class _AccountProfileSheetState extends State<AccountProfileSheet> {
       ),
       child: SafeArea(
         top: false,
-        child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(
-            20.w,
-            12.h,
-            20.w,
-            MediaQuery.of(context).viewInsets.bottom + 24.h,
-          ),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 24.h),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
@@ -72,12 +85,13 @@ class _AccountProfileSheetState extends State<AccountProfileSheet> {
                 ),
               ),
               SizedBox(height: 16.h),
-              // Header row
+
+              // Header
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Pengaturan Profil',
+                    'Akun & Profil',
                     style: GoogleFonts.inter(
                       fontSize: 18.sp,
                       fontWeight: FontWeight.w700,
@@ -93,187 +107,218 @@ class _AccountProfileSheetState extends State<AccountProfileSheet> {
                   ),
                 ],
               ),
-              SizedBox(height: 24.h),
-              // Avatar
-              Center(
-                child: Stack(
-                  children: [
-                    Container(
-                      width: 80.w,
-                      height: 80.w,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                            color: AppColors.primary.withValues(alpha: 0.3), width: 2),
-                      ),
-                      child: Center(
-                        child: Text(
-                          avatarLetter,
-                          style: GoogleFonts.inter(
-                            fontSize: 32.sp,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ),
+              SizedBox(height: 20.h),
+
+              // ── Avatar + info ────────────────────────────────────────
+              Row(
+                children: [
+                  Container(
+                    width: 60.w,
+                    height: 60.w,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.3),
+                          width: 2),
                     ),
-                    Positioned(
-                      right: 0,
-                      bottom: 0,
-                      child: Container(
-                        width: 26.w,
-                        height: 26.w,
-                        decoration: BoxDecoration(
+                    child: Center(
+                      child: Text(
+                        avatarLetter,
+                        style: GoogleFonts.inter(
+                          fontSize: 24.sp,
+                          fontWeight: FontWeight.w700,
                           color: AppColors.primary,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
                         ),
-                        child: Icon(Icons.camera_alt_outlined,
-                            color: Colors.white, size: 13.sp),
                       ),
                     ),
-                  ],
-                ),
-              ),
-              SizedBox(height: 8.h),
-              Center(
-                child: Text(
-                  'Ubah Foto Profil',
-                  style: GoogleFonts.inter(
-                    fontSize: 12.sp,
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w500,
                   ),
-                ),
-              ),
-              SizedBox(height: 24.h),
-              // Name field
-              Text(
-                'Nama Lengkap',
-                style: GoogleFonts.inter(
-                  fontSize: 13.sp,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              SizedBox(height: 8.h),
-              TextField(
-                controller: _nameController,
-                onChanged: (_) => setState(() {}),
-                decoration: InputDecoration(
-                  hintText: 'Masukkan nama lengkap',
-                  hintStyle: GoogleFonts.inter(color: AppColors.hint),
-                  prefixIcon: const Icon(Icons.person_outline, color: AppColors.hint),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12.r),
-                    borderSide: const BorderSide(color: AppColors.border),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12.r),
-                    borderSide: const BorderSide(color: AppColors.border),
-                  ),
-                ),
-              ),
-              SizedBox(height: 16.h),
-              // Email field (readonly)
-              Text(
-                'Email',
-                style: GoogleFonts.inter(
-                  fontSize: 13.sp,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              SizedBox(height: 8.h),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 14.h),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
-                  borderRadius: BorderRadius.circular(12.r),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.email_outlined, color: AppColors.hint, size: 20.sp),
-                    SizedBox(width: 12.w),
-                    Text(
-                      user?.email ?? '-',
-                      style: GoogleFonts.inter(
-                        fontSize: 14.sp,
-                        color: AppColors.textSecondary,
-                      ),
+                  SizedBox(width: 14.w),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          displayName,
+                          style: GoogleFonts.inter(
+                            fontSize: 15.sp,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        SizedBox(height: 2.h),
+                        Text(
+                          user?.email ?? '-',
+                          style: GoogleFonts.inter(
+                              fontSize: 12.sp,
+                              color: AppColors.textSecondary),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (subtitle.isNotEmpty) ...[
+                          SizedBox(height: 2.h),
+                          Text(
+                            subtitle,
+                            style: GoogleFonts.inter(
+                                fontSize: 11.sp, color: AppColors.hint),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
               SizedBox(height: 24.h),
-              // Save button
+
+              // ── Menu Biodata ─────────────────────────────────────────
+              _SectionLabel(label: 'Profil'),
+              SizedBox(height: 8.h),
+              _MenuTile(
+                icon: LucideIcons.userCircle2,
+                label: 'Biodata Diri',
+                subtitle: 'Nama, HP, lahir, pekerjaan, dll.',
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const EditBiodataPage()),
+                  );
+                },
+              ),
+              SizedBox(height: 20.h),
+
+              // ── Menu Keamanan ────────────────────────────────────────
+              _SectionLabel(label: 'Keamanan Akun'),
+              SizedBox(height: 8.h),
+              _MenuTile(
+                icon: LucideIcons.keyRound,
+                label: 'Ubah Password',
+                subtitle: 'Ganti password akun kamu',
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const ChangePasswordPage()),
+                  );
+                },
+              ),
+              SizedBox(height: 24.h),
+
+              // ── Logout ────────────────────────────────────────────────
               SizedBox(
-                height: 48.h,
-                child: ElevatedButton(
-                  onPressed: auth.isLoading || _nameController.text.trim().isEmpty
-                      ? null
-                      : () async {
-                          final name = _nameController.text.trim();
-                          final success = await auth.updateProfileName(name);
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                success
-                                    ? 'Profil berhasil disimpan'
-                                    : auth.errorMessage ?? 'Gagal menyimpan profil',
-                              ),
-                              backgroundColor:
-                                  success ? AppColors.success : AppColors.error,
-                            ),
-                          );
-                          if (success && context.mounted) Navigator.pop(context);
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12.r)),
-                  ),
-                  child: Text(
-                    auth.isLoading ? 'Menyimpan...' : 'Simpan Perubahan',
+                height: 46.h,
+                child: OutlinedButton.icon(
+                  onPressed: auth.isLoading ? null : () => _handleLogout(context),
+                  icon: Icon(LucideIcons.logOut, size: 17.sp),
+                  label: Text(
+                    'Keluar Akun',
                     style: GoogleFonts.inter(
                         fontSize: 14.sp, fontWeight: FontWeight.w600),
                   ),
-                ),
-              ),
-              SizedBox(height: 12.h),
-              // Reset password button
-              OutlinedButton.icon(
-                onPressed: user?.email == null || auth.isLoading
-                    ? null
-                    : () async {
-                        final success = await auth.forgotPassword(user!.email!);
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              success
-                                  ? 'Link reset password dikirim ke email'
-                                  : auth.errorMessage ?? 'Gagal mengirim reset password',
-                            ),
-                          ),
-                        );
-                      },
-                icon: const Icon(Icons.lock_reset_outlined),
-                label: const Text('Kirim Reset Password'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.textSecondary,
-                  side: const BorderSide(color: AppColors.border),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12.r)),
-                  padding: EdgeInsets.symmetric(vertical: 12.h),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.error,
+                    side: const BorderSide(color: AppColors.error),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12.r)),
+                  ),
                 ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Reusable Widgets ──────────────────────────────────────────────────────────
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label,
+      style: GoogleFonts.inter(
+        fontSize: 12.sp,
+        fontWeight: FontWeight.w700,
+        color: AppColors.textSecondary,
+        letterSpacing: 0.3,
+      ),
+    );
+  }
+}
+
+class _MenuTile extends StatelessWidget {
+  const _MenuTile({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12.r),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 13.h),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(12.r),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36.w,
+              height: 36.w,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(9.r),
+              ),
+              child: Icon(icon, size: 18.sp, color: AppColors.primary),
+            ),
+            SizedBox(width: 12.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: GoogleFonts.inter(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 2.h),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.inter(
+                      fontSize: 11.sp,
+                      color: AppColors.hint,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(LucideIcons.chevronRight, size: 16.sp, color: AppColors.hint),
+          ],
         ),
       ),
     );

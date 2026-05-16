@@ -125,6 +125,18 @@ class AuthService {
     }
   }
 
+  Future<UserResponse> updateProfileData(Map<String, dynamic> data) async {
+    try {
+      final current = _supabase.auth.currentUser?.userMetadata ?? {};
+      final merged = {...current, ...data};
+      return await _supabase.auth.updateUser(UserAttributes(data: merged));
+    } on AuthException catch (e) {
+      throw Exception('Gagal update profil: ${e.message}');
+    } catch (e) {
+      throw Exception('Gagal update profil: ${e.toString()}');
+    }
+  }
+
   // Kirim email reset password
   Future<void> resetPassword(String email) async {
     try {
@@ -137,6 +149,21 @@ class AuthService {
       throw Exception(mapped);
     } catch (e) {
       throw Exception('Gagal mengirim reset password: ${e.toString()}');
+    }
+  }
+
+  // Ubah password langsung (in-app)
+  Future<void> changePassword(String newPassword) async {
+    try {
+      await _supabase.auth.updateUser(UserAttributes(password: newPassword));
+    } on AuthException catch (e) {
+      final mapped = _mapAuthMessage(
+        'Gagal mengubah password: ${e.message}',
+        e.message,
+      );
+      throw Exception(mapped);
+    } catch (e) {
+      throw Exception('Gagal mengubah password: ${e.toString()}');
     }
   }
 }

@@ -98,6 +98,36 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> updateProfileData(Map<String, dynamic> data) async {
+    _setLoading(true);
+    _setError(null);
+    try {
+      await _authService.updateProfileData(data);
+      _setLoading(false);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _setError(e.toString().replaceAll('Exception: ', ''));
+      _setLoading(false);
+      return false;
+    }
+  }
+
+  // Ubah password in-app
+  Future<bool> changePassword(String newPassword) async {
+    _setLoading(true);
+    _setError(null);
+    try {
+      await _authService.changePassword(newPassword);
+      _setLoading(false);
+      return true;
+    } catch (e) {
+      _setError(e.toString().replaceAll('Exception: ', ''));
+      _setLoading(false);
+      return false;
+    }
+  }
+
   // Fungsi Lupa Password
   Future<bool> forgotPassword(String email) async {
     _setLoading(true);
