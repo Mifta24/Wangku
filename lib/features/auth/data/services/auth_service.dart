@@ -137,18 +137,41 @@ class AuthService {
     }
   }
 
-  // Kirim email reset password
+  // Kirim OTP ke email untuk reset password
   Future<void> resetPassword(String email) async {
     try {
-      await _supabase.auth.resetPasswordForEmail(email);
+      await _supabase.auth.signInWithOtp(
+        email: email,
+        shouldCreateUser: false,
+        emailRedirectTo: null,
+      );
     } on AuthException catch (e) {
       final mapped = _mapAuthMessage(
-        'Gagal mengirim reset password: ${e.message}',
+        'Gagal mengirim kode OTP: ${e.message}',
         e.message,
       );
       throw Exception(mapped);
     } catch (e) {
-      throw Exception('Gagal mengirim reset password: ${e.toString()}');
+      throw Exception('Gagal mengirim kode OTP: ${e.toString()}');
+    }
+  }
+
+  // Verifikasi OTP dan login langsung
+  Future<void> verifyOtp(String email, String token) async {
+    try {
+      await _supabase.auth.verifyOTP(
+        email: email,
+        token: token,
+        type: OtpType.email,
+      );
+    } on AuthException catch (e) {
+      final mapped = _mapAuthMessage(
+        'Kode OTP tidak valid: ${e.message}',
+        e.message,
+      );
+      throw Exception(mapped);
+    } catch (e) {
+      throw Exception('Gagal verifikasi OTP: ${e.toString()}');
     }
   }
 

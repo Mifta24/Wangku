@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/config/router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
@@ -41,6 +43,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     if (!mounted) return;
 
     if (ok) {
+      authStateRefreshNotifier.clearPasswordRecovery();
       setState(() => _success = true);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -82,7 +85,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 24.h),
-          child: _success ? _SuccessView(onBack: () => Navigator.pop(context)) : _FormView(
+          child: _success ? _SuccessView(onBack: () => context.go('/dashboard')) : _FormView(
             formKey: _formKey,
             newPassController: _newPassController,
             confirmPassController: _confirmPassController,

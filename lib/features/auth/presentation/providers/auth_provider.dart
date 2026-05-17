@@ -178,12 +178,27 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Fungsi Lupa Password
+  // Fungsi Lupa Password - kirim OTP
   Future<bool> forgotPassword(String email) async {
     _setLoading(true);
     _setError(null);
     try {
       await _authService.resetPassword(email);
+      _setLoading(false);
+      return true;
+    } catch (e) {
+      _setError(e.toString().replaceAll('Exception: ', ''));
+      _setLoading(false);
+      return false;
+    }
+  }
+
+  // Verifikasi OTP
+  Future<bool> verifyOtp(String email, String token) async {
+    _setLoading(true);
+    _setError(null);
+    try {
+      await _authService.verifyOtp(email, token);
       _setLoading(false);
       return true;
     } catch (e) {

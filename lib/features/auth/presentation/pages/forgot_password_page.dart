@@ -38,13 +38,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     if (!mounted) return;
 
     if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Email reset password sudah dikirim.'),
-          backgroundColor: AppColors.income,
-        ),
-      );
-      context.pop();
+      context.push('/otp-verification', extra: _emailController.text.trim());
       return;
     }
 
