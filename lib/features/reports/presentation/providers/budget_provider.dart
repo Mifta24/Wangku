@@ -22,8 +22,6 @@ class BudgetProvider extends ChangeNotifier {
   bool _alertInProgress = false;
   bool _isDisposed = false;
   bool _notificationsEnabled = true;
-  // Track kapan terakhir notif dikirim per kategori (reset saat budget dihapus/ditambah)
-  final Map<String, DateTime> _lastCategoryAlertDate = {};
 
   static const double _warningThreshold = 0.8;
 
@@ -125,8 +123,6 @@ class BudgetProvider extends ChangeNotifier {
     try {
       await _budgetRepository.saveCategoryBudget(userId, categoryId, amount);
       _categoryBudgets = {..._categoryBudgets, categoryId: amount};
-      // Reset alert date supaya notifikasi bisa muncul lagi setelah budget diset ulang
-      _lastCategoryAlertDate.remove(categoryId);
     } catch (e) {
       _errorMessage = e.toString();
     }
@@ -152,8 +148,6 @@ class BudgetProvider extends ChangeNotifier {
     try {
       await _budgetRepository.deleteCategoryBudget(userId, categoryId);
       _categoryBudgets = Map.from(_categoryBudgets)..remove(categoryId);
-      // Reset alert date saat budget dihapus
-      _lastCategoryAlertDate.remove(categoryId);
     } catch (e) {
       _errorMessage = e.toString();
     }
@@ -173,11 +167,6 @@ class BudgetProvider extends ChangeNotifier {
     final expense = categoryExpense(categoryId);
     final ratio = expense / budget;
     if (ratio < _warningThreshold) return;
-
-    // Maks 1x per hari per kategori
-    final now = DateTime.now();
-    final lastAlert = _lastCategoryAlertDate[categoryId];
-    if (lastAlert != null && _isSameDay(lastAlert, now)) return;
 
     final rem = categoryRemaining(categoryId);
     final userId = _userId;
@@ -204,7 +193,6 @@ class BudgetProvider extends ChangeNotifier {
         remaining: rem,
         categoryId: categoryId,
       );
-      _lastCategoryAlertDate[categoryId] = now;
     }
 
     // Setelah cek kategori, cek juga total anggaran

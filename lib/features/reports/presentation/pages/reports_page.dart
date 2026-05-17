@@ -645,12 +645,10 @@ class _ReportsPageState extends State<ReportsPage> {
                       PieChartData(
                         pieTouchData: PieTouchData(
                           touchCallback: (event, response) {
-                            if (!event.isInterestedForInteractions ||
-                                response?.touchedSection == null) {
-                              return;
-                            }
+                            if (event is! FlTapUpEvent) return;
                             final index =
-                                response!.touchedSection!.touchedSectionIndex;
+                                response?.touchedSection?.touchedSectionIndex ??
+                                -1;
                             if (index < 0 ||
                                 index >= report.categories.length) {
                               return;
@@ -680,29 +678,38 @@ class _ReportsPageState extends State<ReportsPage> {
                         }).toList(),
                       ),
                     ),
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          selectedCategory != null
-                              ? _formatCurrency(selectedCategory.total)
-                              : _formatCurrency(report.totalAmount),
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
+                    Builder(builder: (context) {
+                      final displayCategory = selectedCategory ?? report.categories.first;
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (displayCategory.icon.isNotEmpty)
+                            Text(
+                              displayCategory.icon,
+                              style: const TextStyle(fontSize: 18),
+                            ),
+                          Text(
+                            _formatCurrency(displayCategory.total),
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
                           ),
-                        ),
-                        Text(
-                          'Total',
-                          style: GoogleFonts.inter(
-                            fontSize: 10,
-                            color: AppColors.textSecondary,
+                          Text(
+                            displayCategory.name,
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      );
+                    }),
                   ],
                 ),
               ),
@@ -761,223 +768,6 @@ class _ReportsPageState extends State<ReportsPage> {
                 ),
               );
             }),
-
-            // Selected category detail
-            if (selectedCategory != null) ...[
-              const SizedBox(height: 16),
-              const Divider(height: 1),
-              const SizedBox(height: 16),
-              _buildSelectedCategoryInfo(report),
-              _buildSelectedCategoryTransactions(report),
-            ],
-          ],
-        ],
-      ),
-    );
-  }
-
-  // ── Selected Category ────────────────────────────────────────────────────────
-
-  Widget _buildSelectedCategoryInfo(ReportProvider report) {
-    final selectedCategory = _selectedCategory(report);
-    if (selectedCategory == null) return const SizedBox.shrink();
-
-    final color = Color(
-      int.parse('FF${selectedCategory.color.replaceFirst('#', '')}', radix: 16),
-    );
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.25)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.16),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Center(
-              child: Text(
-                selectedCategory.icon.isNotEmpty ? selectedCategory.icon : '?',
-                style: const TextStyle(fontSize: 18),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              selectedCategory.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '${(selectedCategory.percentage * 100).toStringAsFixed(1)}%',
-                style: GoogleFonts.inter(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: color,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                _formatCurrency(selectedCategory.total),
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSelectedCategoryTransactions(ReportProvider report) {
-    final selectedCategory = _selectedCategory(report);
-    if (selectedCategory == null) return const SizedBox.shrink();
-
-    final type = report.transactionType == TransactionType.expense
-        ? 'expense'
-        : 'income';
-    final transactions =
-        report.transactions
-            .where(
-              (t) =>
-                  t.categoryId == selectedCategory.categoryId && t.type == type,
-            )
-            .toList()
-          ..sort((a, b) => b.date.compareTo(a.date));
-
-    if (transactions.isEmpty) return const SizedBox.shrink();
-
-    final color = Color(
-      int.parse('FF${selectedCategory.color.replaceFirst('#', '')}', radix: 16),
-    );
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.receipt_long_outlined, color: color, size: 16),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  'Rincian ${selectedCategory.name}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ),
-              Text(
-                '${transactions.length} transaksi',
-                style: GoogleFonts.inter(
-                  fontSize: 11,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          ...transactions.take(5).map((transaction) {
-            final note = transaction.note.trim();
-            final title = note.isEmpty ? selectedCategory.name : note;
-            return Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Row(
-                children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      selectedCategory.icon.isNotEmpty
-                          ? selectedCategory.icon
-                          : '?',
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          DateFormat(
-                            'd MMM yyyy, HH:mm',
-                            'id_ID',
-                          ).format(transaction.date),
-                          style: GoogleFonts.inter(
-                            fontSize: 10,
-                            color: AppColors.hint,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    _formatCurrency(transaction.amount),
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: color,
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
-          if (transactions.length > 5) ...[
-            const SizedBox(height: 10),
-            Text(
-              '+${transactions.length - 5} transaksi lainnya',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
-              ),
-            ),
           ],
         ],
       ),
