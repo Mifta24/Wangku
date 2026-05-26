@@ -679,17 +679,40 @@ class _ReportsPageState extends State<ReportsPage> {
                       ),
                     ),
                     Builder(builder: (context) {
-                      final displayCategory = selectedCategory ?? report.categories.first;
+                      if (selectedCategory == null) {
+                        return Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _formatCurrency(report.totalAmount),
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            Text(
+                              'Total\n$typeLabel',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.inter(
+                                fontSize: 9,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        );
+                      }
                       return Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          if (displayCategory.icon.isNotEmpty)
+                          if (selectedCategory.icon.isNotEmpty)
                             Text(
-                              displayCategory.icon,
+                              selectedCategory.icon,
                               style: const TextStyle(fontSize: 18),
                             ),
                           Text(
-                            _formatCurrency(displayCategory.total),
+                            _formatCurrency(selectedCategory.total),
                             textAlign: TextAlign.center,
                             style: GoogleFonts.inter(
                               fontSize: 11,
@@ -698,7 +721,7 @@ class _ReportsPageState extends State<ReportsPage> {
                             ),
                           ),
                           Text(
-                            displayCategory.name,
+                            selectedCategory.name,
                             textAlign: TextAlign.center,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,

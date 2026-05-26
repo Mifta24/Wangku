@@ -33,43 +33,277 @@ class ReportExportService {
     return file.path;
   }
 
-  Future<String?> exportPdf({required List<TransactionModel> transactions}) async {
+  Future<String?> exportPdf({
+    required List<TransactionModel> transactions,
+    String? userName,
+    DateTime? month,
+  }) async {
     final pdf = pw.Document();
-    final dateFmt = DateFormat('yyyy-MM-dd');
+    final dateFmt = DateFormat('dd/MM/yyyy');
+    final monthLabel =
+        month != null ? DateFormat('MMMM yyyy', 'id_ID').format(month) : '';
+    final generatedAt = DateFormat('d MMMM yyyy, HH:mm').format(DateTime.now());
 
-    final headers = ['Tanggal', 'Tipe', 'Kategori', 'Catatan', 'Jumlah'];
-    final rows = transactions.map((tx) {
-      return [
-        dateFmt.format(tx.date),
-        tx.type,
-        tx.category?.name ?? 'Uncategorized',
-        tx.note,
-        tx.amount.toStringAsFixed(0),
-      ];
-    }).toList();
+    // Totals
+    double totalIncome = 0;
+    double totalExpense = 0;
+    for (final tx in transactions) {
+      if (tx.type == 'income') {
+        totalIncome += tx.amount;
+      } else {
+        totalExpense += tx.amount;
+      }
+    }
+    final net = totalIncome - totalExpense;
 
-    pdf.addPage(
-      pw.Page(
-        build: (context) {
-          return pw.Column(
+    // Color constants
+    const primaryColor = PdfColor.fromInt(0xFF4D96FF);
+    const primaryLight = PdfColor.fromInt(0xFFEBF3FF);
+    const incomeColor = PdfColor.fromInt(0xFF22C55E);
+    const expenseColor = PdfColor.fromInt(0xFFEF4444);
+    const borderColor = PdfColor.fromInt(0xFFE5E7EB);
+    const bgAlt = PdfColor.fromInt(0xFFF9FAFB);
+
+    final nf = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp ', decimalDigits: 0);
+    String fmt(double v) => nf.format(v.abs());
+
+    pw.Widget summaryBox(String label, double amount, PdfColor color) {
+      return pw.Expanded(
+        child: pw.Container(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          decoration: pw.BoxDecoration(
+            color: primaryLight,
+            borderRadius: pw.BorderRadius.circular(8),
+            border: pw.Border.all(color: borderColor, width: 0.5),
+          ),
+          child: pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              pw.Text('Laporan Transaksi',
-                  style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 12),
-              pw.TableHelper.fromTextArray(
-                headers: headers,
-                data: rows,
-                headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                cellAlignment: pw.Alignment.centerLeft,
-                headerDecoration: const pw.BoxDecoration(
-                  color: PdfColor.fromInt(0xFFEFEFEF),
+              pw.Text(
+                label,
+                style: pw.TextStyle(
+                  fontSize: 9,
+                  color: PdfColors.grey700,
                 ),
-                cellStyle: const pw.TextStyle(fontSize: 10),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Text(
+                fmt(amount),
+                style: pw.TextStyle(
+                  fontSize: 12,
+                  fontWeight: pw.FontWeight.bold,
+                  color: color,
+                ),
               ),
             ],
-          );
-        },
+          ),
+        ),
+      );
+    }
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.fromLTRB(28, 28, 28, 28),
+        footer: (ctx) => pw.Container(
+          padding: const pw.EdgeInsets.only(top: 8),
+          decoration: const pw.BoxDecoration(
+            border: pw.Border(top: pw.BorderSide(color: borderColor, width: 0.5)),
+          ),
+          child: pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text(
+                'Dibuat oleh Wangku · $generatedAt',
+                style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
+              ),
+              pw.Text(
+                'Halaman ${ctx.pageNumber} / ${ctx.pagesCount}',
+                style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
+              ),
+            ],
+          ),
+        ),
+        build: (ctx) => [
+          // ── Header bar ──────────────────────────────────────────────
+          pw.Container(
+            padding: const pw.EdgeInsets.all(18),
+            decoration: pw.BoxDecoration(
+              color: primaryColor,
+              borderRadius: pw.BorderRadius.circular(12),
+            ),
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      'Wangku',
+                      style: pw.TextStyle(
+                        fontSize: 18,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.white,
+                      ),
+                    ),
+                    pw.SizedBox(height: 4),
+                    pw.Text(
+                      'Halo, ${userName ?? 'Pengguna'}',
+                      style: pw.TextStyle(
+                        fontSize: 13,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.white,
+                      ),
+                    ),
+                  ],
+                ),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    pw.Text(
+                      'Laporan Keuangan',
+                      style: const pw.TextStyle(
+                        fontSize: 10,
+                        color: PdfColors.white,
+                      ),
+                    ),
+                    if (monthLabel.isNotEmpty) ...[
+                      pw.SizedBox(height: 3),
+                      pw.Text(
+                        monthLabel,
+                        style: pw.TextStyle(
+                          fontSize: 12,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.white,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 14),
+
+          // ── Summary row ──────────────────────────────────────────────
+          pw.Row(
+            children: [
+              summaryBox('Pemasukan', totalIncome, incomeColor),
+              pw.SizedBox(width: 8),
+              summaryBox('Pengeluaran', totalExpense, expenseColor),
+              pw.SizedBox(width: 8),
+              summaryBox(net >= 0 ? 'Surplus' : 'Defisit', net.abs(),
+                  net >= 0 ? incomeColor : expenseColor),
+            ],
+          ),
+          pw.SizedBox(height: 16),
+
+          // ── Table title ──────────────────────────────────────────────
+          pw.Text(
+            'Detail Transaksi  (${transactions.length} transaksi)',
+            style: pw.TextStyle(
+              fontSize: 12,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.grey800,
+            ),
+          ),
+          pw.SizedBox(height: 8),
+
+          // ── Transaction table ────────────────────────────────────────
+          pw.Table(
+            border: pw.TableBorder.all(color: borderColor, width: 0.5),
+            columnWidths: {
+              0: const pw.FixedColumnWidth(62),
+              1: const pw.FixedColumnWidth(52),
+              2: const pw.FlexColumnWidth(2),
+              3: const pw.FlexColumnWidth(2),
+              4: const pw.FixedColumnWidth(78),
+            },
+            children: [
+              pw.TableRow(
+                decoration: const pw.BoxDecoration(color: primaryColor),
+                children: [
+                  'Tanggal',
+                  'Tipe',
+                  'Kategori',
+                  'Catatan',
+                  'Jumlah',
+                ].map((h) {
+                  return pw.Padding(
+                    padding: const pw.EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 6),
+                    child: pw.Text(
+                      h,
+                      style: pw.TextStyle(
+                        fontWeight: pw.FontWeight.bold,
+                        fontSize: 9,
+                        color: PdfColors.white,
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              ...transactions.asMap().entries.map((entry) {
+                final i = entry.key;
+                final tx = entry.value;
+                final isIncome = tx.type == 'income';
+                final rowBg = i.isEven ? PdfColors.white : bgAlt;
+                return pw.TableRow(
+                  decoration: pw.BoxDecoration(color: rowBg),
+                  children: [
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 5),
+                      child: pw.Text(dateFmt.format(tx.date),
+                          style: const pw.TextStyle(fontSize: 8)),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 5),
+                      child: pw.Text(
+                        isIncome ? 'Masuk' : 'Keluar',
+                        style: pw.TextStyle(
+                          fontSize: 8,
+                          fontWeight: pw.FontWeight.bold,
+                          color: isIncome ? incomeColor : expenseColor,
+                        ),
+                      ),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 5),
+                      child: pw.Text(
+                        tx.category?.name ?? '-',
+                        style: const pw.TextStyle(fontSize: 8),
+                      ),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 5),
+                      child: pw.Text(
+                        tx.note.isEmpty ? '-' : tx.note,
+                        style: const pw.TextStyle(fontSize: 8),
+                      ),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 5),
+                      child: pw.Text(
+                        fmt(tx.amount),
+                        style: pw.TextStyle(
+                          fontSize: 8,
+                          fontWeight: pw.FontWeight.bold,
+                          color: isIncome ? incomeColor : expenseColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }),
+            ],
+          ),
+        ],
       ),
     );
 

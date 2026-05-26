@@ -273,8 +273,18 @@ class _ExportTransactionsSheetState extends State<ExportTransactionsSheet> {
   }
 
   Future<void> _export(String format) async {
-    final userId = context.read<AuthProvider>().currentUser?.id;
+    final auth = context.read<AuthProvider>();
+    final userId = auth.currentUser?.id;
     if (userId == null) return;
+
+    final profile = auth.profile;
+    final meta = auth.currentUser?.userMetadata;
+    final rawName = profile?.name.isNotEmpty == true
+        ? profile!.name
+        : (meta?['name'] ?? meta?['full_name'])?.toString();
+    final userName = (rawName?.isNotEmpty == true)
+        ? rawName
+        : auth.currentUser?.email?.split('@').first;
 
     setState(() => _isExporting = true);
     try {
@@ -293,7 +303,11 @@ class _ExportTransactionsSheetState extends State<ExportTransactionsSheet> {
       } else if (format == 'excel') {
         path = await _exportService.exportExcel(transactions: transactions);
       } else {
-        path = await _exportService.exportPdf(transactions: transactions);
+        path = await _exportService.exportPdf(
+          transactions: transactions,
+          userName: userName,
+          month: _selectedMonth,
+        );
       }
 
       if (!mounted) return;
