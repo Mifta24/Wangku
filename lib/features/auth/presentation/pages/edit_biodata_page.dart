@@ -21,12 +21,8 @@ class _EditBiodataPageState extends State<EditBiodataPage> {
 
   late final TextEditingController _nameController;
   late final TextEditingController _phoneController;
-  late final TextEditingController _bioController;
-  late final TextEditingController _jobController;
-  late final TextEditingController _cityController;
 
   DateTime? _birthDate;
-  String? _gender;
 
   @override
   void initState() {
@@ -44,37 +40,17 @@ class _EditBiodataPageState extends State<EditBiodataPage> {
         text: profile?.phone.isNotEmpty == true
             ? profile!.phone
             : meta['phone']?.toString() ?? '');
-    _bioController = TextEditingController(
-        text: profile?.bio.isNotEmpty == true
-            ? profile!.bio
-            : meta['bio']?.toString() ?? '');
-    _jobController = TextEditingController(
-        text: profile?.job.isNotEmpty == true
-            ? profile!.job
-            : meta['job']?.toString() ?? '');
-    _cityController = TextEditingController(
-        text: profile?.city.isNotEmpty == true
-            ? profile!.city
-            : meta['city']?.toString() ?? '');
 
     _birthDate = profile?.birthDate ??
         (meta['birth_date'] != null
             ? DateTime.tryParse(meta['birth_date'].toString())
             : null);
-
-    final rawGender = profile?.gender ?? meta['gender']?.toString();
-    if (rawGender == 'Laki-laki' || rawGender == 'Perempuan') {
-      _gender = rawGender;
-    }
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
-    _bioController.dispose();
-    _jobController.dispose();
-    _cityController.dispose();
     super.dispose();
   }
 
@@ -114,10 +90,6 @@ class _EditBiodataPageState extends State<EditBiodataPage> {
     final data = <String, dynamic>{
       'name': _nameController.text.trim(),
       'phone': _phoneController.text.trim(),
-      'bio': _bioController.text.trim(),
-      'job': _jobController.text.trim(),
-      'city': _cityController.text.trim(),
-      if (_gender != null) 'gender': _gender,
       if (_birthDate != null)
         'birth_date': _birthDate!.toIso8601String().split('T').first,
     };
@@ -128,7 +100,7 @@ class _EditBiodataPageState extends State<EditBiodataPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          success ? 'Biodata berhasil disimpan' : auth.errorMessage ?? 'Gagal menyimpan',
+          success ? 'Profil berhasil disimpan' : auth.errorMessage ?? 'Gagal menyimpan',
           style: GoogleFonts.inter(),
         ),
         backgroundColor: success ? AppColors.success : AppColors.error,
@@ -152,7 +124,7 @@ class _EditBiodataPageState extends State<EditBiodataPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'Edit Biodata',
+          'Edit Profil',
           style: GoogleFonts.inter(
             fontSize: 16.sp,
             fontWeight: FontWeight.w700,
@@ -166,10 +138,6 @@ class _EditBiodataPageState extends State<EditBiodataPage> {
         child: ListView(
           padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 8.h),
           children: [
-            // ── Informasi Dasar ──────────────────────────────────────
-            _SectionHeader(label: 'Informasi Dasar'),
-            SizedBox(height: 12.h),
-
             _FieldCard(
               children: [
                 _FormField(
@@ -231,137 +199,12 @@ class _EditBiodataPageState extends State<EditBiodataPage> {
                     ),
                   ),
                 ),
-                _Divider(),
-                _FormField(
-                  label: 'Jenis Kelamin',
-                  child: Row(
-                    children: ['Laki-laki', 'Perempuan'].map((g) {
-                      final selected = _gender == g;
-                      return Expanded(
-                        child: GestureDetector(
-                          onTap: () => setState(() => _gender = g),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 150),
-                            margin: EdgeInsets.only(
-                                right: g == 'Laki-laki' ? 8.w : 0),
-                            padding: EdgeInsets.symmetric(vertical: 12.h),
-                            decoration: BoxDecoration(
-                              color: selected
-                                  ? AppColors.primary.withValues(alpha: 0.10)
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(10.r),
-                              border: Border.all(
-                                color: selected
-                                    ? AppColors.primary
-                                    : AppColors.border,
-                                width: selected ? 1.5 : 1,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  g == 'Laki-laki'
-                                      ? Icons.male_rounded
-                                      : Icons.female_rounded,
-                                  size: 18.sp,
-                                  color: selected
-                                      ? AppColors.primary
-                                      : AppColors.hint,
-                                ),
-                                SizedBox(width: 6.w),
-                                Text(
-                                  g,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 13.sp,
-                                    fontWeight: selected
-                                        ? FontWeight.w600
-                                        : FontWeight.w400,
-                                    color: selected
-                                        ? AppColors.primary
-                                        : AppColors.textSecondary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 20.h),
-
-            // ── Pekerjaan & Lokasi ───────────────────────────────────
-            _SectionHeader(label: 'Pekerjaan & Lokasi'),
-            SizedBox(height: 12.h),
-
-            _FieldCard(
-              children: [
-                _FormField(
-                  label: 'Pekerjaan',
-                  child: _buildTextField(
-                    controller: _jobController,
-                    hint: 'Mahasiswa, Karyawan Swasta, dll.',
-                    icon: LucideIcons.briefcase,
-                  ),
-                ),
-                _Divider(),
-                _FormField(
-                  label: 'Kota / Domisili',
-                  child: _buildTextField(
-                    controller: _cityController,
-                    hint: 'Jakarta, Bandung, dll.',
-                    icon: LucideIcons.mapPin,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 20.h),
-
-            // ── Bio ──────────────────────────────────────────────────
-            _SectionHeader(label: 'Bio'),
-            SizedBox(height: 12.h),
-
-            _FieldCard(
-              children: [
-                _FormField(
-                  label: 'Tentang Saya',
-                  child: TextFormField(
-                    controller: _bioController,
-                    maxLines: 4,
-                    maxLength: 120,
-                    style: GoogleFonts.inter(fontSize: 14.sp),
-                    decoration: InputDecoration(
-                      hintText: 'Ceritakan sedikit tentang dirimu...',
-                      hintStyle: GoogleFonts.inter(color: AppColors.hint),
-                      counterStyle: GoogleFonts.inter(
-                          fontSize: 11.sp, color: AppColors.hint),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10.r),
-                        borderSide: const BorderSide(color: AppColors.border),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10.r),
-                        borderSide: const BorderSide(color: AppColors.border),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10.r),
-                        borderSide: const BorderSide(color: AppColors.primary),
-                      ),
-                      contentPadding: EdgeInsets.symmetric(
-                          horizontal: 14.w, vertical: 12.h),
-                    ),
-                  ),
-                ),
               ],
             ),
             SizedBox(height: 32.h),
 
             AppButton(
-              label: 'Simpan Biodata',
+              label: 'Simpan Profil',
               isLoading: isLoading,
               onPressed: _handleSave,
             ),
@@ -417,23 +260,6 @@ class _EditBiodataPageState extends State<EditBiodataPage> {
 
 // ── Helper Widgets ─────────────────────────────────────────────────────────────
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.label});
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      label,
-      style: GoogleFonts.inter(
-        fontSize: 12.sp,
-        fontWeight: FontWeight.w700,
-        color: AppColors.textSecondary,
-        letterSpacing: 0.4,
-      ),
-    );
-  }
-}
 
 class _FieldCard extends StatelessWidget {
   const _FieldCard({required this.children});

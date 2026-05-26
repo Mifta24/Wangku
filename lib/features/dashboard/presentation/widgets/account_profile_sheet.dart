@@ -60,14 +60,6 @@ class AccountProfileSheet extends StatelessWidget {
     final avatarLetter =
         displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U';
 
-    final job = profile?.job.isNotEmpty == true
-        ? profile!.job
-        : meta['job']?.toString() ?? '';
-    final city = profile?.city.isNotEmpty == true
-        ? profile!.city
-        : meta['city']?.toString() ?? '';
-    final subtitle = [job, city].where((s) => s.isNotEmpty).join(' · ');
-
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -165,16 +157,6 @@ class AccountProfileSheet extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        if (subtitle.isNotEmpty) ...[
-                          SizedBox(height: 2.h),
-                          Text(
-                            subtitle,
-                            style: GoogleFonts.inter(
-                                fontSize: 11.sp, color: AppColors.hint),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
                       ],
                     ),
                   ),
@@ -187,8 +169,8 @@ class AccountProfileSheet extends StatelessWidget {
               SizedBox(height: 8.h),
               _MenuTile(
                 icon: LucideIcons.userCircle2,
-                label: 'Biodata Diri',
-                subtitle: 'Nama, HP, lahir, pekerjaan, dll.',
+                label: 'Edit Profil',
+                subtitle: 'Nama, nomor HP, tanggal lahir',
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.push(
