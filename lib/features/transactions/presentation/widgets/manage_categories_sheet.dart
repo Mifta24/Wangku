@@ -215,12 +215,12 @@ class _CategoryList extends StatelessWidget {
 
     return Consumer<TransactionProvider>(
       builder: (context, txnProvider, _) {
-        final categories = (type == 'income'
+        final allCategories = (type == 'income'
                 ? txnProvider.incomeCategories
                 : txnProvider.expenseCategories)
             .toList();
 
-        if (categories.isEmpty) {
+        if (allCategories.isEmpty) {
           return Center(
             child: Text(
               'Belum ada kategori',
@@ -232,72 +232,124 @@ class _CategoryList extends StatelessWidget {
           );
         }
 
-        return ListView.separated(
-          padding: EdgeInsets.all(20.w),
-          itemCount: categories.length,
-          separatorBuilder: (_, __) => SizedBox(height: 8.h),
-          itemBuilder: (context, index) {
-            final category = categories[index];
-            final isOwned = category.userId != null && category.userId == userId;
-            final color = Color(
-              int.parse('FF${category.color.replaceFirst('#', '')}', radix: 16),
-            );
+        final systemCats = allCategories.where((c) => c.userId == null).toList();
+        final customCats = allCategories.where((c) => c.userId != null).toList();
 
-            return InkWell(
-              onTap: isOwned ? () => _openEdit(context, category) : null,
-              onLongPress: isOwned ? () => _confirmDelete(context, category) : null,
-              borderRadius: BorderRadius.circular(12.r),
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12.r),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 42.w,
-                      height: 42.w,
-                      decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.16),
-                        borderRadius: BorderRadius.circular(10.r),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(category.icon, style: TextStyle(fontSize: 20.sp)),
-                    ),
-                    SizedBox(width: 12.w),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            category.name,
-                            style: GoogleFonts.inter(
-                              fontSize: 13.sp,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          Text(
-                            isOwned ? 'Kategori saya' : 'Kategori bawaan',
-                            style: GoogleFonts.inter(
-                              fontSize: 11.sp,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Icon(Icons.drag_handle_rounded,
-                        color: AppColors.hint, size: 22.sp),
-                  ],
-                ),
+        return ListView(
+          padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 20.h),
+          children: [
+            if (systemCats.isNotEmpty) ...[
+              _buildSectionHeader(
+                label: 'Kategori Sistem',
+                icon: Icons.lock_outline_rounded,
+                color: AppColors.textSecondary,
               ),
-            );
-          },
+              SizedBox(height: 8.h),
+              ...systemCats.map((cat) => Padding(
+                padding: EdgeInsets.only(bottom: 8.h),
+                child: _buildTile(context, cat, userId),
+              )),
+            ],
+            if (customCats.isNotEmpty) ...[
+              SizedBox(height: 12.h),
+              _buildSectionHeader(
+                label: 'Kategori Kustom',
+                icon: Icons.edit_outlined,
+                color: AppColors.primary,
+              ),
+              SizedBox(height: 8.h),
+              ...customCats.map((cat) => Padding(
+                padding: EdgeInsets.only(bottom: 8.h),
+                child: _buildTile(context, cat, userId),
+              )),
+            ],
+          ],
         );
       },
+    );
+  }
+
+  Widget _buildSectionHeader({
+    required String label,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, size: 14.sp, color: color),
+        SizedBox(width: 6.w),
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 12.sp,
+            fontWeight: FontWeight.w700,
+            color: color,
+            letterSpacing: 0.3,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTile(BuildContext context, CategoryModel category, String? userId) {
+    final isOwned = category.userId != null && category.userId == userId;
+    final color = Color(
+      int.parse('FF${category.color.replaceFirst('#', '')}', radix: 16),
+    );
+
+    return InkWell(
+      onTap: isOwned ? () => _openEdit(context, category) : null,
+      onLongPress: isOwned ? () => _confirmDelete(context, category) : null,
+      borderRadius: BorderRadius.circular(12.r),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12.r),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42.w,
+              height: 42.w,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(10.r),
+              ),
+              alignment: Alignment.center,
+              child: Text(category.icon, style: TextStyle(fontSize: 20.sp)),
+            ),
+            SizedBox(width: 12.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    category.name,
+                    style: GoogleFonts.inter(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  Text(
+                    isOwned ? 'Ketuk edit · Tahan hapus' : 'Tidak bisa diubah',
+                    style: GoogleFonts.inter(
+                      fontSize: 11.sp,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isOwned)
+              Icon(Icons.more_vert_rounded, color: AppColors.hint, size: 20.sp)
+            else
+              Icon(Icons.lock_outline_rounded, color: AppColors.hint, size: 16.sp),
+          ],
+        ),
+      ),
     );
   }
 

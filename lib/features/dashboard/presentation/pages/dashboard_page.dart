@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -8,6 +9,7 @@ import 'package:wangku/features/transactions/presentation/widgets/add_category_d
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/app_card.dart';
+import '../../../../shared/widgets/app_text_field.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../presentation/providers/dashboard_provider.dart';
 import '../../presentation/providers/notification_center_provider.dart';
@@ -107,9 +109,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
     _amountController.text = initialAmount == null
         ? ''
-        : initialAmount.toStringAsFixed(
-            initialAmount.truncateToDouble() == initialAmount ? 0 : 2,
-          );
+        : RupiahInputFormatter.format(initialAmount.toStringAsFixed(0));
     _noteController.text = initialNote ?? '';
     _selectedCategoryId = initialCategoryId;
     String selectedType = initialType ?? 'expense';
@@ -117,6 +117,7 @@ class _DashboardPageState extends State<DashboardPage> {
     bool isSaving = false;
     bool isClosing = false;
     bool shouldFocusAmount = initialCategoryId != null;
+    String? amountErrorText;
 
     showModalBottomSheet<void>(
       context: context,
@@ -160,12 +161,6 @@ class _DashboardPageState extends State<DashboardPage> {
                       (c) => c?.id == _selectedCategoryId,
                       orElse: () => null)
                   : null;
-              final amount = double.tryParse(_amountController.text.trim());
-              final canSave = !isSaving &&
-                  amount != null &&
-                  amount > 0 &&
-                  _selectedCategoryId != null;
-
               if (showForm && shouldFocusAmount) {
                 shouldFocusAmount = false;
                 WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -177,32 +172,26 @@ class _DashboardPageState extends State<DashboardPage> {
 
               Future<void> saveTransaction() async {
                 if (isSaving) return;
-                final amount = double.tryParse(_amountController.text);
-                if (amount == null || amount <= 0) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Jumlah harus lebih dari 0'),
-                      backgroundColor: AppColors.error,
-                    ),
-                  );
+                isSaving = true;
+                final parsedAmount = RupiahInputFormatter.parse(_amountController.text);
+                if (parsedAmount == null || parsedAmount <= 0) {
+                  setSheetState(() {
+                    isSaving = false;
+                    amountErrorText = 'Jumlah harus diisi';
+                  });
                   return;
                 }
                 if (_selectedCategoryId == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Pilih kategori terlebih dahulu'),
-                      backgroundColor: AppColors.error,
-                    ),
-                  );
+                  setSheetState(() => isSaving = false);
                   return;
                 }
-                setSheetState(() => isSaving = true);
+                setSheetState(() {});
                 try {
                   final newTxn = TransactionModel(
                     id: '',
                     userId: authProvider.currentUser!.id,
                     categoryId: _selectedCategoryId!,
-                    amount: amount,
+                    amount: parsedAmount,
                     note: _noteController.text,
                     date: DateTime(
                       selectedDate.year,
@@ -240,23 +229,27 @@ class _DashboardPageState extends State<DashboardPage> {
                   }
                   if (!context.mounted || !parentContext.mounted) return;
                   closeSheet();
-                  ScaffoldMessenger.of(parentContext).showSnackBar(
-                    const SnackBar(
-                      content: Text('Transaksi berhasil ditambahkan'),
-                      backgroundColor: AppColors.success,
-                    ),
-                  );
+                  ScaffoldMessenger.of(parentContext)
+                    ..clearSnackBars()
+                    ..showSnackBar(
+                      const SnackBar(
+                        content: Text('Transaksi berhasil ditambahkan'),
+                        backgroundColor: AppColors.success,
+                      ),
+                    );
                 } catch (e) {
                   if (context.mounted) {
                     setSheetState(() => isSaving = false);
                   }
                   if (!parentContext.mounted) return;
-                  ScaffoldMessenger.of(parentContext).showSnackBar(
-                    SnackBar(
-                      content: Text('Error: ${e.toString()}'),
-                      backgroundColor: AppColors.error,
-                    ),
-                  );
+                  ScaffoldMessenger.of(parentContext)
+                    ..clearSnackBars()
+                    ..showSnackBar(
+                      SnackBar(
+                        content: Text('Error: ${e.toString()}'),
+                        backgroundColor: AppColors.error,
+                      ),
+                    );
                 }
               }
 
@@ -332,12 +325,17 @@ class _DashboardPageState extends State<DashboardPage> {
                 TextInputType? keyboardType,
                 String? prefixText,
                 FocusNode? focusNode,
+                String? errorText,
+                List<TextInputFormatter>? inputFormatters,
+                VoidCallback? onChangedExtra,
               }) {
+                final hasError = errorText != null;
                 return TextField(
                   controller: controller,
                   focusNode: focusNode,
                   keyboardType: keyboardType,
-                  onChanged: (_) => setSheetState(() {}),
+                  inputFormatters: inputFormatters,
+                  onChanged: (_) => setSheetState(() => onChangedExtra?.call()),
                   style: GoogleFonts.inter(
                     fontSize: 15.sp,
                     fontWeight: FontWeight.w600,
@@ -351,7 +349,15 @@ class _DashboardPageState extends State<DashboardPage> {
                       fontWeight: FontWeight.w600,
                       color: AppColors.textSecondary,
                     ),
-                    prefixIcon: Icon(icon, color: AppColors.textSecondary),
+                    prefixIcon: Icon(
+                      icon,
+                      color: hasError ? AppColors.error : AppColors.textSecondary,
+                    ),
+                    errorText: errorText,
+                    errorStyle: GoogleFonts.inter(
+                      fontSize: 11.sp,
+                      color: AppColors.error,
+                    ),
                     filled: true,
                     fillColor: Colors.white,
                     contentPadding: EdgeInsets.symmetric(
@@ -361,13 +367,26 @@ class _DashboardPageState extends State<DashboardPage> {
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14.r),
                       borderSide: BorderSide(
-                        color: AppColors.border.withValues(alpha: 0.75),
+                        color: hasError
+                            ? AppColors.error
+                            : AppColors.border.withValues(alpha: 0.75),
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14.r),
                       borderSide: BorderSide(
-                        color: AppColors.primary,
+                        color: hasError ? AppColors.error : AppColors.primary,
+                        width: 1.6,
+                      ),
+                    ),
+                    errorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14.r),
+                      borderSide: const BorderSide(color: AppColors.error),
+                    ),
+                    focusedErrorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14.r),
+                      borderSide: const BorderSide(
+                        color: AppColors.error,
                         width: 1.6,
                       ),
                     ),
@@ -428,24 +447,21 @@ class _DashboardPageState extends State<DashboardPage> {
 
               Widget saveButton() {
                 return GestureDetector(
-                  onTap: canSave ? () => saveTransaction() : null,
+                  onTap: isSaving ? null : () => saveTransaction(),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
                     height: 50.h,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: canSave ? AppColors.primary : AppColors.border,
+                      color: AppColors.primary,
                       borderRadius: BorderRadius.circular(14.r),
-                      boxShadow: canSave
-                          ? [
-                              BoxShadow(
-                                color:
-                                    AppColors.primary.withValues(alpha: 0.24),
-                                blurRadius: 14,
-                                offset: const Offset(0, 6),
-                              ),
-                            ]
-                          : [],
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.24),
+                          blurRadius: 14,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
                     ),
                     child: isSaving
                         ? SizedBox(
@@ -600,40 +616,58 @@ class _DashboardPageState extends State<DashboardPage> {
                     // ── Content ──
                     Expanded(
                       child: showForm
-                          ? SingleChildScrollView(
-                              padding: EdgeInsets.fromLTRB(
-                                20.w,
-                                8.h,
-                                20.w,
-                                MediaQuery.of(context).viewInsets.bottom +
-                                    24.h,
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  formLabel('Jumlah'),
-                                  formField(
-                                    controller: _amountController,
-                                    hint: '0',
-                                    prefixText: 'Rp ',
-                                    icon: Icons.account_balance_wallet_outlined,
-                                    keyboardType: TextInputType.number,
-                                    focusNode: amountFocusNode,
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Expanded(
+                                  child: SingleChildScrollView(
+                                    physics: const ClampingScrollPhysics(),
+                                    padding: EdgeInsets.fromLTRB(
+                                      20.w,
+                                      8.h,
+                                      20.w,
+                                      8.h,
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        formLabel('Jumlah'),
+                                        formField(
+                                          controller: _amountController,
+                                          hint: '0',
+                                          prefixText: 'Rp ',
+                                          icon: Icons
+                                              .account_balance_wallet_outlined,
+                                          keyboardType: TextInputType.number,
+                                          focusNode: amountFocusNode,
+                                          errorText: amountErrorText,
+                                          inputFormatters: [
+                                            RupiahInputFormatter()
+                                          ],
+                                          onChangedExtra: () =>
+                                              amountErrorText = null,
+                                        ),
+                                        SizedBox(height: 14.h),
+                                        formLabel('Catatan (opsional)'),
+                                        formField(
+                                          controller: _noteController,
+                                          hint: 'Tulis catatan...',
+                                          icon: Icons.edit_note_rounded,
+                                        ),
+                                        SizedBox(height: 14.h),
+                                        formLabel('Tanggal'),
+                                        dateField(),
+                                      ],
+                                    ),
                                   ),
-                                  SizedBox(height: 14.h),
-                                  formLabel('Catatan (opsional)'),
-                                  formField(
-                                    controller: _noteController,
-                                    hint: 'Tulis catatan...',
-                                    icon: Icons.edit_note_rounded,
-                                  ),
-                                  SizedBox(height: 14.h),
-                                  formLabel('Tanggal'),
-                                  dateField(),
-                                  SizedBox(height: 24.h),
-                                  saveButton(),
-                                ],
-                              ),
+                                ),
+                                Padding(
+                                  padding: EdgeInsets.fromLTRB(
+                                      20.w, 8.h, 20.w, 24.h),
+                                  child: saveButton(),
+                                ),
+                              ],
                             )
                           : CustomScrollView(
                               slivers: [
@@ -926,13 +960,107 @@ class _HomeTab extends StatelessWidget {
     );
   }
 
+  void _showMonthPicker(
+    BuildContext context,
+    TransactionProvider txnProvider,
+    AuthProvider authProvider,
+  ) {
+    final now = DateTime.now();
+    final userId = authProvider.currentUser?.id;
+    if (userId == null) return;
+
+    final months = List.generate(
+      12,
+      (i) => DateTime(now.year, now.month - i, 1),
+    );
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 32.h),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40.w,
+                  height: 4.h,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2.r),
+                  ),
+                ),
+              ),
+              SizedBox(height: 16.h),
+              Text(
+                'Pilih Bulan',
+                style: GoogleFonts.inter(
+                  fontSize: 16.sp,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              SizedBox(height: 16.h),
+              Wrap(
+                spacing: 8.w,
+                runSpacing: 10.h,
+                children: months.map((month) {
+                  final selected =
+                      month.year == txnProvider.selectedMonth.year &&
+                      month.month == txnProvider.selectedMonth.month;
+                  final label = DateFormat('MMM yyyy', 'id_ID').format(month);
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      txnProvider.loadMonth(userId, month);
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: 16.w, vertical: 10.h),
+                      decoration: BoxDecoration(
+                        color: selected ? AppColors.primary : Colors.white,
+                        borderRadius: BorderRadius.circular(20.r),
+                        border: Border.all(
+                          color:
+                              selected ? AppColors.primary : AppColors.border,
+                        ),
+                      ),
+                      child: Text(
+                        label,
+                        style: GoogleFonts.inter(
+                          fontSize: 13.sp,
+                          fontWeight: FontWeight.w600,
+                          color: selected
+                              ? Colors.white
+                              : AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              SizedBox(height: 8.h),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer2<DashboardProvider, TransactionProvider>(
       builder: (context, dashboardProvider, txnProvider, _) {
         final authProvider = context.watch<AuthProvider>();
         final metrics = dashboardProvider.metrics;
-        final monthYear = DateFormat('MMMM yyyy', 'id_ID').format(DateTime.now());
+        final monthYear = DateFormat('MMMM yyyy', 'id_ID').format(txnProvider.selectedMonth);
 
         final profile = authProvider.profile;
         final meta = authProvider.currentUser?.userMetadata;
@@ -1104,11 +1232,25 @@ class _HomeTab extends StatelessWidget {
                                   ),
                                 ),
                                 SizedBox(height: 4.h),
-                                Text(
-                                  monthYear,
-                                  style: GoogleFonts.inter(
-                                    color: Colors.white.withValues(alpha: 0.75),
-                                    fontSize: 13.sp,
+                                GestureDetector(
+                                  onTap: () => _showMonthPicker(context, txnProvider, authProvider),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        monthYear,
+                                        style: GoogleFonts.inter(
+                                          color: Colors.white.withValues(alpha: 0.75),
+                                          fontSize: 13.sp,
+                                        ),
+                                      ),
+                                      SizedBox(width: 4.w),
+                                      Icon(
+                                        Icons.keyboard_arrow_down_rounded,
+                                        color: Colors.white.withValues(alpha: 0.75),
+                                        size: 16.sp,
+                                      ),
+                                    ],
                                   ),
                                 ),
                                 SizedBox(height: 20.h),

@@ -257,9 +257,7 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
                 SizedBox(width: 12.w),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: _isLoading || _nameController.text.trim().isEmpty
-                        ? null
-                        : _saveCategory,
+                    onPressed: _isLoading ? null : _saveCategory,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,

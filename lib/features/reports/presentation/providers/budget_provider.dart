@@ -54,22 +54,21 @@ class BudgetProvider extends ChangeNotifier {
   double categoryProgress(String categoryId) {
     final budget = categoryBudget(categoryId);
     if (budget == null || budget <= 0) return 0.0;
-    return (categoryExpense(categoryId) / budget).clamp(0.0, 1.0);
+    return categoryExpense(categoryId) / budget;
   }
 
   double categoryRemaining(String categoryId) {
     final budget = categoryBudget(categoryId);
     if (budget == null) return 0.0;
-    return (budget - categoryExpense(categoryId)).clamp(0.0, double.infinity);
+    return budget - categoryExpense(categoryId);
   }
 
-  double get remaining =>
-      (totalCategoryBudget - monthExpense).clamp(0.0, double.infinity);
+  double get remaining => totalCategoryBudget - monthExpense;
 
   double get progress {
     final total = totalCategoryBudget;
     if (total <= 0) return 0.0;
-    return (monthExpense / total).clamp(0.0, 1.0);
+    return monthExpense / total;
   }
 
   Future<void> loadBudget(String userId) async {
@@ -128,17 +127,6 @@ class BudgetProvider extends ChangeNotifier {
     }
     _isLoading = false;
     notifyListeners();
-
-    // Cek langsung apakah pengeluaran yang sudah ada sudah melewati threshold
-    // Ini penting saat budget dihapus lalu ditambah lagi — tidak perlu tunggu transaksi baru
-    try {
-      final category = txnProvider.categories
-          .where((c) => c.id == categoryId)
-          .firstOrNull;
-      if (category != null) {
-        await checkCategoryWarningAfterTransaction(categoryId, category.name);
-      }
-    } catch (_) {}
   }
 
   Future<void> deleteCategoryBudget(String userId, String categoryId) async {
@@ -195,8 +183,8 @@ class BudgetProvider extends ChangeNotifier {
       );
     }
 
-    // Setelah cek kategori, cek juga total anggaran
-    await _maybeNotifyBudgetWarning();
+    // Total anggaran — dinonaktifkan sementara
+    // await _maybeNotifyBudgetWarning();
   }
 
   void _onTransactionsChanged() {
@@ -204,10 +192,11 @@ class BudgetProvider extends ChangeNotifier {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_isDisposed) return;
       notifyListeners();
-      _maybeNotifyBudgetWarning();
+      // _maybeNotifyBudgetWarning();
     });
   }
 
+  // ignore: unused_element
   Future<void> _maybeNotifyBudgetWarning() async {
     if (_alertInProgress) return;
     final userId = _userId;

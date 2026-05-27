@@ -74,13 +74,17 @@ class _BudgetPageState extends State<BudgetPage> {
     String userId,
     CategoryModel category,
   ) async {
-    final controller = TextEditingController(
-      text: (budgetProvider.categoryBudget(category.id))?.toStringAsFixed(0) ?? '',
-    );
+    final existingBudget = budgetProvider.categoryBudget(category.id);
+    final initialText = existingBudget != null
+        ? RupiahInputFormatter.format(existingBudget.toStringAsFixed(0))
+        : '';
+    final controller = TextEditingController(text: initialText);
+    final formKey = GlobalKey<FormState>();
+    var autovalidate = AutovalidateMode.disabled;
     final parentContext = context;
     BuildContext? sheetContext;
     bool isSaving = false;
-    var amountText = (budgetProvider.categoryBudget(category.id))?.toStringAsFixed(0) ?? '';
+    var amountText = initialText;
 
     try {
       await showModalBottomSheet<void>(
@@ -94,11 +98,6 @@ class _BudgetPageState extends State<BudgetPage> {
           sheetContext = context;
           return StatefulBuilder(
             builder: (context, setSheetState) {
-              final raw = amountText.replaceAll(RegExp(r'[^0-9]'), '');
-              final amount = double.tryParse(raw);
-              final canSave =
-                  !isSaving && !budgetProvider.isLoading && amount != null && amount > 0;
-
               return SingleChildScrollView(
                 child: Padding(
                   padding: EdgeInsets.only(
@@ -107,7 +106,10 @@ class _BudgetPageState extends State<BudgetPage> {
                     top: 20.h,
                     bottom: MediaQuery.of(context).viewInsets.bottom + 20.h,
                   ),
-                  child: Column(
+                  child: Form(
+                    key: formKey,
+                    autovalidateMode: autovalidate,
+                    child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -122,13 +124,23 @@ class _BudgetPageState extends State<BudgetPage> {
                         hintText: 'Masukkan anggaran kategori (Rp)',
                         prefixIcon: Icons.savings_outlined,
                         keyboardType: TextInputType.number,
+                        inputFormatters: [RupiahInputFormatter()],
                         onChanged: (v) => setSheetState(() => amountText = v),
+                        validator: (v) {
+                          final p = RupiahInputFormatter.parse(v ?? '');
+                          if (p == null || p <= 0) return 'Masukkan nominal yang valid';
+                          return null;
+                        },
                       ),
                       SizedBox(height: 16.h),
                       AppButton(
                         label: isSaving ? 'Menyimpan...' : 'Simpan Anggaran',
-                        onPressed: canSave
-                            ? () async {
+                        onPressed: isSaving || budgetProvider.isLoading
+                            ? null
+                            : () async {
+                                setSheetState(() => autovalidate = AutovalidateMode.always);
+                                if (!formKey.currentState!.validate()) return;
+                                final amount = RupiahInputFormatter.parse(amountText)!;
                                 setSheetState(() => isSaving = true);
                                 try {
                                   await budgetProvider.saveCategoryBudget(
@@ -148,8 +160,7 @@ class _BudgetPageState extends State<BudgetPage> {
                                     setSheetState(() => isSaving = false);
                                   }
                                 }
-                              }
-                            : null,
+                              },
                         isLoading: isSaving || budgetProvider.isLoading,
                         icon: Icons.check_circle_outline,
                       ),
@@ -215,6 +226,7 @@ class _BudgetPageState extends State<BudgetPage> {
                       ],
                     ],
                   ),
+                  ),
                 ),
               );
             },
@@ -242,6 +254,8 @@ class _BudgetPageState extends State<BudgetPage> {
     }
 
     final controller = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    var autovalidate = AutovalidateMode.disabled;
     final parentContext = context;
     BuildContext? sheetContext;
     CategoryModel? selected = categories.first;
@@ -260,15 +274,8 @@ class _BudgetPageState extends State<BudgetPage> {
           sheetContext = context;
           return StatefulBuilder(
             builder: (context, setSheetState) {
-              final raw = amountText.replaceAll(RegExp(r'[^0-9]'), '');
-              final amount = double.tryParse(raw);
               final selectedHasBudget = selected != null &&
                   (budgetProvider.categoryBudget(selected!.id) ?? 0) > 0;
-              final canSave = !isSaving &&
-                  !budgetProvider.isLoading &&
-                  selected != null &&
-                  amount != null &&
-                  amount > 0;
 
               return SingleChildScrollView(
                 child: Padding(
@@ -278,111 +285,132 @@ class _BudgetPageState extends State<BudgetPage> {
                     top: 20.h,
                     bottom: MediaQuery.of(context).viewInsets.bottom + 20.h,
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        'Tambah Anggaran Kategori',
-                        style: GoogleFonts.inter(
-                            fontSize: 16.sp, fontWeight: FontWeight.w700),
-                      ),
-                      SizedBox(height: 12.h),
-                      DropdownButtonFormField<CategoryModel>(
-                        initialValue: selected,
-                        isExpanded: true,
-                        items: categories.map((cat) {
-                          final color = Color(int.parse(
-                              'FF${cat.color.replaceFirst('#', '')}',
-                              radix: 16));
-                          return DropdownMenuItem(
-                            value: cat,
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 32.w,
-                                  height: 32.w,
-                                  decoration: BoxDecoration(
-                                    color: color.withValues(alpha: 0.16),
-                                    borderRadius: BorderRadius.circular(9.r),
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: Text(_displayIcon(cat.icon),
-                                      style: TextStyle(fontSize: 16.sp)),
-                                ),
-                                SizedBox(width: 8.w),
-                                Expanded(child: Text(cat.name)),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (value) =>
-                            setSheetState(() => selected = value),
-                        decoration:
-                            const InputDecoration(labelText: 'Pilih kategori'),
-                      ),
-                      if (selectedHasBudget) ...[
-                        SizedBox(height: 8.h),
+                  child: Form(
+                    key: formKey,
+                    autovalidateMode: autovalidate,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
                         Text(
-                          'Tidak bisa tambah kategori anggaran yang sama',
+                          'Tambah Anggaran Kategori',
                           style: GoogleFonts.inter(
-                            fontSize: 12.sp,
-                            color: AppColors.warning,
-                            fontWeight: FontWeight.w600,
+                              fontSize: 16.sp, fontWeight: FontWeight.w700),
+                        ),
+                        SizedBox(height: 12.h),
+                        DropdownButtonFormField<CategoryModel>(
+                          initialValue: selected,
+                          isExpanded: true,
+                          items: categories.map((cat) {
+                            final color = Color(int.parse(
+                                'FF${cat.color.replaceFirst('#', '')}',
+                                radix: 16));
+                            return DropdownMenuItem(
+                              value: cat,
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 32.w,
+                                    height: 32.w,
+                                    decoration: BoxDecoration(
+                                      color: color.withValues(alpha: 0.16),
+                                      borderRadius: BorderRadius.circular(9.r),
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: Text(_displayIcon(cat.icon),
+                                        style: TextStyle(fontSize: 16.sp)),
+                                  ),
+                                  SizedBox(width: 8.w),
+                                  Expanded(child: Text(cat.name)),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (value) =>
+                              setSheetState(() => selected = value),
+                          decoration:
+                              const InputDecoration(labelText: 'Pilih kategori'),
+                        ),
+                        if (selectedHasBudget) ...[
+                          SizedBox(height: 8.h),
+                          Text(
+                            'Tidak bisa tambah kategori anggaran yang sama',
+                            style: GoogleFonts.inter(
+                              fontSize: 12.sp,
+                              color: AppColors.warning,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
+                        ],
+                        SizedBox(height: 12.h),
+                        AppTextField(
+                          controller: controller,
+                          hintText: 'Masukkan anggaran kategori (Rp)',
+                          prefixIcon: Icons.savings_outlined,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [RupiahInputFormatter()],
+                          onChanged: (v) => setSheetState(() => amountText = v),
+                          validator: (v) {
+                            final p = RupiahInputFormatter.parse(v ?? '');
+                            if (p == null || p <= 0) return 'Masukkan nominal yang valid';
+                            return null;
+                          },
+                        ),
+                        SizedBox(height: 16.h),
+                        AppButton(
+                          label: isSaving ? 'Menyimpan...' : 'Simpan Anggaran',
+                          onPressed: isSaving || budgetProvider.isLoading
+                              ? null
+                              : () async {
+                                  // Lock button immediately to prevent spam
+                                  setSheetState(() {
+                                    isSaving = true;
+                                    autovalidate = AutovalidateMode.always;
+                                  });
+                                  if (!formKey.currentState!.validate()) {
+                                    setSheetState(() => isSaving = false);
+                                    return;
+                                  }
+                                  final category = selected!;
+                                  if ((budgetProvider.categoryBudget(category.id) ?? 0) > 0) {
+                                    // Close sheet first so snackbar is visible
+                                    if (sheetContext?.mounted == true) Navigator.pop(sheetContext!);
+                                    if (!parentContext.mounted) return;
+                                    ScaffoldMessenger.of(parentContext).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Kategori ini sudah memiliki anggaran',
+                                        ),
+                                        backgroundColor: AppColors.warning,
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  final amount = RupiahInputFormatter.parse(amountText)!;
+                                  try {
+                                    await budgetProvider.saveCategoryBudget(
+                                        userId, category.id, amount);
+                                    if (sheetContext?.mounted != true) return;
+                                    Navigator.pop(sheetContext!);
+                                    if (!parentContext.mounted) return;
+                                    ScaffoldMessenger.of(parentContext).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                            'Anggaran ${category.name} disimpan'),
+                                        backgroundColor: AppColors.success,
+                                      ),
+                                    );
+                                  } catch (_) {
+                                    if (context.mounted) {
+                                      setSheetState(() => isSaving = false);
+                                    }
+                                  }
+                                },
+                          isLoading: isSaving || budgetProvider.isLoading,
+                          icon: Icons.check_circle_outline,
                         ),
                       ],
-                      SizedBox(height: 12.h),
-                      AppTextField(
-                        controller: controller,
-                        hintText: 'Masukkan anggaran kategori (Rp)',
-                        prefixIcon: Icons.savings_outlined,
-                        keyboardType: TextInputType.number,
-                        onChanged: (v) => setSheetState(() => amountText = v),
-                      ),
-                      SizedBox(height: 16.h),
-                      AppButton(
-                        label: isSaving ? 'Menyimpan...' : 'Simpan Anggaran',
-                        onPressed: canSave
-                            ? () async {
-                                final category = selected!;
-                                if ((budgetProvider.categoryBudget(category.id) ?? 0) > 0) {
-                                  ScaffoldMessenger.of(parentContext).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Tidak bisa tambah kategori anggaran yang sama',
-                                      ),
-                                      backgroundColor: AppColors.warning,
-                                    ),
-                                  );
-                                  return;
-                                }
-
-                                setSheetState(() => isSaving = true);
-                                try {
-                                  await budgetProvider.saveCategoryBudget(
-                                      userId, category.id, amount);
-                                  if (sheetContext?.mounted != true) return;
-                                  Navigator.pop(sheetContext!);
-                                  if (!parentContext.mounted) return;
-                                  ScaffoldMessenger.of(parentContext).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                          'Anggaran ${category.name} disimpan'),
-                                      backgroundColor: AppColors.success,
-                                    ),
-                                  );
-                                } catch (_) {
-                                  if (context.mounted) {
-                                    setSheetState(() => isSaving = false);
-                                  }
-                                }
-                              }
-                            : null,
-                        isLoading: isSaving || budgetProvider.isLoading,
-                        icon: Icons.check_circle_outline,
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               );
@@ -533,7 +561,7 @@ class _BudgetPageState extends State<BudgetPage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Sisa ${_formatCurrency(budget.remaining)}',
+                _remainingLabel(budget.remaining),
                 style: GoogleFonts.inter(
                   fontSize: 12.sp,
                   fontWeight: FontWeight.w500,
@@ -628,13 +656,13 @@ class _BudgetPageState extends State<BudgetPage> {
                       ),
                       SizedBox(height: 2.h),
                       Text(
-                        'Sisa : ${_formatCurrency(remaining)}',
+                        _remainingLabel(remaining),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.inter(
                           fontSize: 11.sp,
                           fontWeight: FontWeight.w500,
-                          color: AppColors.textSecondary,
+                          color: _remainingLabelColor(remaining),
                         ),
                       ),
                     ],
@@ -702,13 +730,21 @@ class _BudgetPageState extends State<BudgetPage> {
     return ClipRRect(
       borderRadius: BorderRadius.circular(999.r),
       child: LinearProgressIndicator(
-        value: value,
+        value: value.clamp(0.0, 1.0),
         minHeight: height,
         backgroundColor: backgroundColor,
         valueColor: AlwaysStoppedAnimation<Color>(color),
       ),
     );
   }
+
+  String _remainingLabel(double remaining) {
+    if (remaining < 0) return 'Melebihi ${_formatCurrency(remaining.abs())}';
+    return 'Sisa ${_formatCurrency(remaining)}';
+  }
+
+  Color _remainingLabelColor(double remaining) =>
+      remaining < 0 ? AppColors.error : AppColors.textSecondary;
 
   Widget _buildAddBudgetButton({
     required bool enabled,

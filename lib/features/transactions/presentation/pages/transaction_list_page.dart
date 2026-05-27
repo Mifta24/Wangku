@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../shared/widgets/app_text_field.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/models/category_model.dart';
 import '../../domain/models/transaction_model.dart';
@@ -289,7 +291,10 @@ class _TransactionListPageState extends State<TransactionListPage> {
     }
   }
 
-  Future<void> _confirmDelete(TransactionModel transaction) async {
+  Future<void> _confirmDelete(
+    TransactionModel transaction, {
+    VoidCallback? onBeforeDelete,
+  }) async {
     final shouldDelete = await showDialog<bool>(
       context: context,
       builder: (context) {
@@ -313,25 +318,30 @@ class _TransactionListPageState extends State<TransactionListPage> {
     );
 
     if (shouldDelete != true) return;
+    onBeforeDelete?.call();
     if (!mounted) return;
     final txnProvider = context.read<TransactionProvider>();
     try {
       await txnProvider.deleteTransaction(transaction.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Transaksi berhasil dihapus.'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Transaksi berhasil dihapus.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Gagal menghapus transaksi.'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Gagal menghapus transaksi.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
     }
   }
 
@@ -463,10 +473,12 @@ class _TransactionListPageState extends State<TransactionListPage> {
                 icon: Icons.delete_outline_rounded,
                 label: 'Hapus Transaksi',
                 color: AppColors.expense,
-                onTap: () {
-                  Navigator.pop(sheetCtx);
-                  _confirmDelete(tx);
-                },
+                onTap: () => _confirmDelete(
+                  tx,
+                  onBeforeDelete: () {
+                    if (sheetCtx.mounted) Navigator.pop(sheetCtx);
+                  },
+                ),
               ),
             ],
           ),
@@ -524,20 +536,24 @@ class _TransactionListPageState extends State<TransactionListPage> {
     try {
       await txnProvider.addTransaction(duplicate, authProvider.currentUser!.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Transaksi berhasil diduplikat.'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Transaksi berhasil diduplikat.'),
+            backgroundColor: AppColors.success,
+          ),
+        );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Gagal menduplikat transaksi.'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Gagal menduplikat transaksi.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
     }
   }
 
@@ -545,7 +561,7 @@ class _TransactionListPageState extends State<TransactionListPage> {
     final txnProvider = context.read<TransactionProvider>();
     final parentContext = context;
     final amountController = TextEditingController(
-      text: transaction.amount.toStringAsFixed(0),
+      text: RupiahInputFormatter.format(transaction.amount.toStringAsFixed(0)),
     );
     final noteController = TextEditingController(text: transaction.note);
     final amountFocusNode = FocusNode();
@@ -556,6 +572,7 @@ class _TransactionListPageState extends State<TransactionListPage> {
     bool isSaving = false;
     bool isClosing = false;
     bool shouldFocusAmount = true;
+    String? amountErrorText;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -596,14 +613,6 @@ class _TransactionListPageState extends State<TransactionListPage> {
                         (c) => c?.id == selectedCategoryId,
                         orElse: () => null,
                       );
-                final parsedAmount = double.tryParse(
-                  amountController.text.trim(),
-                );
-                final canSave =
-                    !isSaving &&
-                    parsedAmount != null &&
-                    parsedAmount > 0 &&
-                    selectedCategoryId != null;
                 final showForm = selectedCategoryId != null;
 
                 if (showForm && shouldFocusAmount) {
@@ -616,15 +625,17 @@ class _TransactionListPageState extends State<TransactionListPage> {
                 }
 
                 Future<void> saveChanges() async {
-                  if (!canSave || isSaving) return;
-                  final amount = double.tryParse(amountController.text.trim());
-                  if (amount == null ||
-                      amount <= 0 ||
-                      selectedCategoryId == null) {
+                  if (isSaving) return;
+                  isSaving = true;
+                  final amount = RupiahInputFormatter.parse(amountController.text.trim());
+                  if (amount == null || amount <= 0 || selectedCategoryId == null) {
+                    setSheetState(() {
+                      isSaving = false;
+                      if (amount == null || amount <= 0) amountErrorText = 'Jumlah harus diisi';
+                    });
                     return;
                   }
-
-                  setSheetState(() => isSaving = true);
+                  setSheetState(() {});
                   final updated = transaction.copyWith(
                     categoryId: selectedCategoryId!,
                     amount: amount,
@@ -657,12 +668,14 @@ class _TransactionListPageState extends State<TransactionListPage> {
                     );
                     if (!context.mounted || !parentContext.mounted) return;
                     await closeSheet();
-                    ScaffoldMessenger.of(parentContext).showSnackBar(
-                      const SnackBar(
-                        content: Text('Transaksi berhasil diperbarui.'),
-                        backgroundColor: AppColors.success,
-                      ),
-                    );
+                    ScaffoldMessenger.of(parentContext)
+                      ..clearSnackBars()
+                      ..showSnackBar(
+                        const SnackBar(
+                          content: Text('Transaksi berhasil diperbarui.'),
+                          backgroundColor: AppColors.success,
+                        ),
+                      );
                   } catch (_) {
                     if (context.mounted) {
                       setSheetState(() => isSaving = false);
@@ -745,12 +758,17 @@ class _TransactionListPageState extends State<TransactionListPage> {
                   TextInputType? keyboardType,
                   String? prefixText,
                   FocusNode? focusNode,
+                  String? errorText,
+                  List<TextInputFormatter>? inputFormatters,
+                  VoidCallback? onChangedExtra,
                 }) {
+                  final hasError = errorText != null;
                   return TextField(
                     controller: controller,
                     focusNode: focusNode,
                     keyboardType: keyboardType,
-                    onChanged: (_) => setSheetState(() {}),
+                    inputFormatters: inputFormatters,
+                    onChanged: (_) => setSheetState(() => onChangedExtra?.call()),
                     style: GoogleFonts.inter(
                       fontSize: 15.sp,
                       fontWeight: FontWeight.w600,
@@ -764,7 +782,15 @@ class _TransactionListPageState extends State<TransactionListPage> {
                         fontWeight: FontWeight.w600,
                         color: AppColors.textSecondary,
                       ),
-                      prefixIcon: Icon(icon, color: AppColors.textSecondary),
+                      prefixIcon: Icon(
+                        icon,
+                        color: hasError ? AppColors.error : AppColors.textSecondary,
+                      ),
+                      errorText: errorText,
+                      errorStyle: GoogleFonts.inter(
+                        fontSize: 11.sp,
+                        color: AppColors.error,
+                      ),
                       filled: true,
                       fillColor: Colors.white,
                       contentPadding: EdgeInsets.symmetric(
@@ -774,13 +800,26 @@ class _TransactionListPageState extends State<TransactionListPage> {
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14.r),
                         borderSide: BorderSide(
-                          color: AppColors.border.withValues(alpha: 0.75),
+                          color: hasError
+                              ? AppColors.error
+                              : AppColors.border.withValues(alpha: 0.75),
                         ),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14.r),
                         borderSide: BorderSide(
-                          color: AppColors.primary,
+                          color: hasError ? AppColors.error : AppColors.primary,
+                          width: 1.6,
+                        ),
+                      ),
+                      errorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14.r),
+                        borderSide: const BorderSide(color: AppColors.error),
+                      ),
+                      focusedErrorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14.r),
+                        borderSide: const BorderSide(
+                          color: AppColors.error,
                           width: 1.6,
                         ),
                       ),
@@ -843,25 +882,21 @@ class _TransactionListPageState extends State<TransactionListPage> {
 
                 Widget saveButton() {
                   return GestureDetector(
-                    onTap: canSave ? () => saveChanges() : null,
+                    onTap: isSaving ? null : () => saveChanges(),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
                       height: 50.h,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: canSave ? AppColors.primary : AppColors.border,
+                        color: AppColors.primary,
                         borderRadius: BorderRadius.circular(14.r),
-                        boxShadow: canSave
-                            ? [
-                                BoxShadow(
-                                  color: AppColors.primary.withValues(
-                                    alpha: 0.24,
-                                  ),
-                                  blurRadius: 14,
-                                  offset: const Offset(0, 6),
-                                ),
-                              ]
-                            : [],
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.24),
+                            blurRadius: 14,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
                       ),
                       child: isSaving
                           ? SizedBox(
@@ -1023,42 +1058,58 @@ class _TransactionListPageState extends State<TransactionListPage> {
                       SizedBox(height: 12.h),
                       Expanded(
                         child: showForm
-                            ? SingleChildScrollView(
-                                padding: EdgeInsets.fromLTRB(
-                                  20.w,
-                                  8.h,
-                                  20.w,
-                                  MediaQuery.of(context).viewInsets.bottom +
-                                      24.h,
-                                ),
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    formLabel('Jumlah'),
-                                    formField(
-                                      controller: amountController,
-                                      hint: '0',
-                                      prefixText: 'Rp ',
-                                      icon:
-                                          Icons.account_balance_wallet_outlined,
-                                      keyboardType: TextInputType.number,
-                                      focusNode: amountFocusNode,
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Expanded(
+                                    child: SingleChildScrollView(
+                                      physics: const ClampingScrollPhysics(),
+                                      padding: EdgeInsets.fromLTRB(
+                                        20.w,
+                                        8.h,
+                                        20.w,
+                                        8.h,
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          formLabel('Jumlah'),
+                                          formField(
+                                            controller: amountController,
+                                            hint: '0',
+                                            prefixText: 'Rp ',
+                                            icon: Icons
+                                                .account_balance_wallet_outlined,
+                                            keyboardType: TextInputType.number,
+                                            focusNode: amountFocusNode,
+                                            errorText: amountErrorText,
+                                            inputFormatters: [
+                                              RupiahInputFormatter()
+                                            ],
+                                            onChangedExtra: () =>
+                                                amountErrorText = null,
+                                          ),
+                                          SizedBox(height: 14.h),
+                                          formLabel('Catatan (opsional)'),
+                                          formField(
+                                            controller: noteController,
+                                            hint: 'Tulis catatan...',
+                                            icon: Icons.edit_note_rounded,
+                                          ),
+                                          SizedBox(height: 14.h),
+                                          formLabel('Tanggal'),
+                                          dateField(),
+                                        ],
+                                      ),
                                     ),
-                                    SizedBox(height: 14.h),
-                                    formLabel('Catatan (opsional)'),
-                                    formField(
-                                      controller: noteController,
-                                      hint: 'Tulis catatan...',
-                                      icon: Icons.edit_note_rounded,
-                                    ),
-                                    SizedBox(height: 14.h),
-                                    formLabel('Tanggal'),
-                                    dateField(),
-                                    SizedBox(height: 24.h),
-                                    saveButton(),
-                                  ],
-                                ),
+                                  ),
+                                  Padding(
+                                    padding: EdgeInsets.fromLTRB(
+                                        20.w, 8.h, 20.w, 24.h),
+                                    child: saveButton(),
+                                  ),
+                                ],
                               )
                             : CustomScrollView(
                                 slivers: [

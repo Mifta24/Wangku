@@ -130,6 +130,7 @@ class _RegisterPageState extends State<RegisterPage> {
             padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 16.h),
             child: Form(
               key: _formKey,
+              autovalidateMode: AutovalidateMode.disabled,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,

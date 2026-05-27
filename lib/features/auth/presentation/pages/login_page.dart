@@ -66,6 +66,7 @@ class _LoginPageState extends State<LoginPage> {
             padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 16.h),
             child: Form(
               key: _formKey,
+              autovalidateMode: AutovalidateMode.disabled,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -128,7 +129,10 @@ class _LoginPageState extends State<LoginPage> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
-                      onPressed: () => context.pushNamed('forgot-password'),
+                      onPressed: () {
+                        _formKey.currentState?.reset();
+                        context.pushNamed('forgot-password');
+                      },
                       style: TextButton.styleFrom(
                         padding: EdgeInsets.symmetric(vertical: 4.h),
                         minimumSize: Size.zero,
@@ -162,7 +166,10 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ),
                       GestureDetector(
-                        onTap: () => context.pushNamed('register'),
+                        onTap: () {
+                          _formKey.currentState?.reset();
+                          context.pushNamed('register');
+                        },
                         child: Text(
                           'Daftar Sekarang',
                           style: GoogleFonts.inter(
