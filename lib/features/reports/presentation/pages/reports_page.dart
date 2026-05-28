@@ -46,6 +46,28 @@ class _ReportsPageState extends State<ReportsPage> {
     });
   }
 
+  List<LineBarSpot> _orderedTrendSpots(List<LineBarSpot> spots) {
+    return List<LineBarSpot>.from(spots)
+      ..sort((a, b) => a.barIndex.compareTo(b.barIndex));
+  }
+
+  bool _isSameTrendSelection(
+    List<LineBarSpot> current,
+    List<LineBarSpot> next,
+  ) {
+    return current.isNotEmpty &&
+        next.isNotEmpty &&
+        current.first.spotIndex == next.first.spotIndex;
+  }
+
+  List<int> _trendIndicatorIndexes(List<LineBarSpot> spots, int barIndex) {
+    return spots
+        .where((spot) => spot.barIndex == barIndex)
+        .map((spot) => spot.spotIndex)
+        .toSet()
+        .toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final authProvider = context.read<AuthProvider>();
@@ -202,7 +224,7 @@ class _ReportsPageState extends State<ReportsPage> {
       PeriodType.year => 'Tahun Ini',
     };
     final label = isSurplus ? 'Surplus $periodLabel' : 'Defisit $periodLabel';
-    final changePercent = report.netChangePercentage;
+    // final changePercent = report.netChangePercentage;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -228,24 +250,15 @@ class _ReportsPageState extends State<ReportsPage> {
               color: AppColors.textSecondary,
             ),
           ),
-          // const SizedBox(height: 6),
-          // Row(
-          //   crossAxisAlignment: CrossAxisAlignment.center,
-          //   children: [
-          //     Text(
-          //       _formatCurrency(report.netAmount.abs()),
-          //       style: GoogleFonts.inter(
-          //         fontSize: 26,
-          //         fontWeight: FontWeight.w800,
-          //         color: netColor,
-          //       ),
-          //     ),
-          //     if (changePercent != null) ...[
-          //       const SizedBox(width: 10),
-          //       _buildChangeChip(changePercent, report.periodType),
-          //     ],
-          //   ],
-          // ),
+          const SizedBox(height: 6),
+          Text(
+            _formatCurrency(report.netAmount.abs()),
+            style: GoogleFonts.inter(
+              fontSize: 26,
+              fontWeight: FontWeight.w800,
+              color: netColor,
+            ),
+          ),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -392,6 +405,9 @@ class _ReportsPageState extends State<ReportsPage> {
   }
 
   LineChartData _buildTrendChartData(List<TrendPoint> points) {
+    final visibleTrendSpots = _tempTouchSpots.isNotEmpty
+        ? _tempTouchSpots
+        : _persistedTrendSpots;
     final maxAmount = points.fold<double>(1, (max, p) {
       final pointMax = p.income > p.expense ? p.income : p.expense;
       return pointMax > max ? pointMax : max;
@@ -467,6 +483,7 @@ class _ReportsPageState extends State<ReportsPage> {
       ),
       lineTouchData: LineTouchData(
         enabled: true,
+        handleBuiltInTouches: false,
         touchTooltipData: LineTouchTooltipData(
           getTooltipColor: (_) => AppColors.textPrimary,
           getTooltipItems: (spots) => spots.map((spot) {
@@ -482,23 +499,43 @@ class _ReportsPageState extends State<ReportsPage> {
           }).toList(),
         ),
         touchCallback: (event, response) {
-          final spots = response?.lineBarSpots;
-          if (spots != null && spots.isNotEmpty) {
-            _tempTouchSpots = List<LineBarSpot>.from(spots);
-          }
-          if (event is FlTapUpEvent && _tempTouchSpots.isNotEmpty) {
+          final touchedSpots = response?.lineBarSpots;
+          final nextSpots = touchedSpots == null || touchedSpots.isEmpty
+              ? <LineBarSpot>[]
+              : _orderedTrendSpots(touchedSpots);
+
+          if (event is FlTapUpEvent) {
+            final selectedSpots = nextSpots.isNotEmpty
+                ? nextSpots
+                : _tempTouchSpots;
+            if (selectedSpots.isEmpty) return;
+
             setState(() {
-              final isSame = _persistedTrendSpots.isNotEmpty &&
-                  _persistedTrendSpots.first.x == _tempTouchSpots.first.x;
-              _persistedTrendSpots = isSame ? [] : _tempTouchSpots;
+              final isSame = _isSameTrendSelection(
+                _persistedTrendSpots,
+                selectedSpots,
+              );
+              _persistedTrendSpots = isSame ? [] : selectedSpots;
               _tempTouchSpots = [];
             });
+            return;
           }
+
+          if (!event.isInterestedForInteractions || nextSpots.isEmpty) {
+            if (_tempTouchSpots.isNotEmpty) {
+              setState(() => _tempTouchSpots = []);
+            }
+            return;
+          }
+
+          setState(() {
+            _tempTouchSpots = nextSpots;
+          });
         },
       ),
-      showingTooltipIndicators: _persistedTrendSpots.isEmpty
+      showingTooltipIndicators: visibleTrendSpots.isEmpty
           ? []
-          : [ShowingTooltipIndicators(_persistedTrendSpots)],
+          : [ShowingTooltipIndicators(visibleTrendSpots)],
       lineBarsData: [
         _buildTrendLine(
           points
@@ -507,6 +544,7 @@ class _ReportsPageState extends State<ReportsPage> {
               .map((e) => FlSpot(e.key.toDouble(), e.value.income))
               .toList(),
           AppColors.income,
+          _trendIndicatorIndexes(visibleTrendSpots, 0),
         ),
         _buildTrendLine(
           points
@@ -515,18 +553,24 @@ class _ReportsPageState extends State<ReportsPage> {
               .map((e) => FlSpot(e.key.toDouble(), e.value.expense))
               .toList(),
           AppColors.expense,
+          _trendIndicatorIndexes(visibleTrendSpots, 1),
         ),
       ],
     );
   }
 
-  LineChartBarData _buildTrendLine(List<FlSpot> spots, Color color) {
+  LineChartBarData _buildTrendLine(
+    List<FlSpot> spots,
+    Color color,
+    List<int> showingIndicators,
+  ) {
     return LineChartBarData(
       spots: spots,
       isCurved: true,
       color: color,
       barWidth: 2.5,
       isStrokeCapRound: true,
+      showingIndicators: showingIndicators,
       dotData: FlDotData(
         show: true,
         getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
