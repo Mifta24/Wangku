@@ -8,6 +8,7 @@ import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/otp_verification_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
+import '../../features/auth/presentation/pages/splash_page.dart';
 import '../../features/dashboard/presentation/pages/dashboard_page.dart';
 
 class AuthStateRefreshNotifier extends ChangeNotifier {
@@ -48,7 +49,7 @@ final AuthStateRefreshNotifier authStateRefreshNotifier =
 final AuthStateRefreshNotifier _authStateRefreshNotifier = authStateRefreshNotifier;
 
 final GoRouter appRouter = GoRouter(
-  initialLocation: '/login',
+  initialLocation: '/splash',
   refreshListenable: _authStateRefreshNotifier,
   redirect: (context, state) {
     final user = Supabase.instance.client.auth.currentUser;
@@ -56,6 +57,10 @@ final GoRouter appRouter = GoRouter(
 
     if (_authStateRefreshNotifier.isPasswordRecovery) {
       return location == '/reset-password' ? null : '/reset-password';
+    }
+
+    if (location == '/splash') {
+      return null;
     }
 
     final isAuthPage = location == '/login' ||
@@ -70,6 +75,11 @@ final GoRouter appRouter = GoRouter(
     return isAuthPage ? '/dashboard' : null;
   },
   routes: [
+    GoRoute(
+      path: '/splash',
+      name: 'splash',
+      builder: (context, state) => const SplashPage(),
+    ),
     GoRoute(
       path: '/login',
       name: 'login',
