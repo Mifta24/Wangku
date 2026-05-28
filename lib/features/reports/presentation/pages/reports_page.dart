@@ -24,7 +24,8 @@ class _ReportsPageState extends State<ReportsPage> {
   );
 
   String? _selectedCategoryId;
-  int? _selectedTrendIndex;
+  List<LineBarSpot> _persistedTrendSpots = [];
+  List<LineBarSpot> _tempTouchSpots = [];
 
   String _formatCurrency(double amount) => _currencyFormatter.format(amount);
 
@@ -227,24 +228,24 @@ class _ReportsPageState extends State<ReportsPage> {
               color: AppColors.textSecondary,
             ),
           ),
-          const SizedBox(height: 6),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Text(
-                _formatCurrency(report.netAmount.abs()),
-                style: GoogleFonts.inter(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w800,
-                  color: netColor,
-                ),
-              ),
-              if (changePercent != null) ...[
-                const SizedBox(width: 10),
-                _buildChangeChip(changePercent, report.periodType),
-              ],
-            ],
-          ),
+          // const SizedBox(height: 6),
+          // Row(
+          //   crossAxisAlignment: CrossAxisAlignment.center,
+          //   children: [
+          //     Text(
+          //       _formatCurrency(report.netAmount.abs()),
+          //       style: GoogleFonts.inter(
+          //         fontSize: 26,
+          //         fontWeight: FontWeight.w800,
+          //         color: netColor,
+          //       ),
+          //     ),
+          //     if (changePercent != null) ...[
+          //       const SizedBox(width: 10),
+          //       _buildChangeChip(changePercent, report.periodType),
+          //     ],
+          //   ],
+          // ),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -266,44 +267,44 @@ class _ReportsPageState extends State<ReportsPage> {
     );
   }
 
-  Widget _buildChangeChip(double changePercent, PeriodType periodType) {
-    final isImproved = changePercent >= 0;
-    final color = isImproved ? AppColors.income : AppColors.expense;
-    final icon = isImproved ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded;
-    final sign = isImproved ? '+' : '-';
-    final absPercent = changePercent.abs().toStringAsFixed(1);
-    final prevLabel = switch (periodType) {
-      PeriodType.week => 'minggu lalu',
-      PeriodType.month => 'bulan lalu',
-      PeriodType.year => 'tahun lalu',
-    };
+  // Widget _buildChangeChip(double changePercent, PeriodType periodType) {
+  //   final isImproved = changePercent >= 0;
+  //   final color = isImproved ? AppColors.income : AppColors.expense;
+  //   final icon = isImproved ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded;
+  //   final sign = isImproved ? '+' : '-';
+  //   final absPercent = changePercent.abs().toStringAsFixed(1);
+  //   final prevLabel = switch (periodType) {
+  //     PeriodType.week => 'minggu lalu',
+  //     PeriodType.month => 'bulan lalu',
+  //     PeriodType.year => 'tahun lalu',
+  //   };
 
-    return Tooltip(
-      message: 'Dibanding $prevLabel',
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 11, color: color),
-            const SizedBox(width: 2),
-            Text(
-              '$sign$absPercent%',
-              style: GoogleFonts.inter(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: color,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  //   return Tooltip(
+  //     message: 'Dibanding $prevLabel',
+  //     child: Container(
+  //       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+  //       decoration: BoxDecoration(
+  //         color: color.withValues(alpha: 0.10),
+  //         borderRadius: BorderRadius.circular(20),
+  //       ),
+  //       child: Row(
+  //         mainAxisSize: MainAxisSize.min,
+  //         children: [
+  //           Icon(icon, size: 11, color: color),
+  //           const SizedBox(width: 2),
+  //           Text(
+  //             '$sign$absPercent%',
+  //             style: GoogleFonts.inter(
+  //               fontSize: 11,
+  //               fontWeight: FontWeight.w700,
+  //               color: color,
+  //             ),
+  //           ),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
 
   Widget _buildSummaryChip(String label, double amount, Color color) {
     return Row(
@@ -361,25 +362,13 @@ class _ReportsPageState extends State<ReportsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Tren Cashflow',
-                style: GoogleFonts.inter(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              Row(
-                children: [
-                  _buildTrendLegend(AppColors.income, 'Pemasukan'),
-                  const SizedBox(width: 12),
-                  _buildTrendLegend(AppColors.expense, 'Pengeluaran'),
-                ],
-              ),
-            ],
+          Text(
+            'Tren Cashflow',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
           ),
           const SizedBox(height: 16),
           if (points.isEmpty)
@@ -397,12 +386,6 @@ class _ReportsPageState extends State<ReportsPage> {
               height: 200,
               child: LineChart(_buildTrendChartData(points)),
             ),
-          if (points.isNotEmpty && _selectedTrendIndex != null) ...[
-            const SizedBox(height: 12),
-            _buildTrendDetail(
-              points[_selectedTrendIndex!.clamp(0, points.length - 1)],
-            ),
-          ],
         ],
       ),
     );
@@ -499,16 +482,23 @@ class _ReportsPageState extends State<ReportsPage> {
           }).toList(),
         ),
         touchCallback: (event, response) {
-          if (!event.isInterestedForInteractions ||
-              response?.lineBarSpots == null ||
-              response!.lineBarSpots!.isEmpty) {
-            return;
+          final spots = response?.lineBarSpots;
+          if (spots != null && spots.isNotEmpty) {
+            _tempTouchSpots = List<LineBarSpot>.from(spots);
           }
-          setState(() {
-            _selectedTrendIndex = response.lineBarSpots!.first.x.round();
-          });
+          if (event is FlTapUpEvent && _tempTouchSpots.isNotEmpty) {
+            setState(() {
+              final isSame = _persistedTrendSpots.isNotEmpty &&
+                  _persistedTrendSpots.first.x == _tempTouchSpots.first.x;
+              _persistedTrendSpots = isSame ? [] : _tempTouchSpots;
+              _tempTouchSpots = [];
+            });
+          }
         },
       ),
+      showingTooltipIndicators: _persistedTrendSpots.isEmpty
+          ? []
+          : [ShowingTooltipIndicators(_persistedTrendSpots)],
       lineBarsData: [
         _buildTrendLine(
           points
@@ -540,7 +530,7 @@ class _ReportsPageState extends State<ReportsPage> {
       dotData: FlDotData(
         show: true,
         getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
-          radius: index == _selectedTrendIndex ? 4.5 : 2.5,
+          radius: 2.5,
           color: Colors.white,
           strokeWidth: 2,
           strokeColor: color,
@@ -553,71 +543,8 @@ class _ReportsPageState extends State<ReportsPage> {
     );
   }
 
-  Widget _buildTrendLegend(Color color, String label) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 5),
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 11,
-            fontWeight: FontWeight.w500,
-            color: AppColors.textSecondary,
-          ),
-        ),
-      ],
-    );
-  }
 
-  Widget _buildTrendDetail(TrendPoint point) {
-    final net = point.income - point.expense;
-    final isSurplus = net >= 0;
 
-    return Wrap(
-      spacing: 12,
-      runSpacing: 4,
-      children: [
-        Text(
-          point.label,
-          style: GoogleFonts.inter(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        Text(
-          'Masuk ${_formatCurrency(point.income)}',
-          style: GoogleFonts.inter(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: AppColors.income,
-          ),
-        ),
-        Text(
-          'Keluar ${_formatCurrency(point.expense)}',
-          style: GoogleFonts.inter(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: AppColors.expense,
-          ),
-        ),
-        Text(
-          '${isSurplus ? '+' : '-'}${_formatCurrency(net.abs())}',
-          style: GoogleFonts.inter(
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            color: isSurplus ? AppColors.income : AppColors.expense,
-          ),
-        ),
-      ],
-    );
-  }
 
   // ── Breakdown Kategori ───────────────────────────────────────────────────────
 
@@ -724,9 +651,14 @@ class _ReportsPageState extends State<ReportsPage> {
                               radix: 16,
                             ),
                           );
+                          // Pastikan setiap slice minimal 2% agar kategori kecil tetap terlihat
+                          final minValue = report.totalAmount * 0.02;
+                          final displayValue = isZero
+                              ? 1.0
+                              : (c.total < minValue ? minValue : c.total);
                           return PieChartSectionData(
                             color: color,
-                            value: isZero ? 1 : c.total,
+                            value: displayValue,
                             title: '',
                             radius: isSelected ? 36 : 28,
                           );
@@ -807,7 +739,10 @@ class _ReportsPageState extends State<ReportsPage> {
                   radix: 16,
                 ),
               );
-              final percentStr = (cat.percentage * 100).toStringAsFixed(0);
+              final percentRaw = cat.percentage * 100;
+              final percentStr = percentRaw < 1
+                  ? percentRaw.toStringAsFixed(1)
+                  : percentRaw.toStringAsFixed(0);
               final isSelected = cat.categoryId == _selectedCategoryId;
               return GestureDetector(
                 onTap: () => _selectCategory(cat),

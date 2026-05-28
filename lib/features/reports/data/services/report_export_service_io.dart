@@ -222,7 +222,7 @@ class ReportExportService {
             columnWidths: {
               0: const pw.FixedColumnWidth(24),
               1: const pw.FixedColumnWidth(58),
-              2: const pw.FixedColumnWidth(56),
+              2: const pw.FixedColumnWidth(68),
               3: const pw.FlexColumnWidth(2),
               4: const pw.FlexColumnWidth(2),
               5: const pw.FixedColumnWidth(72),

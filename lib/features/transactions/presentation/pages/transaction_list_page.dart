@@ -2165,21 +2165,52 @@ class _TransactionListPageState extends State<TransactionListPage> {
                 ? ListView(
                     children: [
                       SizedBox(height: 80.h),
-                      Icon(
-                        Icons.receipt_long_rounded,
-                        size: 56.sp,
-                        color: AppColors.hint,
-                      ),
-                      SizedBox(height: 12.h),
-                      Center(
-                        child: Text(
-                          'Belum ada transaksi yang cocok.',
-                          style: GoogleFonts.inter(
-                            fontSize: 13.sp,
-                            color: AppColors.textSecondary,
+                      if (monthItems.isEmpty) ...[
+                        Center(
+                          child: Text(
+                            '📋',
+                            style: TextStyle(fontSize: 48.sp),
                           ),
                         ),
-                      ),
+                        SizedBox(height: 16.h),
+                        Center(
+                          child: Text(
+                            'Belum ada catatan transaksi',
+                            style: GoogleFonts.inter(
+                              fontSize: 16.sp,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 8.h),
+                        Center(
+                          child: Text(
+                            'Ketuk tombol "+" untuk mencatat\ntransaksi pertama kamu.',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.inter(
+                              fontSize: 13.sp,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ] else ...[
+                        Icon(
+                          Icons.receipt_long_rounded,
+                          size: 56.sp,
+                          color: AppColors.hint,
+                        ),
+                        SizedBox(height: 12.h),
+                        Center(
+                          child: Text(
+                            'Belum ada transaksi yang cocok.',
+                            style: GoogleFonts.inter(
+                              fontSize: 13.sp,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   )
                 : Builder(
