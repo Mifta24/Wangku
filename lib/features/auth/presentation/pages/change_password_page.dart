@@ -85,7 +85,13 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 24.h),
-          child: _success ? _SuccessView(onBack: () => context.go('/dashboard')) : _FormView(
+          child: _success ? _SuccessView(onBack: () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            } else {
+              context.go('/dashboard');
+            }
+          }) : _FormView(
             formKey: _formKey,
             newPassController: _newPassController,
             confirmPassController: _confirmPassController,
@@ -296,6 +302,7 @@ class _SuccessView extends StatelessWidget {
         SizedBox(height: 40.h),
         AppButton(
           label: 'Kembali ke Profil',
+          // Profile page
           onPressed: onBack,
         ),
       ],

@@ -919,11 +919,7 @@ class _TransactionListPageState extends State<TransactionListPage> {
                   );
                 }
 
-                return Padding(
-                  padding: EdgeInsets.only(
-                    bottom: MediaQuery.of(context).viewInsets.bottom,
-                  ),
-                  child: Column(
+                return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Center(
@@ -1157,7 +1153,6 @@ class _TransactionListPageState extends State<TransactionListPage> {
                               ),
                       ),
                     ],
-                  ),
                 );
               },
             ),
@@ -1708,11 +1703,7 @@ class _TransactionListPageState extends State<TransactionListPage> {
                   );
                 }
 
-                return Padding(
-                  padding: EdgeInsets.only(
-                    bottom: MediaQuery.of(context).viewInsets.bottom,
-                  ),
-                  child: Column(
+                return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Center(
@@ -1883,7 +1874,6 @@ class _TransactionListPageState extends State<TransactionListPage> {
                         ),
                       ),
                     ],
-                  ),
                 );
               },
             ),

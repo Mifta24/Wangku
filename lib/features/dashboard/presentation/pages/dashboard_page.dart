@@ -27,7 +27,6 @@ import 'notifications_page.dart';
 import '../widgets/account_profile_sheet.dart';
 import '../widgets/export_transactions_sheet.dart';
 import '../widgets/manage_notifications_sheet.dart';
-import '../widgets/manage_shortcuts_sheet.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -484,10 +483,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 );
               }
 
-              return Padding(
-                padding: EdgeInsets.only(
-                    bottom: MediaQuery.of(context).viewInsets.bottom),
-                child: Column(
+              return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // ── Drag handle ──
@@ -818,7 +814,6 @@ class _DashboardPageState extends State<DashboardPage> {
                             ),
                     ),
                   ],
-                ),
               );
             },
           ),
@@ -834,6 +829,35 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _handleLogout() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+        title: Text(
+          'Keluar Akun',
+          style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          'Yakin ingin keluar dari akun ini?',
+          style: GoogleFonts.inter(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Batal',
+                style: GoogleFonts.inter(color: AppColors.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Keluar',
+                style: GoogleFonts.inter(
+                    color: AppColors.error, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    if (!mounted) return;
     await context.read<AuthProvider>().logout();
     if (!mounted) return;
     context.goNamed('login');
@@ -1703,20 +1727,6 @@ class _ProfileTab extends StatelessWidget {
                         isScrollControlled: true,
                         backgroundColor: Colors.transparent,
                         builder: (context) => const AccountProfileSheet(),
-                      ),
-                    ),
-                    _divider(),
-                    _buildSettingTile(
-                      context,
-                      icon: Icons.flash_on_outlined,
-                      iconColor: AppColors.primary,
-                      title: 'Manajemen Shortcut',
-                      subtitle: 'Atur shortcut transaksi favorit',
-                      onTap: () => showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        backgroundColor: Colors.transparent,
-                        builder: (context) => const ManageShortcutsSheet(),
                       ),
                     ),
                     _divider(),
