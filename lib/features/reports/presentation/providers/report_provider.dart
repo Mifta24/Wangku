@@ -52,6 +52,8 @@ class ReportProvider extends ChangeNotifier {
   double _totalAmount = 0.0;
   double _incomeTotal = 0.0;
   double _expenseTotal = 0.0;
+  double _previousIncomeTotal = 0.0;
+  double _previousExpenseTotal = 0.0;
   bool _isLoading = false;
   TransactionProvider? _transactionProvider;
 
@@ -90,6 +92,12 @@ class ReportProvider extends ChangeNotifier {
   double get incomeTotal => _incomeTotal;
   double get expenseTotal => _expenseTotal;
   double get netAmount => _incomeTotal - _expenseTotal;
+  double get previousNetAmount => _previousIncomeTotal - _previousExpenseTotal;
+  double? get netChangePercentage {
+    final prev = previousNetAmount;
+    if (prev == 0) return null;
+    return (netAmount - prev) / prev.abs() * 100;
+  }
   bool get isLoading => _isLoading;
 
   void setPeriodType(PeriodType type) {
@@ -174,15 +182,25 @@ class ReportProvider extends ChangeNotifier {
     try {
       final userId = _userId;
       if (userId == null) return;
-      
-      _transactions = await _repository.getTransactions(
-        userId: userId,
-        startDate: start,
-        endDate: end,
-      );
+
+      final (prevStart, prevEnd) = _previousPeriodRange();
+      final results = await Future.wait([
+        _repository.getTransactions(userId: userId, startDate: start, endDate: end),
+        _repository.getTransactions(userId: userId, startDate: prevStart, endDate: prevEnd),
+      ]);
+      _transactions = results[0];
+      final prevTx = results[1];
+      _previousIncomeTotal = prevTx
+          .where((t) => t.type == 'income')
+          .fold(0.0, (s, t) => s + t.amount);
+      _previousExpenseTotal = prevTx
+          .where((t) => t.type == 'expense')
+          .fold(0.0, (s, t) => s + t.amount);
     } catch (e) {
       debugPrint('Error loading report data: $e');
       _transactions = [];
+      _previousIncomeTotal = 0.0;
+      _previousExpenseTotal = 0.0;
     }
 
     _processData();
@@ -264,6 +282,28 @@ class ReportProvider extends ChangeNotifier {
       case PeriodType.year:
         final start = DateTime(_currentDate.year, 1, 1);
         return (start, DateTime(_currentDate.year + 1, 1, 1));
+    }
+  }
+
+  (DateTime, DateTime) _previousPeriodRange() {
+    switch (_periodType) {
+      case PeriodType.week:
+        final weekday = _currentDate.weekday;
+        final currentStart = DateTime(
+          _currentDate.year,
+          _currentDate.month,
+          _currentDate.day,
+        ).subtract(Duration(days: weekday - 1));
+        return (currentStart.subtract(const Duration(days: 7)), currentStart);
+      case PeriodType.month:
+        final prevStart = DateTime(_currentDate.year, _currentDate.month - 1, 1);
+        final prevEnd = DateTime(_currentDate.year, _currentDate.month, 1);
+        return (prevStart, prevEnd);
+      case PeriodType.year:
+        return (
+          DateTime(_currentDate.year - 1, 1, 1),
+          DateTime(_currentDate.year, 1, 1),
+        );
     }
   }
 

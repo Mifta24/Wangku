@@ -195,7 +195,13 @@ class _ReportsPageState extends State<ReportsPage> {
   Widget _buildSurplusCard(ReportProvider report) {
     final isSurplus = report.netAmount >= 0;
     final netColor = isSurplus ? AppColors.income : AppColors.expense;
-    final label = isSurplus ? 'Surplus Bulan Ini' : 'Defisit Bulan Ini';
+    final periodLabel = switch (report.periodType) {
+      PeriodType.week => 'Minggu Ini',
+      PeriodType.month => 'Bulan Ini',
+      PeriodType.year => 'Tahun Ini',
+    };
+    final label = isSurplus ? 'Surplus $periodLabel' : 'Defisit $periodLabel';
+    final changePercent = report.netChangePercentage;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -222,13 +228,22 @@ class _ReportsPageState extends State<ReportsPage> {
             ),
           ),
           const SizedBox(height: 6),
-          Text(
-            _formatCurrency(report.netAmount.abs()),
-            style: GoogleFonts.inter(
-              fontSize: 26,
-              fontWeight: FontWeight.w800,
-              color: netColor,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                _formatCurrency(report.netAmount.abs()),
+                style: GoogleFonts.inter(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  color: netColor,
+                ),
+              ),
+              if (changePercent != null) ...[
+                const SizedBox(width: 10),
+                _buildChangeChip(changePercent, report.periodType),
+              ],
+            ],
           ),
           const SizedBox(height: 12),
           Row(
@@ -247,6 +262,45 @@ class _ReportsPageState extends State<ReportsPage> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildChangeChip(double changePercent, PeriodType periodType) {
+    final isImproved = changePercent >= 0;
+    final color = isImproved ? AppColors.income : AppColors.expense;
+    final icon = isImproved ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded;
+    final sign = isImproved ? '+' : '-';
+    final absPercent = changePercent.abs().toStringAsFixed(1);
+    final prevLabel = switch (periodType) {
+      PeriodType.week => 'minggu lalu',
+      PeriodType.month => 'bulan lalu',
+      PeriodType.year => 'tahun lalu',
+    };
+
+    return Tooltip(
+      message: 'Dibanding $prevLabel',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 11, color: color),
+            const SizedBox(width: 2),
+            Text(
+              '$sign$absPercent%',
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -411,8 +465,9 @@ class _ReportsPageState extends State<ReportsPage> {
             interval: 1,
             getTitlesWidget: (value, meta) {
               final index = value.round();
-              if (index < 0 || index >= points.length)
+              if (index < 0 || index >= points.length) {
                 return const SizedBox.shrink();
+              }
               return Padding(
                 padding: const EdgeInsets.only(top: 6),
                 child: Text(
@@ -636,8 +691,8 @@ class _ReportsPageState extends State<ReportsPage> {
             // Donut chart - centered
             Center(
               child: SizedBox(
-                width: 160,
-                height: 160,
+                width: 210,
+                height: 210,
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
@@ -657,7 +712,7 @@ class _ReportsPageState extends State<ReportsPage> {
                           },
                         ),
                         sectionsSpace: 2,
-                        centerSpaceRadius: 50,
+                        centerSpaceRadius: 68,
                         startDegreeOffset: 270,
                         sections: report.categories.map((c) {
                           final isZero = report.totalAmount == 0;
@@ -673,66 +728,72 @@ class _ReportsPageState extends State<ReportsPage> {
                             color: color,
                             value: isZero ? 1 : c.total,
                             title: '',
-                            radius: isSelected ? 28 : 22,
+                            radius: isSelected ? 36 : 28,
                           );
                         }).toList(),
                       ),
                     ),
-                    Builder(builder: (context) {
-                      if (selectedCategory == null) {
+                    SizedBox(
+                      width: 120,
+                      child: Builder(builder: (context) {
+                        if (selectedCategory == null) {
+                          return Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Total $typeLabel',
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                style: GoogleFonts.inter(
+                                  fontSize: 10,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                _formatCurrency(report.totalAmount),
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          );
+                        }
                         return Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            if (selectedCategory.icon.isNotEmpty)
+                              Text(
+                                selectedCategory.icon,
+                                style: const TextStyle(fontSize: 20),
+                              ),
                             Text(
-                              _formatCurrency(report.totalAmount),
+                              selectedCategory.name,
                               textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                               style: GoogleFonts.inter(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textPrimary,
+                                fontSize: 10,
+                                color: AppColors.textSecondary,
                               ),
                             ),
+                            const SizedBox(height: 3),
                             Text(
-                              'Total\n$typeLabel',
+                              _formatCurrency(selectedCategory.total),
                               textAlign: TextAlign.center,
                               style: GoogleFonts.inter(
-                                fontSize: 9,
-                                color: AppColors.textSecondary,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.textPrimary,
                               ),
                             ),
                           ],
                         );
-                      }
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (selectedCategory.icon.isNotEmpty)
-                            Text(
-                              selectedCategory.icon,
-                              style: const TextStyle(fontSize: 18),
-                            ),
-                          Text(
-                            _formatCurrency(selectedCategory.total),
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          Text(
-                            selectedCategory.name,
-                            textAlign: TextAlign.center,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(
-                              fontSize: 10,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      );
-                    }),
+                      }),
+                    ),
                   ],
                 ),
               ),

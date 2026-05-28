@@ -13,16 +13,19 @@ import '../../../transactions/domain/models/transaction_model.dart';
 class ReportExportService {
   Future<String?> exportCsv({required List<TransactionModel> transactions}) async {
     final buffer = StringBuffer();
-    buffer.writeln('Tanggal,Tipe,Kategori,Catatan,Jumlah');
+    buffer.writeln('No.,Tanggal,Tipe,Kategori,Catatan,Jumlah');
 
-    final dateFmt = DateFormat('yyyy-MM-dd');
-    for (final tx in transactions) {
+    final dateFmt = DateFormat('dd/MM/yyyy');
+    final sorted = List<TransactionModel>.from(transactions)
+      ..sort((a, b) => a.date.compareTo(b.date));
+    for (var i = 0; i < sorted.length; i++) {
+      final tx = sorted[i];
       final date = dateFmt.format(tx.date);
-      final type = tx.type;
+      final type = tx.type == 'income' ? 'Pemasukan' : 'Pengeluaran';
       final category = tx.category?.name ?? 'Uncategorized';
       final note = _escapeCsv(tx.note);
       final amount = tx.amount.toStringAsFixed(0);
-      buffer.writeln('$date,$type,$category,$note,$amount');
+      buffer.writeln('${i + 1},$date,$type,$category,$note,$amount');
     }
 
     final dir = await getApplicationDocumentsDirectory();
@@ -100,6 +103,9 @@ class ReportExportService {
         ),
       );
     }
+
+    final sortedTx = List<TransactionModel>.from(transactions)
+      ..sort((a, b) => a.date.compareTo(b.date));
 
     pdf.addPage(
       pw.MultiPage(
@@ -201,7 +207,7 @@ class ReportExportService {
 
           // ── Table title ──────────────────────────────────────────────
           pw.Text(
-            'Detail Transaksi  (${transactions.length} transaksi)',
+            'Detail Transaksi  (${sortedTx.length} transaksi)',
             style: pw.TextStyle(
               fontSize: 12,
               fontWeight: pw.FontWeight.bold,
@@ -214,16 +220,18 @@ class ReportExportService {
           pw.Table(
             border: pw.TableBorder.all(color: borderColor, width: 0.5),
             columnWidths: {
-              0: const pw.FixedColumnWidth(62),
-              1: const pw.FixedColumnWidth(52),
-              2: const pw.FlexColumnWidth(2),
+              0: const pw.FixedColumnWidth(24),
+              1: const pw.FixedColumnWidth(58),
+              2: const pw.FixedColumnWidth(56),
               3: const pw.FlexColumnWidth(2),
-              4: const pw.FixedColumnWidth(78),
+              4: const pw.FlexColumnWidth(2),
+              5: const pw.FixedColumnWidth(72),
             },
             children: [
               pw.TableRow(
                 decoration: const pw.BoxDecoration(color: primaryColor),
                 children: [
+                  'No.',
                   'Tanggal',
                   'Tipe',
                   'Kategori',
@@ -244,7 +252,7 @@ class ReportExportService {
                   );
                 }).toList(),
               ),
-              ...transactions.asMap().entries.map((entry) {
+              ...sortedTx.asMap().entries.map((entry) {
                 final i = entry.key;
                 final tx = entry.value;
                 final isIncome = tx.type == 'income';
@@ -255,6 +263,12 @@ class ReportExportService {
                     pw.Padding(
                       padding: const pw.EdgeInsets.symmetric(
                           horizontal: 6, vertical: 5),
+                      child: pw.Text('${i + 1}',
+                          style: const pw.TextStyle(fontSize: 8)),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 5),
                       child: pw.Text(dateFmt.format(tx.date),
                           style: const pw.TextStyle(fontSize: 8)),
                     ),
@@ -262,7 +276,7 @@ class ReportExportService {
                       padding: const pw.EdgeInsets.symmetric(
                           horizontal: 6, vertical: 5),
                       child: pw.Text(
-                        isIncome ? 'Masuk' : 'Keluar',
+                        isIncome ? 'Pemasukan' : 'Pengeluaran',
                         style: pw.TextStyle(
                           fontSize: 8,
                           fontWeight: pw.FontWeight.bold,
@@ -315,31 +329,35 @@ class ReportExportService {
   }
 
   Future<String?> exportExcel({required List<TransactionModel> transactions}) async {
-    final dateFmt = DateFormat('yyyy-MM-dd');
+    final dateFmt = DateFormat('dd/MM/yyyy');
     final excel = Excel.createExcel();
     final sheet = excel['Laporan'];
 
     // Header
-    final headers = ['Tanggal', 'Tipe', 'Kategori', 'Catatan', 'Jumlah'];
+    final headers = ['No.', 'Tanggal', 'Tipe', 'Kategori', 'Catatan', 'Jumlah'];
     for (var i = 0; i < headers.length; i++) {
       sheet
           .cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0))
           .value = TextCellValue(headers[i]);
     }
 
-    // Data rows
-    for (var rowIdx = 0; rowIdx < transactions.length; rowIdx++) {
-      final tx = transactions[rowIdx];
+    // Data rows sorted by date ascending
+    final sorted = List<TransactionModel>.from(transactions)
+      ..sort((a, b) => a.date.compareTo(b.date));
+    for (var rowIdx = 0; rowIdx < sorted.length; rowIdx++) {
+      final tx = sorted[rowIdx];
       final row = rowIdx + 1;
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value =
-          TextCellValue(dateFmt.format(tx.date));
+          IntCellValue(rowIdx + 1);
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value =
-          TextCellValue(tx.type);
+          TextCellValue(dateFmt.format(tx.date));
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value =
-          TextCellValue(tx.category?.name ?? 'Uncategorized');
+          TextCellValue(tx.type == 'income' ? 'Pemasukan' : 'Pengeluaran');
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value =
-          TextCellValue(tx.note);
+          TextCellValue(tx.category?.name ?? 'Uncategorized');
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value =
+          TextCellValue(tx.note);
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value =
           DoubleCellValue(tx.amount);
     }
 
