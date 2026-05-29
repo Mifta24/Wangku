@@ -56,6 +56,7 @@ class ReportProvider extends ChangeNotifier {
   double _previousExpenseTotal = 0.0;
   bool _isLoading = false;
   TransactionProvider? _transactionProvider;
+  int _loadRequestId = 0;
 
   ReportProvider({String? userId}) : _userId = userId {
     if (_userId != null) {
@@ -77,6 +78,13 @@ class ReportProvider extends ChangeNotifier {
   }
 
   void refreshFromTransactions(List<TransactionModel> transactions) {
+    final (start, end) = _currentPeriodRange();
+    final provider = _transactionProvider;
+    if (provider != null && !provider.hasLoadedRange(start, end)) {
+      _loadData();
+      return;
+    }
+
     _transactions = _filterTransactionsForCurrentPeriod(transactions);
     _processData(notify: true);
   }
@@ -158,51 +166,44 @@ class ReportProvider extends ChangeNotifier {
   }
 
   Future<void> _loadData() async {
+    final requestId = ++_loadRequestId;
     _isLoading = true;
     notifyListeners();
 
-    DateTime start, end;
-    switch (_periodType) {
-      case PeriodType.week:
-        final weekday = _currentDate.weekday;
-        start = _currentDate.subtract(Duration(days: weekday - 1));
-        start = DateTime(start.year, start.month, start.day);
-        end = start.add(const Duration(days: 7));
-        break;
-      case PeriodType.month:
-        start = DateTime(_currentDate.year, _currentDate.month, 1);
-        end = DateTime(_currentDate.year, _currentDate.month + 1, 1);
-        break;
-      case PeriodType.year:
-        start = DateTime(_currentDate.year, 1, 1);
-        end = DateTime(_currentDate.year + 1, 1, 1);
-        break;
-    }
+    final (start, end) = _currentPeriodRange();
 
     try {
       final userId = _userId;
-      if (userId == null) return;
+      if (userId == null) {
+        _transactions = [];
+        _previousIncomeTotal = 0.0;
+        _previousExpenseTotal = 0.0;
+      } else {
+        final (prevStart, prevEnd) = _previousPeriodRange();
+        final results = await Future.wait([
+          _repository.getTransactions(userId: userId, startDate: start, endDate: end),
+          _repository.getTransactions(userId: userId, startDate: prevStart, endDate: prevEnd),
+        ]);
+        if (requestId != _loadRequestId) return;
 
-      final (prevStart, prevEnd) = _previousPeriodRange();
-      final results = await Future.wait([
-        _repository.getTransactions(userId: userId, startDate: start, endDate: end),
-        _repository.getTransactions(userId: userId, startDate: prevStart, endDate: prevEnd),
-      ]);
-      _transactions = results[0];
-      final prevTx = results[1];
-      _previousIncomeTotal = prevTx
-          .where((t) => t.type == 'income')
-          .fold(0.0, (s, t) => s + t.amount);
-      _previousExpenseTotal = prevTx
-          .where((t) => t.type == 'expense')
-          .fold(0.0, (s, t) => s + t.amount);
+        _transactions = _filterTransactionsInRange(results[0], start, end);
+        final prevTx = _filterTransactionsInRange(results[1], prevStart, prevEnd);
+        _previousIncomeTotal = prevTx
+            .where((t) => t.type == 'income')
+            .fold(0.0, (s, t) => s + t.amount);
+        _previousExpenseTotal = prevTx
+            .where((t) => t.type == 'expense')
+            .fold(0.0, (s, t) => s + t.amount);
+      }
     } catch (e) {
+      if (requestId != _loadRequestId) return;
       debugPrint('Error loading report data: $e');
       _transactions = [];
       _previousIncomeTotal = 0.0;
       _previousExpenseTotal = 0.0;
     }
 
+    if (requestId != _loadRequestId) return;
     _processData();
     _isLoading = false;
     notifyListeners();
@@ -261,6 +262,14 @@ class ReportProvider extends ChangeNotifier {
     List<TransactionModel> transactions,
   ) {
     final (start, end) = _currentPeriodRange();
+    return _filterTransactionsInRange(transactions, start, end);
+  }
+
+  List<TransactionModel> _filterTransactionsInRange(
+    List<TransactionModel> transactions,
+    DateTime start,
+    DateTime end,
+  ) {
     return transactions
         .where((t) => !t.date.isBefore(start) && t.date.isBefore(end))
         .toList();
@@ -310,7 +319,12 @@ class ReportProvider extends ChangeNotifier {
   void _onTransactionsChanged() {
     final provider = _transactionProvider;
     if (provider == null) return;
-    refreshFromTransactions(provider.transactions);
+    final (start, end) = _currentPeriodRange();
+    if (provider.hasLoadedRange(start, end)) {
+      refreshFromTransactions(provider.transactions);
+    } else {
+      _loadData();
+    }
   }
 
   @override

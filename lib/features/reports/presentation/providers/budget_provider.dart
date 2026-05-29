@@ -4,12 +4,14 @@ import '../../../../core/database/hive_manager.dart';
 import '../../../../core/notifications/app_notification_record.dart';
 import '../../../../core/notifications/notification_service.dart';
 import '../../../dashboard/data/repositories/app_notification_repository.dart';
+import '../../../transactions/data/repositories/transaction_repository.dart';
 import '../../../transactions/presentation/providers/transaction_provider.dart';
 import '../../data/repositories/budget_repository.dart';
 
 class BudgetProvider extends ChangeNotifier {
   final TransactionProvider txnProvider;
   final BudgetRepository _budgetRepository = BudgetRepository();
+  final TransactionRepository _transactionRepository = TransactionRepository();
   final HiveManager _hiveManager = HiveManager.instance;
   final AppNotificationRepository _notificationRepository =
       AppNotificationRepository();
@@ -22,6 +24,7 @@ class BudgetProvider extends ChangeNotifier {
   bool _alertInProgress = false;
   bool _isDisposed = false;
   bool _notificationsEnabled = true;
+  DateTime _selectedMonth = DateTime.now();
 
   static const double _warningThreshold = 0.8;
 
@@ -33,10 +36,34 @@ class BudgetProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get notificationsEnabled => _notificationsEnabled;
+  DateTime get selectedMonth => _selectedMonth;
+  bool get isCurrentMonth => _isSameMonth(_selectedMonth, DateTime.now());
+  String get periodLabel {
+    const months = [
+      'Januari',
+      'Februari',
+      'Maret',
+      'April',
+      'Mei',
+      'Juni',
+      'Juli',
+      'Agustus',
+      'September',
+      'Oktober',
+      'November',
+      'Desember',
+    ];
+    return '${months[_selectedMonth.month - 1]} ${_selectedMonth.year}';
+  }
 
   double get monthExpense {
-    return txnProvider.monthTransactions
-        .where((t) => t.type == 'expense' && _categoryBudgets.containsKey(t.categoryId))
+    return txnProvider.transactions
+        .where(
+          (t) =>
+              t.type == 'expense' &&
+              _categoryBudgets.containsKey(t.categoryId) &&
+              _isSameMonth(t.date, _selectedMonth),
+        )
         .fold<double>(0.0, (p, e) => p + e.amount);
   }
 
@@ -44,8 +71,13 @@ class BudgetProvider extends ChangeNotifier {
       _categoryBudgets.values.fold(0.0, (sum, v) => sum + v);
 
   double categoryExpense(String categoryId) {
-    return txnProvider.monthTransactions
-        .where((t) => t.type == 'expense' && t.categoryId == categoryId)
+    return txnProvider.transactions
+        .where(
+          (t) =>
+              t.type == 'expense' &&
+              t.categoryId == categoryId &&
+              _isSameMonth(t.date, _selectedMonth),
+        )
         .fold<double>(0.0, (p, e) => p + e.amount);
   }
 
@@ -93,14 +125,20 @@ class BudgetProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
-  Future<void> loadCategoryBudgets(String userId) async {
+  Future<void> loadCategoryBudgets(String userId, [DateTime? month]) async {
     _userId = userId;
+    if (month != null) {
+      _selectedMonth = DateTime(month.year, month.month, 1);
+    }
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
     try {
       // Supabase utama, Hive fallback (ditangani di repository)
-      _categoryBudgets = await _budgetRepository.getCategoryBudgets(userId);
+      _categoryBudgets = await _budgetRepository.getCategoryBudgets(
+        userId,
+        _selectedMonth,
+      );
       // Reset alert date cache supaya dicek ulang dari Hive
       _lastBudgetAlertDate = await _hiveManager.getBudgetAlertLastDate(userId);
     } catch (e) {
@@ -108,6 +146,68 @@ class BudgetProvider extends ChangeNotifier {
     }
     _isLoading = false;
     notifyListeners();
+  }
+
+  Future<void> setSelectedMonth(String userId, DateTime month) async {
+    final now = DateTime.now();
+    final currentMonth = DateTime(now.year, now.month, 1);
+    final targetMonth = DateTime(month.year, month.month, 1);
+    if (targetMonth.isAfter(currentMonth)) return;
+    await loadCategoryBudgets(userId, targetMonth);
+  }
+
+  Future<void> previousMonth(String userId) {
+    return setSelectedMonth(
+      userId,
+      DateTime(_selectedMonth.year, _selectedMonth.month - 1, 1),
+    );
+  }
+
+  Future<void> nextMonth(String userId) {
+    return setSelectedMonth(
+      userId,
+      DateTime(_selectedMonth.year, _selectedMonth.month + 1, 1),
+    );
+  }
+
+  Future<bool> copyPreviousMonthBudgets(String userId) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      final previousMonth = DateTime(
+        _selectedMonth.year,
+        _selectedMonth.month - 1,
+        1,
+      );
+      final previousBudgets = await _budgetRepository.getCategoryBudgets(
+        userId,
+        previousMonth,
+      );
+      if (previousBudgets.isEmpty) {
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      for (final entry in previousBudgets.entries) {
+        await _budgetRepository.saveCategoryBudget(
+          userId,
+          entry.key,
+          entry.value,
+          _selectedMonth,
+        );
+      }
+      _categoryBudgets = previousBudgets;
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
   }
 
   Future<void> saveCategoryBudget(
@@ -120,7 +220,12 @@ class BudgetProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
     try {
-      await _budgetRepository.saveCategoryBudget(userId, categoryId, amount);
+      await _budgetRepository.saveCategoryBudget(
+        userId,
+        categoryId,
+        amount,
+        _selectedMonth,
+      );
       _categoryBudgets = {..._categoryBudgets, categoryId: amount};
     } catch (e) {
       _errorMessage = e.toString();
@@ -134,7 +239,11 @@ class BudgetProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
     try {
-      await _budgetRepository.deleteCategoryBudget(userId, categoryId);
+      await _budgetRepository.deleteCategoryBudget(
+        userId,
+        categoryId,
+        _selectedMonth,
+      );
       _categoryBudgets = Map.from(_categoryBudgets)..remove(categoryId);
     } catch (e) {
       _errorMessage = e.toString();
@@ -147,16 +256,21 @@ class BudgetProvider extends ChangeNotifier {
   Future<void> checkCategoryWarningAfterTransaction(
     String categoryId,
     String categoryName,
+    DateTime transactionDate,
   ) async {
     if (!_notificationsEnabled) return;
-    final budget = categoryBudget(categoryId);
+    if (!_isSameMonth(transactionDate, DateTime.now())) return;
+    final budget = await _categoryBudgetForMonth(categoryId, DateTime.now());
     if (budget == null || budget <= 0) return;
 
-    final expense = categoryExpense(categoryId);
+    final expense = await _categoryExpenseForMonth(
+      categoryId,
+      DateTime.now(),
+    ).catchError((_) => categoryExpense(categoryId));
     final ratio = expense / budget;
     if (ratio < _warningThreshold) return;
 
-    final rem = categoryRemaining(categoryId);
+    final rem = budget - expense;
     final userId = _userId;
     if (userId != null) {
       final isOver = ratio >= 1.0;
@@ -254,6 +368,54 @@ class BudgetProvider extends ChangeNotifier {
   bool _isSameDay(DateTime? a, DateTime b) {
     if (a == null) return false;
     return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  bool _isSameMonth(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month;
+  }
+
+  Future<double> _categoryExpenseForMonth(
+    String categoryId,
+    DateTime month,
+  ) async {
+    final start = DateTime(month.year, month.month, 1);
+    final end = DateTime(month.year, month.month + 1, 1);
+    final userId = _userId;
+
+    if (txnProvider.hasLoadedRange(start, end)) {
+      return txnProvider.transactions
+          .where(
+            (t) =>
+                t.type == 'expense' &&
+                t.categoryId == categoryId &&
+                !t.date.isBefore(start) &&
+                t.date.isBefore(end),
+          )
+          .fold<double>(0.0, (p, e) => p + e.amount);
+    }
+
+    if (userId == null) return categoryExpense(categoryId);
+
+    final transactions = await _transactionRepository.getTransactions(
+      userId: userId,
+      startDate: start,
+      endDate: end,
+    );
+
+    return transactions
+        .where((t) => t.type == 'expense' && t.categoryId == categoryId)
+        .fold<double>(0.0, (p, e) => p + e.amount);
+  }
+
+  Future<double?> _categoryBudgetForMonth(
+    String categoryId,
+    DateTime month,
+  ) async {
+    if (_isSameMonth(month, _selectedMonth)) return categoryBudget(categoryId);
+    final userId = _userId;
+    if (userId == null) return null;
+    final budgets = await _budgetRepository.getCategoryBudgets(userId, month);
+    return budgets[categoryId];
   }
 
   @override

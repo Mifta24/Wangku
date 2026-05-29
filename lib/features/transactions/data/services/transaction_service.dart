@@ -28,7 +28,7 @@ class TransactionService {
         query = query.gte('date', startDate.toIso8601String());
       }
       if (endDate != null) {
-        query = query.lte('date', endDate.toIso8601String());
+        query = query.lt('date', endDate.toIso8601String());
       }
 
       final response = await query.order('date', ascending: false);

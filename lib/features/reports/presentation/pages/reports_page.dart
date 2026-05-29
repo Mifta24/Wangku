@@ -26,6 +26,7 @@ class _ReportsPageState extends State<ReportsPage> {
   String? _selectedCategoryId;
   List<LineBarSpot> _persistedTrendSpots = [];
   List<LineBarSpot> _tempTouchSpots = [];
+  final GlobalKey _pieChartKey = GlobalKey();
 
   String _formatCurrency(double amount) => _currencyFormatter.format(amount);
 
@@ -44,6 +45,74 @@ class _ReportsPageState extends State<ReportsPage> {
           ? null
           : category.categoryId;
     });
+  }
+
+  void _clearSelectedCategory() {
+    if (_selectedCategoryId == null) return;
+    setState(() => _selectedCategoryId = null);
+  }
+
+  void _clearCategoryIfOutsideDonut(Offset localPosition) {
+    const chartSize = 190.0;
+    const outerRadius = 92.0;
+    const centerSpaceRadius = 60.0;
+    final center = Offset(chartSize / 2, chartSize / 2);
+    final distance = (localPosition - center).distance;
+
+    if (distance > outerRadius || distance < centerSpaceRadius) {
+      _clearSelectedCategory();
+    }
+  }
+
+  void _clearCategoryIfOutsidePieChart(PointerUpEvent event) {
+    final renderObject = _pieChartKey.currentContext?.findRenderObject();
+    if (renderObject is! RenderBox) return;
+
+    final localPosition = renderObject.globalToLocal(event.position);
+    final chartSize = renderObject.size;
+    final isInsideChartBox =
+        localPosition.dx >= 0 &&
+        localPosition.dy >= 0 &&
+        localPosition.dx <= chartSize.width &&
+        localPosition.dy <= chartSize.height;
+
+    if (!isInsideChartBox) {
+      _clearSelectedCategory();
+    }
+  }
+
+  void _clearCategoryFromPageTap(TapDownDetails details) {
+    if (_selectedCategoryId == null) return;
+
+    final renderObject = _pieChartKey.currentContext?.findRenderObject();
+    if (renderObject is! RenderBox) {
+      _clearSelectedCategory();
+      return;
+    }
+
+    final localPosition = renderObject.globalToLocal(details.globalPosition);
+    final chartSize = renderObject.size;
+    final isInsideChartBox =
+        localPosition.dx >= 0 &&
+        localPosition.dy >= 0 &&
+        localPosition.dx <= chartSize.width &&
+        localPosition.dy <= chartSize.height;
+
+    if (!isInsideChartBox) {
+      _clearSelectedCategory();
+      return;
+    }
+
+    final center = Offset(chartSize.width / 2, chartSize.height / 2);
+    final distance = (localPosition - center).distance;
+    const centerSpaceRadius = 60.0;
+    const maxSelectedDonutRadius = 92.0;
+    final isInsideDonutRing =
+        distance >= centerSpaceRadius && distance <= maxSelectedDonutRadius;
+
+    if (!isInsideDonutRing) {
+      _clearSelectedCategory();
+    }
   }
 
   List<LineBarSpot> _orderedTrendSpots(List<LineBarSpot> spots) {
@@ -77,8 +146,11 @@ class _ReportsPageState extends State<ReportsPage> {
 
     return Consumer<ReportProvider>(
       builder: (context, report, _) {
-        return SafeArea(
-          child: Column(
+        return GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTapDown: _clearCategoryFromPageTap,
+          child: SafeArea(
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildHeader(),
@@ -105,6 +177,7 @@ class _ReportsPageState extends State<ReportsPage> {
                       ),
               ),
             ],
+          ),
           ),
         );
       },
@@ -505,6 +578,13 @@ class _ReportsPageState extends State<ReportsPage> {
               : _orderedTrendSpots(touchedSpots);
 
           if (event is FlTapUpEvent) {
+            if (nextSpots.isEmpty && _tempTouchSpots.isEmpty) {
+              if (_persistedTrendSpots.isNotEmpty) {
+                setState(() => _persistedTrendSpots = []);
+              }
+              return;
+            }
+
             final selectedSpots = nextSpots.isNotEmpty
                 ? nextSpots
                 : _tempTouchSpots;
@@ -521,9 +601,19 @@ class _ReportsPageState extends State<ReportsPage> {
             return;
           }
 
-          if (!event.isInterestedForInteractions || nextSpots.isEmpty) {
+          if (!event.isInterestedForInteractions) {
             if (_tempTouchSpots.isNotEmpty) {
               setState(() => _tempTouchSpots = []);
+            }
+            return;
+          }
+
+          if (nextSpots.isEmpty) {
+            if (_tempTouchSpots.isNotEmpty || _persistedTrendSpots.isNotEmpty) {
+              setState(() {
+                _tempTouchSpots = [];
+                _persistedTrendSpots = [];
+              });
             }
             return;
           }
@@ -598,21 +688,24 @@ class _ReportsPageState extends State<ReportsPage> {
         : 'Pemasukan';
     final selectedCategory = _selectedCategory(report);
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerUp: _clearCategoryIfOutsidePieChart,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE5E7EB)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Section title + toggle
@@ -661,65 +754,102 @@ class _ReportsPageState extends State<ReportsPage> {
           else ...[
             // Donut chart - centered
             Center(
-              child: SizedBox(
-                width: 210,
-                height: 210,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    PieChart(
-                      PieChartData(
-                        pieTouchData: PieTouchData(
-                          touchCallback: (event, response) {
-                            if (event is! FlTapUpEvent) return;
-                            final index =
-                                response?.touchedSection?.touchedSectionIndex ??
-                                -1;
-                            if (index < 0 ||
-                                index >= report.categories.length) {
-                              return;
-                            }
-                            _selectCategory(report.categories[index]);
-                          },
+              child: Listener(
+                behavior: HitTestBehavior.translucent,
+                onPointerUp: (event) =>
+                    _clearCategoryIfOutsideDonut(event.localPosition),
+                child: SizedBox(
+                  key: _pieChartKey,
+                  width: 190,
+                  height: 190,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      PieChart(
+                        PieChartData(
+                          pieTouchData: PieTouchData(
+                            touchCallback: (event, response) {
+                              if (event is! FlTapUpEvent) return;
+                              final index =
+                                  response?.touchedSection?.touchedSectionIndex ??
+                                  -1;
+                              if (index < 0 ||
+                                  index >= report.categories.length) {
+                                _clearSelectedCategory();
+                                return;
+                              }
+                              _selectCategory(report.categories[index]);
+                            },
+                          ),
+                          sectionsSpace: 2,
+                          centerSpaceRadius: 60,
+                          startDegreeOffset: 270,
+                          sections: report.categories.map((c) {
+                            final isZero = report.totalAmount == 0;
+                            final isSelected =
+                                c.categoryId == _selectedCategoryId;
+                            final color = Color(
+                              int.parse(
+                                'FF${c.color.replaceFirst('#', '')}',
+                                radix: 16,
+                              ),
+                            );
+                            // Pastikan setiap slice minimal 2% agar kategori kecil tetap terlihat
+                            final minValue = report.totalAmount * 0.02;
+                            final displayValue = isZero
+                                ? 1.0
+                                : (c.total < minValue ? minValue : c.total);
+                            return PieChartSectionData(
+                              color: color,
+                              value: displayValue,
+                              title: '',
+                              radius: isSelected ? 32 : 25,
+                            );
+                          }).toList(),
                         ),
-                        sectionsSpace: 2,
-                        centerSpaceRadius: 68,
-                        startDegreeOffset: 270,
-                        sections: report.categories.map((c) {
-                          final isZero = report.totalAmount == 0;
-                          final isSelected =
-                              c.categoryId == _selectedCategoryId;
-                          final color = Color(
-                            int.parse(
-                              'FF${c.color.replaceFirst('#', '')}',
-                              radix: 16,
-                            ),
-                          );
-                          // Pastikan setiap slice minimal 2% agar kategori kecil tetap terlihat
-                          final minValue = report.totalAmount * 0.02;
-                          final displayValue = isZero
-                              ? 1.0
-                              : (c.total < minValue ? minValue : c.total);
-                          return PieChartSectionData(
-                            color: color,
-                            value: displayValue,
-                            title: '',
-                            radius: isSelected ? 36 : 28,
-                          );
-                        }).toList(),
                       ),
-                    ),
-                    SizedBox(
-                      width: 120,
-                      child: Builder(builder: (context) {
-                        if (selectedCategory == null) {
+                      SizedBox(
+                        width: 110,
+                        child: Builder(builder: (context) {
+                          if (selectedCategory == null) {
+                            return Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Total $typeLabel',
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  _formatCurrency(report.totalAmount),
+                                  textAlign: TextAlign.center,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                              ],
+                            );
+                          }
                           return Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              if (selectedCategory.icon.isNotEmpty)
+                                Text(
+                                  selectedCategory.icon,
+                                  style: const TextStyle(fontSize: 20),
+                                ),
                               Text(
-                                'Total $typeLabel',
+                                selectedCategory.name,
                                 textAlign: TextAlign.center,
                                 maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                                 style: GoogleFonts.inter(
                                   fontSize: 10,
                                   color: AppColors.textSecondary,
@@ -727,7 +857,7 @@ class _ReportsPageState extends State<ReportsPage> {
                               ),
                               const SizedBox(height: 3),
                               Text(
-                                _formatCurrency(report.totalAmount),
+                                _formatCurrency(selectedCategory.total),
                                 textAlign: TextAlign.center,
                                 style: GoogleFonts.inter(
                                   fontSize: 13,
@@ -737,40 +867,10 @@ class _ReportsPageState extends State<ReportsPage> {
                               ),
                             ],
                           );
-                        }
-                        return Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (selectedCategory.icon.isNotEmpty)
-                              Text(
-                                selectedCategory.icon,
-                                style: const TextStyle(fontSize: 20),
-                              ),
-                            Text(
-                              selectedCategory.name,
-                              textAlign: TextAlign.center,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.inter(
-                                fontSize: 10,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              _formatCurrency(selectedCategory.total),
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                          ],
-                        );
-                      }),
-                    ),
-                  ],
+                        }),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -833,6 +933,7 @@ class _ReportsPageState extends State<ReportsPage> {
             }),
           ],
         ],
+        ),
       ),
     );
   }

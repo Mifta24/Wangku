@@ -211,14 +211,16 @@ class HiveManager {
     String userId,
     String categoryId,
     double monthlyBudget,
+    [DateTime? month]
   ) async {
     try {
       final box = _budgetBoxInstance ?? await Hive.openBox<dynamic>(_budgetBox);
-      final key = '${userId}_category_budget_$categoryId';
+      final key = _categoryBudgetKey(userId, categoryId, month);
       await box.put(key, {
         'userId': userId,
         'categoryId': categoryId,
         'amount': monthlyBudget,
+        'month': _monthKey(month ?? DateTime.now()),
         'createdAt': DateTime.now().toIso8601String(),
       });
     } catch (e) {
@@ -241,10 +243,15 @@ class HiveManager {
   }
 
   /// Get user budget per category
-  Future<double?> getCategoryBudget(String userId, String categoryId) async {
+  Future<double?> getCategoryBudget(
+    String userId,
+    String categoryId, [
+    DateTime? month,
+  ]) async {
     try {
       final box = _budgetBoxInstance ?? await Hive.openBox<dynamic>(_budgetBox);
-      final data = box.get('${userId}_category_budget_$categoryId');
+      final data = box.get(_categoryBudgetKey(userId, categoryId, month)) ??
+          box.get(_legacyCategoryBudgetKey(userId, categoryId));
       if (data == null) return null;
       return (data['amount'] as num).toDouble();
     } catch (e) {
@@ -316,11 +323,15 @@ class HiveManager {
   }
 
   /// Get all category budgets for user
-  Future<Map<String, double>> getCategoryBudgets(String userId) async {
+  Future<Map<String, double>> getCategoryBudgets(
+    String userId, [
+    DateTime? month,
+  ]) async {
     try {
       final box = _budgetBoxInstance ?? await Hive.openBox<dynamic>(_budgetBox);
       final budgets = <String, double>{};
-      final prefix = '${userId}_category_budget_';
+      final targetMonth = month ?? DateTime.now();
+      final prefix = '${userId}_category_budget_${_monthKey(targetMonth)}_';
 
       for (final key in box.keys) {
         if (key is String && key.startsWith(prefix)) {
@@ -330,6 +341,22 @@ class HiveManager {
           if (amount == null) continue;
           final categoryId = key.substring(prefix.length);
           budgets[categoryId] = (amount as num).toDouble();
+        }
+      }
+
+      if (budgets.isEmpty && _isSameMonth(targetMonth, DateTime.now())) {
+        final legacyPrefix = '${userId}_category_budget_';
+        for (final key in box.keys) {
+          if (key is String &&
+              key.startsWith(legacyPrefix) &&
+              !key.substring(legacyPrefix.length).contains('_')) {
+            final data = box.get(key);
+            if (data == null) continue;
+            final amount = data['amount'];
+            if (amount == null) continue;
+            final categoryId = key.substring(legacyPrefix.length);
+            budgets[categoryId] = (amount as num).toDouble();
+          }
         }
       }
 
@@ -528,14 +555,42 @@ class HiveManager {
   }
 
   /// Delete category budget
-  Future<void> deleteCategoryBudget(String userId, String categoryId) async {
+  Future<void> deleteCategoryBudget(
+    String userId,
+    String categoryId, [
+    DateTime? month,
+  ]) async {
     try {
       final box = _budgetBoxInstance ?? await Hive.openBox<dynamic>(_budgetBox);
-      await box.delete('${userId}_category_budget_$categoryId');
+      await box.delete(_categoryBudgetKey(userId, categoryId, month));
+      if (month == null || _isSameMonth(month, DateTime.now())) {
+        await box.delete(_legacyCategoryBudgetKey(userId, categoryId));
+      }
     } catch (e) {
       debugPrint('Error deleting category budget: $e');
       rethrow;
     }
+  }
+
+  String _categoryBudgetKey(
+    String userId,
+    String categoryId,
+    DateTime? month,
+  ) {
+    final target = month ?? DateTime.now();
+    return '${userId}_category_budget_${_monthKey(target)}_$categoryId';
+  }
+
+  String _legacyCategoryBudgetKey(String userId, String categoryId) {
+    return '${userId}_category_budget_$categoryId';
+  }
+
+  String _monthKey(DateTime month) {
+    return '${month.year.toString().padLeft(4, '0')}${month.month.toString().padLeft(2, '0')}';
+  }
+
+  bool _isSameMonth(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month;
   }
 
   Future<void> deleteCategory(String id) async {

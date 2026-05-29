@@ -223,6 +223,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           .checkCategoryWarningAfterTransaction(
                         _selectedCategoryId!,
                         cat.name,
+                        newTxn.date,
                       );
                     }
                   }

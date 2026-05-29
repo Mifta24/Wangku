@@ -168,7 +168,7 @@ class _FormView extends StatelessWidget {
           ),
           SizedBox(height: 6.h),
           Text(
-            'Password baru minimal 6 karakter.\nPastikan mudah diingat dan aman.',
+            'Password baru minimal 8 karakter.\nPastikan mudah diingat dan aman.',
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
               fontSize: 13.sp,
@@ -200,7 +200,7 @@ class _FormView extends StatelessWidget {
                 SizedBox(height: 8.h),
                 AppTextField(
                   controller: newPassController,
-                  hintText: 'Minimal 6 karakter',
+                  hintText: 'Minimal 8 karakter',
                   prefixIcon: LucideIcons.lock,
                   obscureText: obscureNew,
                   suffixIcon: _ToggleVisibilityButton(
@@ -209,7 +209,7 @@ class _FormView extends StatelessWidget {
                   ),
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) return 'Password tidak boleh kosong';
-                    if (v.trim().length < 6) return 'Password minimal 6 karakter';
+                    if (v.trim().length < 8) return 'Password minimal 8 karakter';
                     return null;
                   },
                 ),

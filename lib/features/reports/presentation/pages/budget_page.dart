@@ -42,6 +42,38 @@ class _BudgetPageState extends State<BudgetPage> {
 
   Color _progressPillBackground(Color color) => color.withValues(alpha: 0.12);
 
+  Future<void> _changeBudgetMonth(
+    BudgetProvider budget,
+    TransactionProvider txnProvider,
+    String userId,
+    DateTime month,
+  ) async {
+    await Future.wait([
+      budget.setSelectedMonth(userId, month),
+      txnProvider.loadMonth(userId, month),
+    ]);
+  }
+
+  Future<void> _copyPreviousBudgets(
+    BudgetProvider budget,
+    String userId,
+  ) async {
+    final copied = await budget.copyPreviousMonthBudgets(userId);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            copied
+                ? 'Anggaran bulan sebelumnya disalin'
+                : 'Belum ada anggaran di bulan sebelumnya',
+          ),
+          backgroundColor: copied ? AppColors.success : AppColors.warning,
+        ),
+      );
+  }
+
   List<CategoryModel> _filterAndSortCategories(
     List<CategoryModel> allCategories,
     BudgetProvider budget,
@@ -432,83 +464,109 @@ class _BudgetPageState extends State<BudgetPage> {
       builder: (context, budget, txnProvider, _) {
         final totalBudget = budget.totalCategoryBudget;
         final hasBudget = totalBudget > 0;
+        final canEdit = budget.isCurrentMonth;
+        final isBudgetLoading = budget.isLoading;
         final expenseCategories = txnProvider.expenseCategories;
         final filteredCategories =
             _filterAndSortCategories(expenseCategories, budget);
         return Container(
           color: AppColors.background,
-          child: ListView(
-            padding: EdgeInsets.fromLTRB(20.w, 22.h, 20.w, 26.h),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  SizedBox(width: 36.w),
-                  Expanded(
-                    child: Text(
-                      'Anggaran',
-                      textAlign: TextAlign.center,
+              Container(
+                color: AppColors.background,
+                padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 12.h),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildHeader(
+                      canAdd: userId != null &&
+                          expenseCategories.isNotEmpty &&
+                          canEdit,
+                      onAdd: userId == null ||
+                              expenseCategories.isEmpty ||
+                              !canEdit
+                          ? null
+                          : () => _openCategoryBudgetPickerSheet(
+                                budget,
+                                userId,
+                                expenseCategories,
+                              ),
+                    ),
+                    SizedBox(height: 12.h),
+                    _buildMonthNavigator(
+                      budget: budget,
+                      txnProvider: txnProvider,
+                      userId: userId,
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView(
+                  padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 26.h),
+                  children: [
+                    _buildTotalBudgetCard(
+                      budget: budget,
+                      hasBudget: hasBudget,
+                      isLoading: isBudgetLoading,
+                    ),
+                    if (!canEdit && !isBudgetLoading) ...[
+                      SizedBox(height: 10.h),
+                      _buildHistoryNotice(),
+                    ],
+                    if (canEdit && !hasBudget && !isBudgetLoading) ...[
+                      SizedBox(height: 10.h),
+                      _buildCopyPreviousButton(
+                        enabled: userId != null,
+                        onPressed: userId == null
+                            ? null
+                            : () => _copyPreviousBudgets(budget, userId),
+                      ),
+                    ],
+                    SizedBox(height: 22.h),
+                    Text(
+                      'Rincian Anggaran',
                       style: GoogleFonts.inter(
-                        fontSize: 17.sp,
-                        fontWeight: FontWeight.w800,
+                        fontSize: 15.sp,
+                        fontWeight: FontWeight.w700,
                         color: AppColors.textPrimary,
                       ),
                     ),
-                  ),
-                  InkWell(
-                    borderRadius: BorderRadius.circular(18.r),
-                    onTap: userId == null || expenseCategories.isEmpty
-                        ? null
-                        : () => _openCategoryBudgetPickerSheet(
-                              budget,
-                              userId,
-                              expenseCategories,
-                            ),
-                    child: SizedBox(
-                      width: 36.w,
-                      height: 36.w,
-                      child: Icon(
-                        Icons.add_rounded,
-                        color: AppColors.textPrimary,
-                        size: 24.sp,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 18.h),
-              _buildTotalBudgetCard(budget: budget, hasBudget: hasBudget),
-              SizedBox(height: 22.h),
-              Text(
-                'Rincian Anggaran',
-                style: GoogleFonts.inter(
-                  fontSize: 15.sp,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              SizedBox(height: 14.h),
-              if (budget.categoryBudgets.isEmpty)
-                _buildEmptyState(
-                  expenseCategories: expenseCategories,
-                )
-              else
-                ...filteredCategories.map(
-                  (cat) => _buildCategoryBudgetCard(
-                    budget: budget,
-                    userId: userId,
-                    category: cat,
-                  ),
-                ),
-              SizedBox(height: 4.h),
-              _buildAddBudgetButton(
-                enabled: userId != null && expenseCategories.isNotEmpty,
-                onPressed: userId == null || expenseCategories.isEmpty
-                    ? null
-                    : () => _openCategoryBudgetPickerSheet(
-                          budget,
-                          userId,
-                          expenseCategories,
+                    SizedBox(height: 14.h),
+                    if (isBudgetLoading)
+                      _buildBudgetLoadingState()
+                    else if (budget.categoryBudgets.isEmpty)
+                      _buildEmptyState(
+                        expenseCategories: expenseCategories,
+                      )
+                    else
+                      ...filteredCategories.map(
+                        (cat) => _buildCategoryBudgetCard(
+                          budget: budget,
+                          userId: userId,
+                          category: cat,
+                          canEdit: canEdit,
                         ),
+                      ),
+                    SizedBox(height: 4.h),
+                    if (!isBudgetLoading)
+                      _buildAddBudgetButton(
+                        enabled: userId != null &&
+                            expenseCategories.isNotEmpty &&
+                            canEdit,
+                        onPressed:
+                            userId == null || expenseCategories.isEmpty || !canEdit
+                            ? null
+                            : () => _openCategoryBudgetPickerSheet(
+                                  budget,
+                                  userId,
+                                  expenseCategories,
+                                ),
+                      ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -517,9 +575,198 @@ class _BudgetPageState extends State<BudgetPage> {
     );
   }
 
+  Widget _buildHeader({
+    required bool canAdd,
+    required VoidCallback? onAdd,
+  }) {
+    return Row(
+      children: [
+        SizedBox(width: 36.w),
+        Expanded(
+          child: Text(
+            'Anggaran',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ),
+        InkWell(
+          borderRadius: BorderRadius.circular(18.r),
+          onTap: canAdd ? onAdd : null,
+          child: SizedBox(
+            width: 36.w,
+            height: 36.w,
+            child: Icon(
+              Icons.add_rounded,
+              color: canAdd ? AppColors.textPrimary : AppColors.textSecondary,
+              size: 24.sp,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMonthNavigator({
+    required BudgetProvider budget,
+    required TransactionProvider txnProvider,
+    required String? userId,
+  }) {
+    final now = DateTime.now();
+    final currentMonth = DateTime(now.year, now.month, 1);
+    final selectedMonth = DateTime(
+      budget.selectedMonth.year,
+      budget.selectedMonth.month,
+      1,
+    );
+    final canGoNext = selectedMonth.isBefore(currentMonth);
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          IconButton(
+            icon: Icon(Icons.chevron_left, size: 24.sp),
+            onPressed: userId == null
+                ? null
+                : () => _changeBudgetMonth(
+                      budget,
+                      txnProvider,
+                      userId,
+                      DateTime(
+                        budget.selectedMonth.year,
+                        budget.selectedMonth.month - 1,
+                        1,
+                      ),
+                    ),
+            color: AppColors.textSecondary,
+            disabledColor: AppColors.hint,
+          ),
+          Text(
+            budget.periodLabel,
+            style: GoogleFonts.inter(
+              fontSize: 14.sp,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          IconButton(
+            icon: Icon(Icons.chevron_right, size: 24.sp),
+            onPressed: userId == null || !canGoNext
+                ? null
+                : () => _changeBudgetMonth(
+                      budget,
+                      txnProvider,
+                      userId,
+                      DateTime(
+                        budget.selectedMonth.year,
+                        budget.selectedMonth.month + 1,
+                        1,
+                      ),
+                    ),
+            color: AppColors.textSecondary,
+            disabledColor: AppColors.hint,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHistoryNotice() {
+    return Container(
+      padding: EdgeInsets.all(12.w),
+      decoration: BoxDecoration(
+        color: AppColors.info.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(8.r),
+        border: Border.all(color: AppColors.info.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.history_rounded, color: AppColors.info, size: 16.sp),
+          SizedBox(width: 8.w),
+          Expanded(
+            child: Text(
+              'Riwayat budget hanya untuk dilihat. Edit anggaran dilakukan di bulan berjalan.',
+              style: GoogleFonts.inter(
+                fontSize: 11.sp,
+                height: 1.35,
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCopyPreviousButton({
+    required bool enabled,
+    required VoidCallback? onPressed,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      height: 38.h,
+      child: OutlinedButton.icon(
+        onPressed: enabled ? onPressed : null,
+        icon: Icon(Icons.copy_all_rounded, size: 15.sp),
+        label: Text(
+          'Salin dari Bulan Sebelumnya',
+          style: GoogleFonts.inter(
+            fontSize: 12.sp,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.primary,
+          side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(6.r),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBudgetLoadingState() {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(vertical: 26.h),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8.r),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 22.w,
+            height: 22.w,
+            child: const CircularProgressIndicator(strokeWidth: 2.4),
+          ),
+          SizedBox(height: 12.h),
+          Text(
+            'Memuat anggaran...',
+            style: GoogleFonts.inter(
+              fontSize: 12.sp,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTotalBudgetCard({
     required BudgetProvider budget,
     required bool hasBudget,
+    required bool isLoading,
   }) {
     final progressColor = _budgetProgressColor(budget.progress);
 
@@ -538,7 +785,7 @@ class _BudgetPageState extends State<BudgetPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Total Anggaran Bulan ini',
+            'Total Anggaran ${budget.periodLabel}',
             style: GoogleFonts.inter(
               fontSize: 12.sp,
               fontWeight: FontWeight.w500,
@@ -547,7 +794,9 @@ class _BudgetPageState extends State<BudgetPage> {
           ),
           SizedBox(height: 6.h),
           Text(
-            hasBudget ? _formatCurrency(budget.totalCategoryBudget) : 'Rp 0',
+            isLoading
+                ? 'Memuat...'
+                : (hasBudget ? _formatCurrency(budget.totalCategoryBudget) : 'Rp 0'),
             style: GoogleFonts.inter(
               fontSize: 27.sp,
               fontWeight: FontWeight.w800,
@@ -561,7 +810,7 @@ class _BudgetPageState extends State<BudgetPage> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                _remainingLabel(budget.remaining),
+                isLoading ? 'Memuat data anggaran' : _remainingLabel(budget.remaining),
                 style: GoogleFonts.inter(
                   fontSize: 12.sp,
                   fontWeight: FontWeight.w500,
@@ -569,7 +818,7 @@ class _BudgetPageState extends State<BudgetPage> {
                 ),
               ),
               Text(
-                '${(budget.progress * 100).toStringAsFixed(0)}%',
+                isLoading ? '-' : '${(budget.progress * 100).toStringAsFixed(0)}%',
                 style: GoogleFonts.inter(
                   fontSize: 12.sp,
                   fontWeight: FontWeight.w800,
@@ -580,7 +829,7 @@ class _BudgetPageState extends State<BudgetPage> {
           ),
           SizedBox(height: 8.h),
           _buildProgressBar(
-            value: budget.progress,
+            value: isLoading ? 0 : budget.progress,
             color: hasBudget ? progressColor : Colors.white,
             backgroundColor: Colors.white.withValues(alpha: 0.35),
             height: 6.h,
@@ -594,6 +843,7 @@ class _BudgetPageState extends State<BudgetPage> {
     required BudgetProvider budget,
     required String? userId,
     required CategoryModel category,
+    required bool canEdit,
   }) {
     final categoryBudget = budget.categoryBudget(category.id) ?? 0;
     final spent = budget.categoryExpense(category.id);
@@ -605,7 +855,7 @@ class _BudgetPageState extends State<BudgetPage> {
     );
 
     return GestureDetector(
-      onTap: userId == null
+      onTap: userId == null || !canEdit
           ? null
           : () => _openCategoryBudgetSheet(budget, userId, category),
       child: Container(

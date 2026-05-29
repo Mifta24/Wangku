@@ -18,6 +18,8 @@ class TransactionProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
   DateTime _selectedMonth = DateTime.now();
+  DateTime? _loadedStartDate;
+  DateTime? _loadedEndDate;
 
   // Getters
   List<TransactionModel> get transactions => _transactions;
@@ -25,6 +27,12 @@ class TransactionProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   DateTime get selectedMonth => _selectedMonth;
+  bool hasLoadedRange(DateTime startDate, DateTime endDate) {
+    final loadedStart = _loadedStartDate;
+    final loadedEnd = _loadedEndDate;
+    if (loadedStart == null || loadedEnd == null) return false;
+    return !startDate.isBefore(loadedStart) && !endDate.isAfter(loadedEnd);
+  }
 
   // Computed getters
   List<TransactionModel> get todayTransactions {
@@ -103,6 +111,8 @@ class TransactionProvider extends ChangeNotifier {
         endDate: endDate,
       );
 
+      _loadedStartDate = startDate;
+      _loadedEndDate = endDate;
       _transactions = txs;
       _setLoading(false);
       notifyListeners();
@@ -291,8 +301,10 @@ class TransactionProvider extends ChangeNotifier {
       _clearError();
       final newTxn = await _repository.addTransaction(transaction);
 
-      // Tambah ke state lokal immediately untuk UI responsiveness
-      _transactions.insert(0, newTxn);
+      // Tambah ke cache aktif hanya kalau tanggal transaksi masuk range yang sedang dibuka.
+      if (_isWithinLoadedRange(newTxn.date)) {
+        _transactions.insert(0, newTxn);
+      }
       notifyListeners();
     } catch (e) {
       _setError('Gagal tambah transaksi: ${e.toString()}');
@@ -316,9 +328,15 @@ class TransactionProvider extends ChangeNotifier {
       // Update di state
       final index = _transactions.indexWhere((t) => t.id == transactionId);
       if (index != -1) {
-        _transactions[index] = updated;
-        notifyListeners();
+        if (_isWithinLoadedRange(updated.date)) {
+          _transactions[index] = updated;
+        } else {
+          _transactions.removeAt(index);
+        }
+      } else if (_isWithinLoadedRange(updated.date)) {
+        _transactions.insert(0, updated);
       }
+      notifyListeners();
     } catch (e) {
       _setError('Gagal update transaksi: ${e.toString()}');
       notifyListeners();
@@ -411,6 +429,13 @@ class TransactionProvider extends ChangeNotifier {
     _errorMessage = null;
   }
 
+  bool _isWithinLoadedRange(DateTime date) {
+    final loadedStart = _loadedStartDate;
+    final loadedEnd = _loadedEndDate;
+    if (loadedStart == null || loadedEnd == null) return true;
+    return !date.isBefore(loadedStart) && date.isBefore(loadedEnd);
+  }
+
   /// Refresh data (call when app comes back to foreground)
   Future<void> refresh(String userId) async {
     final startDate = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
@@ -423,6 +448,8 @@ class TransactionProvider extends ChangeNotifier {
     _transactions = [];
     _categories = [];
     _customShortcuts = [];
+    _loadedStartDate = null;
+    _loadedEndDate = null;
     _isLoading = false;
     _errorMessage = null;
     notifyListeners();

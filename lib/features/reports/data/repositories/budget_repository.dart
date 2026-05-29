@@ -6,17 +6,26 @@ class BudgetRepository {
   final HiveManager _hive = HiveManager.instance;
 
   /// Ambil semua budget kategori: Supabase utama, Hive fallback
-  Future<Map<String, double>> getCategoryBudgets(String userId) async {
+  Future<Map<String, double>> getCategoryBudgets(
+    String userId, [
+    DateTime? month,
+  ]) async {
+    final targetMonth = month ?? DateTime.now();
     try {
-      final budgets = await _service.fetchCategoryBudgets(userId);
+      final budgets = await _service.fetchCategoryBudgets(userId, targetMonth);
       // Update cache Hive supaya sinkron
       for (final entry in budgets.entries) {
-        await _hive.saveCategoryBudget(userId, entry.key, entry.value);
+        await _hive.saveCategoryBudget(
+          userId,
+          entry.key,
+          entry.value,
+          targetMonth,
+        );
       }
       return budgets;
     } catch (_) {
       // Offline: pakai data Hive
-      return _hive.getCategoryBudgets(userId);
+      return _hive.getCategoryBudgets(userId, targetMonth);
     }
   }
 
@@ -25,21 +34,28 @@ class BudgetRepository {
     String userId,
     String categoryId,
     double amount,
+    [DateTime? month]
   ) async {
+    final targetMonth = month ?? DateTime.now();
     // Simpan ke Supabase
-    await _service.saveCategoryBudget(userId, categoryId, amount);
+    await _service.saveCategoryBudget(userId, categoryId, amount, targetMonth);
     // Update cache lokal
-    await _hive.saveCategoryBudget(userId, categoryId, amount);
+    await _hive.saveCategoryBudget(userId, categoryId, amount, targetMonth);
   }
 
   /// Hapus budget kategori dari Supabase dan Hive
-  Future<void> deleteCategoryBudget(String userId, String categoryId) async {
+  Future<void> deleteCategoryBudget(
+    String userId,
+    String categoryId, [
+    DateTime? month,
+  ]) async {
+    final targetMonth = month ?? DateTime.now();
     try {
-      await _service.deleteCategoryBudget(userId, categoryId);
+      await _service.deleteCategoryBudget(userId, categoryId, targetMonth);
     } catch (_) {
       // Lanjut hapus lokal meski server gagal
     }
-    await _hive.deleteCategoryBudget(userId, categoryId);
+    await _hive.deleteCategoryBudget(userId, categoryId, targetMonth);
   }
 
   /// Hapus semua budget user (dipanggil saat logout)

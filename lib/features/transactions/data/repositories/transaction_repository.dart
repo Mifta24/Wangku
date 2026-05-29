@@ -58,11 +58,30 @@ class TransactionRepository implements ITransactionRepository {
       // Fallback ke Hive cache jika offline
       final cached = await _hiveManager.getTransactions(userId);
       if (cached.isNotEmpty) {
-        return cached;
+        return _filterByDateRange(
+          cached,
+          startDate: startDate,
+          endDate: endDate,
+        );
       }
       // Jika tidak ada cache dan online gagal, throw error
       rethrow;
     }
+  }
+
+  List<TransactionModel> _filterByDateRange(
+    List<TransactionModel> transactions, {
+    DateTime? startDate,
+    DateTime? endDate,
+  }) {
+    return transactions
+        .where((transaction) {
+          final date = transaction.date;
+          if (startDate != null && date.isBefore(startDate)) return false;
+          if (endDate != null && !date.isBefore(endDate)) return false;
+          return true;
+        })
+        .toList();
   }
 
   @override
