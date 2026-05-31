@@ -8,6 +8,7 @@ import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/otp_verification_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
+import '../../features/auth/presentation/pages/reset_password_page.dart';
 // import '../../features/auth/presentation/pages/splash_page.dart';
 import '../../features/dashboard/presentation/pages/dashboard_page.dart';
 
@@ -107,7 +108,7 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/reset-password',
       name: 'reset-password',
-      builder: (context, state) => const ChangePasswordPage(),
+      builder: (context, state) => const ResetPasswordPage(),
     ),
     GoRoute(
       path: '/dashboard',

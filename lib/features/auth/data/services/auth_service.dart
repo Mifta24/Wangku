@@ -5,7 +5,11 @@ class AuthService {
   final SupabaseClient _supabase = Supabase.instance.client;
 
 
-  String _mapAuthMessage(String fallback, String rawMessage) {
+  String _mapAuthMessage(
+    String fallback,
+    String rawMessage, {
+    String? invalidCredentialMessage,
+  }) {
     final message = rawMessage.toLowerCase();
 
     if (message.contains('rate limit') ||
@@ -20,24 +24,24 @@ class AuthService {
       return 'Email ini sudah terdaftar. Silakan login atau gunakan email lain.';
     }
 
-    if (message.contains('invalid login credentials') ||
-        message.contains('invalid email or password') ||
-        message.contains('email not confirmed') == false && message.contains('invalid')) {
-      return 'Email atau password salah.';
-    }
-
     if (message.contains('email not confirmed')) {
       return 'Email belum dikonfirmasi. Cek inbox email Anda atau hubungi admin.';
     }
 
     if (message.contains('password should be at least') ||
         message.contains('password is too short')) {
-      return 'Password terlalu pendek. Minimal 6 karakter.';
+      return 'Password terlalu pendek. Minimal 8 karakter.';
     }
 
     if (message.contains('unable to validate email address') ||
         message.contains('invalid email')) {
       return 'Format email tidak valid.';
+    }
+
+    if (message.contains('invalid login credentials') ||
+        message.contains('invalid email or password') ||
+        message.contains('invalid')) {
+      return invalidCredentialMessage ?? 'Email atau password salah.';
     }
 
     if (message.contains('signup is disabled') ||
@@ -166,8 +170,9 @@ class AuthService {
       );
     } on AuthException catch (e) {
       final mapped = _mapAuthMessage(
-        'Kode OTP tidak valid: ${e.message}',
+        'Kode OTP tidak valid atau sudah kedaluwarsa.',
         e.message,
+        invalidCredentialMessage: 'Kode OTP tidak valid atau sudah kedaluwarsa.',
       );
       throw Exception(mapped);
     } catch (e) {

@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
@@ -29,39 +27,9 @@ class _RegisterPageState extends State<RegisterPage> {
   final _formKey = GlobalKey<FormState>();
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
-  static const int _cooldownDuration = 30;
-  int _cooldownSeconds = 0;
-  Timer? _cooldownTimer;
-
-  void _startCooldown() {
-    _cooldownTimer?.cancel();
-    setState(() {
-      _cooldownSeconds = _cooldownDuration;
-    });
-
-    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-
-      if (_cooldownSeconds <= 1) {
-        timer.cancel();
-        setState(() {
-          _cooldownSeconds = 0;
-        });
-        return;
-      }
-
-      setState(() {
-        _cooldownSeconds -= 1;
-      });
-    });
-  }
 
   @override
   void dispose() {
-    _cooldownTimer?.cancel();
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -70,18 +38,7 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   void _handleRegister() async {
-    if (_cooldownSeconds > 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Tunggu $_cooldownSeconds detik sebelum mencoba lagi.'),
-          backgroundColor: AppColors.expense,
-        ),
-      );
-      return;
-    }
-
     if (_formKey.currentState!.validate()) {
-      _startCooldown();
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final success = await authProvider.register(
         _emailController.text.trim(),
@@ -190,7 +147,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) return 'Password tidak boleh kosong';
-                      if (value.length < 6) return 'Password minimal 6 karakter';
+                      if (value.trim().length < 8) return 'Password minimal 8 karakter';
                       return null;
                     },
                   ),
@@ -216,11 +173,9 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                   SizedBox(height: 20.h),
                   AppButton(
-                    label: _cooldownSeconds > 0
-                        ? 'Coba lagi dalam $_cooldownSeconds dtk'
-                        : 'Daftar',
+                    label: 'Daftar',
                     isLoading: isLoading,
-                    onPressed: (_cooldownSeconds > 0 || isLoading) ? null : _handleRegister,
+                    onPressed: isLoading ? null : _handleRegister,
                   ),
                   SizedBox(height: 20.h),
 
