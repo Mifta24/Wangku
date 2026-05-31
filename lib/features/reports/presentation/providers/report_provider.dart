@@ -120,6 +120,10 @@ class ReportProvider extends ChangeNotifier {
       _processData(notify: true); // Doesn't need fetch, just re-filter
   }
 
+  (DateTime, DateTime) get currentPeriodRange => _currentPeriodRange();
+
+  Future<void> reload() => _loadData();
+
   void nextPeriod() {
     switch (_periodType) {
       case PeriodType.week:

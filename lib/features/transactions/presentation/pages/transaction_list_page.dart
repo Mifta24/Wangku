@@ -600,352 +600,414 @@ class _TransactionListPageState extends State<TransactionListPage> {
             }
             return true;
           },
-          child: SizedBox(
-            height: MediaQuery.of(context).size.height * 0.82,
-            child: StatefulBuilder(
-              builder: (context, setSheetState) {
-                final categories = selectedType == 'income'
-                    ? txnProvider.incomeCategories
-                    : txnProvider.expenseCategories;
-                final selectedCategory = selectedCategoryId == null
-                    ? null
-                    : categories.cast<CategoryModel?>().firstWhere(
-                        (c) => c?.id == selectedCategoryId,
-                        orElse: () => null,
-                      );
-                final showForm = selectedCategoryId != null;
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+            child: DraggableScrollableSheet(
+              expand: false,
+              initialChildSize: 0.82,
+              minChildSize: 0.45,
+              maxChildSize: 0.92,
+              builder: (context, sheetScrollController) {
+                return StatefulBuilder(
+                  builder: (context, setSheetState) {
+                    final keyboardOpen =
+                        MediaQuery.of(context).viewInsets.bottom > 0;
+                    final categories = selectedType == 'income'
+                        ? txnProvider.incomeCategories
+                        : txnProvider.expenseCategories;
+                    final selectedCategory = selectedCategoryId == null
+                        ? null
+                        : categories.cast<CategoryModel?>().firstWhere(
+                            (c) => c?.id == selectedCategoryId,
+                            orElse: () => null,
+                          );
+                    final showForm = selectedCategoryId != null;
 
-                if (showForm && shouldFocusAmount) {
-                  shouldFocusAmount = false;
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (context.mounted) {
-                      amountFocusNode.requestFocus();
-                    }
-                  });
-                }
-
-                Future<void> saveChanges() async {
-                  if (isSaving) return;
-                  isSaving = true;
-                  final amount = RupiahInputFormatter.parse(amountController.text.trim());
-                  if (amount == null || amount <= 0 || selectedCategoryId == null) {
-                    setSheetState(() {
-                      isSaving = false;
-                      if (amount == null || amount <= 0) amountErrorText = 'Jumlah harus diisi';
-                    });
-                    return;
-                  }
-                  setSheetState(() {});
-                  final updated = transaction.copyWith(
-                    categoryId: selectedCategoryId!,
-                    amount: amount,
-                    note: noteController.text.trim(),
-                    date: DateTime(
-                      selectedDate.year,
-                      selectedDate.month,
-                      selectedDate.day,
-                      transaction.date.hour,
-                      transaction.date.minute,
-                      transaction.date.second,
-                    ),
-                    type: selectedType,
-                    category: txnProvider.categories.firstWhere(
-                      (c) => c.id == selectedCategoryId,
-                      orElse: () => CategoryModel(
-                        id: selectedCategoryId!,
-                        name: transaction.category?.name ?? 'Uncategorized',
-                        icon: transaction.category?.icon ?? 'receipt',
-                        color: transaction.category?.color ?? '#94A3B8',
-                        type: selectedType,
-                      ),
-                    ),
-                  );
-
-                  try {
-                    await txnProvider.updateTransaction(
-                      transaction.id,
-                      updated,
-                    );
-                    if (!context.mounted || !parentContext.mounted) return;
-                    await closeSheet();
-                    ScaffoldMessenger.of(parentContext)
-                      ..clearSnackBars()
-                      ..showSnackBar(
-                        const SnackBar(
-                          content: Text('Transaksi berhasil diperbarui.'),
-                          backgroundColor: AppColors.success,
-                        ),
-                      );
-                  } catch (_) {
-                    if (context.mounted) {
-                      setSheetState(() => isSaving = false);
-                    }
-                  }
-                }
-
-                Widget categoryItem(CategoryModel category) {
-                  final isSelected = selectedCategoryId == category.id;
-                  final color = Color(
-                    int.parse(
-                      'FF${category.color.replaceFirst('#', '')}',
-                      radix: 16,
-                    ),
-                  );
-
-                  return GestureDetector(
-                    onTap: () {
-                      setSheetState(() {
-                        selectedCategoryId = category.id;
-                        shouldFocusAmount = true;
+                    if (showForm && shouldFocusAmount) {
+                      shouldFocusAmount = false;
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (context.mounted) {
+                          amountFocusNode.requestFocus();
+                        }
                       });
-                    },
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          width: 56.w,
-                          height: 56.w,
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? color
-                                : color.withValues(alpha: 0.12),
-                            shape: BoxShape.circle,
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            category.icon.isNotEmpty ? category.icon : '?',
-                            style: TextStyle(fontSize: 22.sp),
-                          ),
-                        ),
-                        SizedBox(height: 5.h),
-                        Text(
-                          category.name,
-                          textAlign: TextAlign.center,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.inter(
-                            fontSize: 11.sp,
-                            color: isSelected ? color : AppColors.textPrimary,
-                            fontWeight: isSelected
-                                ? FontWeight.w600
-                                : FontWeight.w400,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }
+                    }
 
-                Widget formLabel(String text) {
-                  return Padding(
-                    padding: EdgeInsets.only(bottom: 6.h),
-                    child: Text(
-                      text,
-                      style: GoogleFonts.inter(
-                        fontSize: 13.sp,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  );
-                }
-
-                Widget formField({
-                  required TextEditingController controller,
-                  required String hint,
-                  required IconData icon,
-                  TextInputType? keyboardType,
-                  String? prefixText,
-                  FocusNode? focusNode,
-                  String? errorText,
-                  List<TextInputFormatter>? inputFormatters,
-                  VoidCallback? onChangedExtra,
-                }) {
-                  final hasError = errorText != null;
-                  return TextField(
-                    controller: controller,
-                    focusNode: focusNode,
-                    keyboardType: keyboardType,
-                    inputFormatters: inputFormatters,
-                    onChanged: (_) => setSheetState(() => onChangedExtra?.call()),
-                    style: GoogleFonts.inter(
-                      fontSize: 15.sp,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: hint,
-                      prefixText: prefixText,
-                      prefixStyle: GoogleFonts.inter(
-                        fontSize: 15.sp,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
-                      ),
-                      prefixIcon: Icon(
-                        icon,
-                        color: hasError ? AppColors.error : AppColors.textSecondary,
-                      ),
-                      errorText: errorText,
-                      errorStyle: GoogleFonts.inter(
-                        fontSize: 11.sp,
-                        color: AppColors.error,
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 14.w,
-                        vertical: 13.h,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14.r),
-                        borderSide: BorderSide(
-                          color: hasError
-                              ? AppColors.error
-                              : AppColors.border.withValues(alpha: 0.75),
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14.r),
-                        borderSide: BorderSide(
-                          color: hasError ? AppColors.error : AppColors.primary,
-                          width: 1.6,
-                        ),
-                      ),
-                      errorBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14.r),
-                        borderSide: const BorderSide(color: AppColors.error),
-                      ),
-                      focusedErrorBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14.r),
-                        borderSide: const BorderSide(
-                          color: AppColors.error,
-                          width: 1.6,
-                        ),
-                      ),
-                    ),
-                  );
-                }
-
-                Widget dateField() {
-                  return InkWell(
-                    borderRadius: BorderRadius.circular(14.r),
-                    onTap: () async {
-                      FocusManager.instance.primaryFocus?.unfocus();
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: selectedDate,
-                        firstDate: DateTime(2000),
-                        lastDate: DateTime.now().add(const Duration(days: 365)),
-                        helpText: 'Pilih Tanggal Transaksi',
-                        cancelText: 'Batal',
-                        confirmText: 'Pilih',
+                    Future<void> saveChanges() async {
+                      if (isSaving) return;
+                      isSaving = true;
+                      final amount = RupiahInputFormatter.parse(
+                        amountController.text.trim(),
                       );
-                      if (picked == null) return;
-                      setSheetState(() => selectedDate = picked);
-                    },
-                    child: Container(
-                      height: 52.h,
-                      padding: EdgeInsets.symmetric(horizontal: 14.w),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14.r),
-                        border: Border.all(
-                          color: AppColors.border.withValues(alpha: 0.75),
+                      if (amount == null ||
+                          amount <= 0 ||
+                          selectedCategoryId == null) {
+                        setSheetState(() {
+                          isSaving = false;
+                          if (amount == null || amount <= 0)
+                            amountErrorText = 'Jumlah harus diisi';
+                        });
+                        return;
+                      }
+                      setSheetState(() {});
+                      final updated = transaction.copyWith(
+                        categoryId: selectedCategoryId!,
+                        amount: amount,
+                        note: noteController.text.trim(),
+                        date: DateTime(
+                          selectedDate.year,
+                          selectedDate.month,
+                          selectedDate.day,
+                          transaction.date.hour,
+                          transaction.date.minute,
+                          transaction.date.second,
                         ),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              DateFormat(
-                                'd MMMM yyyy',
-                                'id_ID',
-                              ).format(selectedDate),
-                              style: GoogleFonts.inter(
-                                fontSize: 15.sp,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                          ),
-                          Icon(
-                            Icons.calendar_month_rounded,
-                            color: AppColors.textSecondary,
-                            size: 21.sp,
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-
-                Widget saveButton() {
-                  return GestureDetector(
-                    onTap: isSaving ? null : () => saveChanges(),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      height: 50.h,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(14.r),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.24),
-                            blurRadius: 14,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: isSaving
-                          ? SizedBox(
-                              width: 18.w,
-                              height: 18.w,
-                              child: const CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Text(
-                              'Simpan Perubahan',
-                              style: GoogleFonts.inter(
-                                fontSize: 15.sp,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                              ),
-                            ),
-                    ),
-                  );
-                }
-
-                return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Center(
-                        child: Container(
-                          margin: EdgeInsets.only(top: 12.h, bottom: 8.h),
-                          width: 40.w,
-                          height: 4.h,
-                          decoration: BoxDecoration(
-                            color: Colors.grey.withValues(alpha: 0.3),
-                            borderRadius: BorderRadius.circular(2.r),
+                        type: selectedType,
+                        category: txnProvider.categories.firstWhere(
+                          (c) => c.id == selectedCategoryId,
+                          orElse: () => CategoryModel(
+                            id: selectedCategoryId!,
+                            name: transaction.category?.name ?? 'Uncategorized',
+                            icon: transaction.category?.icon ?? 'receipt',
+                            color: transaction.category?.color ?? '#94A3B8',
+                            type: selectedType,
                           ),
                         ),
-                      ),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 20.w),
-                        child: Row(
+                      );
+
+                      try {
+                        await txnProvider.updateTransaction(
+                          transaction.id,
+                          updated,
+                        );
+                        if (!context.mounted || !parentContext.mounted) return;
+                        await closeSheet();
+                        ScaffoldMessenger.of(parentContext)
+                          ..clearSnackBars()
+                          ..showSnackBar(
+                            const SnackBar(
+                              content: Text('Transaksi berhasil diperbarui.'),
+                              backgroundColor: AppColors.success,
+                            ),
+                          );
+                      } catch (_) {
+                        if (context.mounted) {
+                          setSheetState(() => isSaving = false);
+                        }
+                      }
+                    }
+
+                    Widget categoryItem(CategoryModel category) {
+                      final isSelected = selectedCategoryId == category.id;
+                      final color = Color(
+                        int.parse(
+                          'FF${category.color.replaceFirst('#', '')}',
+                          radix: 16,
+                        ),
+                      );
+
+                      return GestureDetector(
+                        onTap: () {
+                          setSheetState(() {
+                            selectedCategoryId = category.id;
+                            shouldFocusAmount = true;
+                          });
+                        },
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            if (showForm)
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              width: 56.w,
+                              height: 56.w,
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? color
+                                    : color.withValues(alpha: 0.12),
+                                shape: BoxShape.circle,
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                category.icon.isNotEmpty ? category.icon : '?',
+                                style: TextStyle(fontSize: 22.sp),
+                              ),
+                            ),
+                            SizedBox(height: 5.h),
+                            Text(
+                              category.name,
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 11.sp,
+                                color: isSelected
+                                    ? color
+                                    : AppColors.textPrimary,
+                                fontWeight: isSelected
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    Widget formLabel(String text) {
+                      return Padding(
+                        padding: EdgeInsets.only(bottom: 6.h),
+                        child: Text(
+                          text,
+                          style: GoogleFonts.inter(
+                            fontSize: 13.sp,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      );
+                    }
+
+                    Widget formField({
+                      required TextEditingController controller,
+                      required String hint,
+                      required IconData icon,
+                      TextInputType? keyboardType,
+                      String? prefixText,
+                      FocusNode? focusNode,
+                      String? errorText,
+                      List<TextInputFormatter>? inputFormatters,
+                      VoidCallback? onChangedExtra,
+                    }) {
+                      final hasError = errorText != null;
+                      return TextField(
+                        controller: controller,
+                        focusNode: focusNode,
+                        keyboardType: keyboardType,
+                        inputFormatters: inputFormatters,
+                        onChanged: (_) =>
+                            setSheetState(() => onChangedExtra?.call()),
+                        style: GoogleFonts.inter(
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: hint,
+                          prefixText: prefixText,
+                          prefixStyle: GoogleFonts.inter(
+                            fontSize: 15.sp,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                          ),
+                          prefixIcon: Icon(
+                            icon,
+                            color: hasError
+                                ? AppColors.error
+                                : AppColors.textSecondary,
+                          ),
+                          errorText: errorText,
+                          errorStyle: GoogleFonts.inter(
+                            fontSize: 11.sp,
+                            color: AppColors.error,
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 14.w,
+                            vertical: 13.h,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14.r),
+                            borderSide: BorderSide(
+                              color: hasError
+                                  ? AppColors.error
+                                  : AppColors.border.withValues(alpha: 0.75),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14.r),
+                            borderSide: BorderSide(
+                              color: hasError
+                                  ? AppColors.error
+                                  : AppColors.primary,
+                              width: 1.6,
+                            ),
+                          ),
+                          errorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14.r),
+                            borderSide: const BorderSide(
+                              color: AppColors.error,
+                            ),
+                          ),
+                          focusedErrorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14.r),
+                            borderSide: const BorderSide(
+                              color: AppColors.error,
+                              width: 1.6,
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+
+                    Widget dateField() {
+                      return InkWell(
+                        borderRadius: BorderRadius.circular(14.r),
+                        onTap: () async {
+                          FocusManager.instance.primaryFocus?.unfocus();
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: selectedDate,
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime.now().add(
+                              const Duration(days: 365),
+                            ),
+                            helpText: 'Pilih Tanggal Transaksi',
+                            cancelText: 'Batal',
+                            confirmText: 'Pilih',
+                          );
+                          if (picked == null) return;
+                          setSheetState(() => selectedDate = picked);
+                        },
+                        child: Container(
+                          height: 52.h,
+                          padding: EdgeInsets.symmetric(horizontal: 14.w),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14.r),
+                            border: Border.all(
+                              color: AppColors.border.withValues(alpha: 0.75),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  DateFormat(
+                                    'd MMMM yyyy',
+                                    'id_ID',
+                                  ).format(selectedDate),
+                                  style: GoogleFonts.inter(
+                                    fontSize: 15.sp,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                              ),
+                              Icon(
+                                Icons.calendar_month_rounded,
+                                color: AppColors.textSecondary,
+                                size: 21.sp,
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+
+                    Widget saveButton() {
+                      return GestureDetector(
+                        onTap: isSaving ? null : () => saveChanges(),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          height: 50.h,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(14.r),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primary.withValues(
+                                  alpha: 0.24,
+                                ),
+                                blurRadius: 14,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: isSaving
+                              ? SizedBox(
+                                  width: 18.w,
+                                  height: 18.w,
+                                  child: const CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Text(
+                                  'Simpan Perubahan',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 15.sp,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                        ),
+                      );
+                    }
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Center(
+                          child: Container(
+                            margin: EdgeInsets.only(top: 12.h, bottom: 8.h),
+                            width: 40.w,
+                            height: 4.h,
+                            decoration: BoxDecoration(
+                              color: Colors.grey.withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(2.r),
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 20.w),
+                          child: Row(
+                            children: [
+                              if (showForm)
+                                GestureDetector(
+                                  onTap: () {
+                                    FocusManager.instance.primaryFocus
+                                        ?.unfocus();
+                                    setSheetState(() {
+                                      selectedCategoryId = null;
+                                      shouldFocusAmount = false;
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: EdgeInsets.all(6.w),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.withValues(
+                                        alpha: 0.12,
+                                      ),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      Icons.arrow_back,
+                                      size: 18.sp,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                )
+                              else
+                                SizedBox(width: 30.w),
+                              Expanded(
+                                child: Text(
+                                  selectedCategory == null
+                                      ? 'Edit Transaksi'
+                                      : '${selectedCategory.icon}  ${selectedCategory.name}',
+                                  textAlign: TextAlign.center,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 16.sp,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                              ),
                               GestureDetector(
-                                onTap: () {
-                                  FocusManager.instance.primaryFocus?.unfocus();
-                                  setSheetState(() {
-                                    selectedCategoryId = null;
-                                    shouldFocusAmount = false;
-                                  });
-                                },
+                                onTap: () => closeSheet(),
                                 child: Container(
                                   padding: EdgeInsets.all(6.w),
                                   decoration: BoxDecoration(
@@ -953,206 +1015,188 @@ class _TransactionListPageState extends State<TransactionListPage> {
                                     shape: BoxShape.circle,
                                   ),
                                   child: Icon(
-                                    Icons.arrow_back,
+                                    Icons.close,
                                     size: 18.sp,
                                     color: AppColors.textSecondary,
                                   ),
                                 ),
-                              )
-                            else
-                              SizedBox(width: 30.w),
-                            Expanded(
-                              child: Text(
-                                selectedCategory == null
-                                    ? 'Edit Transaksi'
-                                    : '${selectedCategory.icon}  ${selectedCategory.name}',
-                                textAlign: TextAlign.center,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.inter(
-                                  fontSize: 16.sp,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textPrimary,
-                                ),
                               ),
-                            ),
-                            GestureDetector(
-                              onTap: () => closeSheet(),
-                              child: Container(
-                                padding: EdgeInsets.all(6.w),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.withValues(alpha: 0.12),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  Icons.close,
-                                  size: 18.sp,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      SizedBox(height: 16.h),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 20.w),
-                        child: Container(
-                          padding: EdgeInsets.all(3.w),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(24.r),
-                          ),
-                          child: Row(
-                            children: [
-                              for (final entry in const {
-                                'income': 'Pemasukan',
-                                'expense': 'Pengeluaran',
-                              }.entries)
-                                Expanded(
-                                  child: GestureDetector(
-                                    onTap: () => setSheetState(() {
-                                      selectedType = entry.key;
-                                      selectedCategoryId = null;
-                                      shouldFocusAmount = false;
-                                    }),
-                                    child: AnimatedContainer(
-                                      duration: const Duration(
-                                        milliseconds: 200,
-                                      ),
-                                      padding: EdgeInsets.symmetric(
-                                        vertical: 10.h,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: selectedType == entry.key
-                                            ? (entry.key == 'income'
-                                                  ? AppColors.income
-                                                  : AppColors.expense)
-                                            : Colors.transparent,
-                                        borderRadius: BorderRadius.circular(
-                                          20.r,
-                                        ),
-                                      ),
-                                      child: Text(
-                                        entry.value,
-                                        textAlign: TextAlign.center,
-                                        style: GoogleFonts.inter(
-                                          fontSize: 14.sp,
-                                          fontWeight: FontWeight.w600,
-                                          color: selectedType == entry.key
-                                              ? Colors.white
-                                              : AppColors.textSecondary,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
                             ],
                           ),
                         ),
-                      ),
-                      SizedBox(height: 12.h),
-                      Expanded(
-                        child: showForm
-                            ? Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
+                        SizedBox(height: 16.h),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 20.w),
+                          child: Container(
+                            padding: EdgeInsets.all(3.w),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(24.r),
+                            ),
+                            child: Row(
+                              children: [
+                                for (final entry in const {
+                                  'income': 'Pemasukan',
+                                  'expense': 'Pengeluaran',
+                                }.entries)
                                   Expanded(
-                                    child: SingleChildScrollView(
-                                      physics: const ClampingScrollPhysics(),
-                                      padding: EdgeInsets.fromLTRB(
-                                        20.w,
-                                        8.h,
-                                        20.w,
-                                        8.h,
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.stretch,
-                                        children: [
-                                          formLabel('Jumlah'),
-                                          formField(
-                                            controller: amountController,
-                                            hint: '0',
-                                            prefixText: 'Rp ',
-                                            icon: Icons
-                                                .account_balance_wallet_outlined,
-                                            keyboardType: TextInputType.number,
-                                            focusNode: amountFocusNode,
-                                            errorText: amountErrorText,
-                                            inputFormatters: [
-                                              RupiahInputFormatter()
-                                            ],
-                                            onChangedExtra: () =>
-                                                amountErrorText = null,
+                                    child: GestureDetector(
+                                      onTap: () => setSheetState(() {
+                                        selectedType = entry.key;
+                                        selectedCategoryId = null;
+                                        shouldFocusAmount = false;
+                                      }),
+                                      child: AnimatedContainer(
+                                        duration: const Duration(
+                                          milliseconds: 200,
+                                        ),
+                                        padding: EdgeInsets.symmetric(
+                                          vertical: 10.h,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: selectedType == entry.key
+                                              ? (entry.key == 'income'
+                                                    ? AppColors.income
+                                                    : AppColors.expense)
+                                              : Colors.transparent,
+                                          borderRadius: BorderRadius.circular(
+                                            20.r,
                                           ),
-                                          SizedBox(height: 14.h),
-                                          formLabel('Catatan (opsional)'),
-                                          formField(
-                                            controller: noteController,
-                                            hint: 'Tulis catatan...',
-                                            icon: Icons.edit_note_rounded,
+                                        ),
+                                        child: Text(
+                                          entry.value,
+                                          textAlign: TextAlign.center,
+                                          style: GoogleFonts.inter(
+                                            fontSize: 14.sp,
+                                            fontWeight: FontWeight.w600,
+                                            color: selectedType == entry.key
+                                                ? Colors.white
+                                                : AppColors.textSecondary,
                                           ),
-                                          SizedBox(height: 14.h),
-                                          formLabel('Tanggal'),
-                                          dateField(),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding: EdgeInsets.fromLTRB(
-                                        20.w, 8.h, 20.w, 24.h),
-                                    child: saveButton(),
-                                  ),
-                                ],
-                              )
-                            : CustomScrollView(
-                                slivers: [
-                                  SliverToBoxAdapter(
-                                    child: Padding(
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: 20.w,
-                                      ),
-                                      child: Text(
-                                        'Pilih Kategori',
-                                        style: GoogleFonts.inter(
-                                          fontSize: 12.sp,
-                                          fontWeight: FontWeight.w600,
-                                          color: AppColors.textSecondary,
                                         ),
                                       ),
                                     ),
                                   ),
-                                  SliverToBoxAdapter(
-                                    child: SizedBox(height: 10.h),
-                                  ),
-                                  SliverPadding(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 20.w,
-                                    ),
-                                    sliver: SliverGrid(
-                                      gridDelegate:
-                                          SliverGridDelegateWithFixedCrossAxisCount(
-                                            crossAxisCount: 4,
-                                            mainAxisSpacing: 12.h,
-                                            crossAxisSpacing: 8.w,
-                                            childAspectRatio: 0.78,
-                                          ),
-                                      delegate: SliverChildBuilderDelegate(
-                                        (context, index) =>
-                                            categoryItem(categories[index]),
-                                        childCount: categories.length,
+                              ],
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 12.h),
+                        Expanded(
+                          child: showForm
+                              ? Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    Expanded(
+                                      child: SingleChildScrollView(
+                                        controller: sheetScrollController,
+                                        keyboardDismissBehavior:
+                                            ScrollViewKeyboardDismissBehavior
+                                                .onDrag,
+                                        physics:
+                                            const AlwaysScrollableScrollPhysics(
+                                              parent: ClampingScrollPhysics(),
+                                            ),
+                                        padding: EdgeInsets.fromLTRB(
+                                          20.w,
+                                          8.h,
+                                          20.w,
+                                          keyboardOpen
+                                              ? MediaQuery.of(
+                                                      context,
+                                                    ).viewInsets.bottom +
+                                                    16.h
+                                              : 8.h,
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.stretch,
+                                          children: [
+                                            formLabel('Jumlah'),
+                                            formField(
+                                              controller: amountController,
+                                              hint: '0',
+                                              prefixText: 'Rp ',
+                                              icon: Icons
+                                                  .account_balance_wallet_outlined,
+                                              keyboardType:
+                                                  TextInputType.number,
+                                              focusNode: amountFocusNode,
+                                              errorText: amountErrorText,
+                                              inputFormatters: [
+                                                RupiahInputFormatter(),
+                                              ],
+                                              onChangedExtra: () =>
+                                                  amountErrorText = null,
+                                            ),
+                                            SizedBox(height: 14.h),
+                                            formLabel('Catatan (opsional)'),
+                                            formField(
+                                              controller: noteController,
+                                              hint: 'Tulis catatan...',
+                                              icon: Icons.edit_note_rounded,
+                                            ),
+                                            SizedBox(height: 14.h),
+                                            formLabel('Tanggal'),
+                                            dateField(),
+                                            SizedBox(height: 16.h),
+                                            saveButton(),
+                                          ],
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  SliverToBoxAdapter(
-                                    child: SizedBox(height: 24.h),
-                                  ),
-                                ],
-                              ),
-                      ),
-                    ],
+                                  ],
+                                )
+                              : CustomScrollView(
+                                  controller: sheetScrollController,
+                                  slivers: [
+                                    SliverToBoxAdapter(
+                                      child: Padding(
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 20.w,
+                                        ),
+                                        child: Text(
+                                          'Pilih Kategori',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 12.sp,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.textSecondary,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    SliverToBoxAdapter(
+                                      child: SizedBox(height: 10.h),
+                                    ),
+                                    SliverPadding(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 20.w,
+                                      ),
+                                      sliver: SliverGrid(
+                                        gridDelegate:
+                                            SliverGridDelegateWithFixedCrossAxisCount(
+                                              crossAxisCount: 4,
+                                              mainAxisSpacing: 12.h,
+                                              crossAxisSpacing: 8.w,
+                                              childAspectRatio: 0.78,
+                                            ),
+                                        delegate: SliverChildBuilderDelegate(
+                                          (context, index) =>
+                                              categoryItem(categories[index]),
+                                          childCount: categories.length,
+                                        ),
+                                      ),
+                                    ),
+                                    SliverToBoxAdapter(
+                                      child: SizedBox(height: 24.h),
+                                    ),
+                                  ],
+                                ),
+                        ),
+                      ],
+                    );
+                  },
                 );
               },
             ),
@@ -1704,176 +1748,168 @@ class _TransactionListPageState extends State<TransactionListPage> {
                 }
 
                 return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Center(
-                        child: Container(
-                          margin: EdgeInsets.only(top: 12.h, bottom: 8.h),
-                          width: 40.w,
-                          height: 4.h,
-                          decoration: BoxDecoration(
-                            color: Colors.grey.withValues(alpha: 0.3),
-                            borderRadius: BorderRadius.circular(2.r),
-                          ),
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        margin: EdgeInsets.only(top: 12.h, bottom: 8.h),
+                        width: 40.w,
+                        height: 4.h,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(2.r),
                         ),
                       ),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 20.w),
+                    ),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20.w),
+                      child: Row(
+                        children: [
+                          SizedBox(width: 30.w),
+                          Expanded(
+                            child: Text(
+                              selectedCategory == null
+                                  ? 'Edit Transaksi'
+                                  : '${selectedCategory.icon}  ${selectedCategory.name}',
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 16.sp,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: closeSheet,
+                            child: Container(
+                              padding: EdgeInsets.all(6.w),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.withValues(alpha: 0.12),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.close,
+                                size: 18.sp,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 16.h),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20.w),
+                      child: Container(
+                        padding: EdgeInsets.all(3.w),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(24.r),
+                        ),
                         child: Row(
                           children: [
-                            SizedBox(width: 30.w),
-                            Expanded(
-                              child: Text(
-                                selectedCategory == null
-                                    ? 'Edit Transaksi'
-                                    : '${selectedCategory.icon}  ${selectedCategory.name}',
-                                textAlign: TextAlign.center,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: GoogleFonts.inter(
-                                  fontSize: 16.sp,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textPrimary,
+                            for (final entry in const {
+                              'expense': 'Pengeluaran',
+                              'income': 'Pemasukan',
+                            }.entries)
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => setSheetState(() {
+                                    selectedType = entry.key;
+                                    selectedCategoryId = null;
+                                    inputPanelVisible = false;
+                                  }),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: 10.h,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: selectedType == entry.key
+                                          ? (entry.key == 'income'
+                                                ? AppColors.income
+                                                : AppColors.expense)
+                                          : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(20.r),
+                                    ),
+                                    child: Text(
+                                      entry.value,
+                                      textAlign: TextAlign.center,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 14.sp,
+                                        fontWeight: FontWeight.w600,
+                                        color: selectedType == entry.key
+                                            ? Colors.white
+                                            : AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
-                            GestureDetector(
-                              onTap: closeSheet,
-                              child: Container(
-                                padding: EdgeInsets.all(6.w),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.withValues(alpha: 0.12),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  Icons.close,
-                                  size: 18.sp,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ),
                           ],
                         ),
                       ),
-                      SizedBox(height: 16.h),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 20.w),
-                        child: Container(
-                          padding: EdgeInsets.all(3.w),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(24.r),
-                          ),
-                          child: Row(
-                            children: [
-                              for (final entry in const {
-                                'expense': 'Pengeluaran',
-                                'income': 'Pemasukan',
-                              }.entries)
-                                Expanded(
-                                  child: GestureDetector(
-                                    onTap: () => setSheetState(() {
-                                      selectedType = entry.key;
-                                      selectedCategoryId = null;
-                                      inputPanelVisible = false;
-                                    }),
-                                    child: AnimatedContainer(
-                                      duration: const Duration(
-                                        milliseconds: 200,
-                                      ),
-                                      padding: EdgeInsets.symmetric(
-                                        vertical: 10.h,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: selectedType == entry.key
-                                            ? (entry.key == 'income'
-                                                  ? AppColors.income
-                                                  : AppColors.expense)
-                                            : Colors.transparent,
-                                        borderRadius: BorderRadius.circular(
-                                          20.r,
-                                        ),
-                                      ),
-                                      child: Text(
-                                        entry.value,
-                                        textAlign: TextAlign.center,
-                                        style: GoogleFonts.inter(
-                                          fontSize: 14.sp,
-                                          fontWeight: FontWeight.w600,
-                                          color: selectedType == entry.key
-                                              ? Colors.white
-                                              : AppColors.textSecondary,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      SizedBox(height: 12.h),
-                      Expanded(
-                        child: Stack(
-                          children: [
-                            CustomScrollView(
-                              slivers: [
-                                SliverToBoxAdapter(
-                                  child: Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 20.w,
-                                    ),
-                                    child: Text(
-                                      'Pilih Kategori',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 12.sp,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppColors.textSecondary,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                SliverToBoxAdapter(
-                                  child: SizedBox(height: 10.h),
-                                ),
-                                SliverPadding(
+                    ),
+                    SizedBox(height: 12.h),
+                    Expanded(
+                      child: Stack(
+                        children: [
+                          CustomScrollView(
+                            slivers: [
+                              SliverToBoxAdapter(
+                                child: Padding(
                                   padding: EdgeInsets.symmetric(
                                     horizontal: 20.w,
                                   ),
-                                  sliver: SliverGrid(
-                                    gridDelegate:
-                                        SliverGridDelegateWithFixedCrossAxisCount(
-                                          crossAxisCount: 4,
-                                          mainAxisSpacing: 12.h,
-                                          crossAxisSpacing: 8.w,
-                                          childAspectRatio: 0.78,
-                                        ),
-                                    delegate: SliverChildBuilderDelegate(
-                                      (context, index) =>
-                                          categoryItem(categories[index]),
-                                      childCount: categories.length,
+                                  child: Text(
+                                    'Pilih Kategori',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12.sp,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textSecondary,
                                     ),
                                   ),
                                 ),
-                                SliverToBoxAdapter(
-                                  child: SizedBox(
-                                    height: showPanel ? 380.h : 20.h,
+                              ),
+                              SliverToBoxAdapter(child: SizedBox(height: 10.h)),
+                              SliverPadding(
+                                padding: EdgeInsets.symmetric(horizontal: 20.w),
+                                sliver: SliverGrid(
+                                  gridDelegate:
+                                      SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: 4,
+                                        mainAxisSpacing: 12.h,
+                                        crossAxisSpacing: 8.w,
+                                        childAspectRatio: 0.78,
+                                      ),
+                                  delegate: SliverChildBuilderDelegate(
+                                    (context, index) =>
+                                        categoryItem(categories[index]),
+                                    childCount: categories.length,
                                   ),
                                 ),
-                              ],
-                            ),
-                            AnimatedPositioned(
-                              duration: const Duration(milliseconds: 260),
-                              curve: Curves.easeOutCubic,
-                              left: 0,
-                              right: 0,
-                              bottom: showPanel ? 0 : -420.h,
-                              child: inputPanel(),
-                            ),
-                          ],
-                        ),
+                              ),
+                              SliverToBoxAdapter(
+                                child: SizedBox(
+                                  height: showPanel ? 380.h : 20.h,
+                                ),
+                              ),
+                            ],
+                          ),
+                          AnimatedPositioned(
+                            duration: const Duration(milliseconds: 260),
+                            curve: Curves.easeOutCubic,
+                            left: 0,
+                            right: 0,
+                            bottom: showPanel ? 0 : -420.h,
+                            child: inputPanel(),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
+                  ],
                 );
               },
             ),
@@ -2167,10 +2203,7 @@ class _TransactionListPageState extends State<TransactionListPage> {
                       SizedBox(height: 80.h),
                       if (monthItems.isEmpty) ...[
                         Center(
-                          child: Text(
-                            '📋',
-                            style: TextStyle(fontSize: 48.sp),
-                          ),
+                          child: Text('📋', style: TextStyle(fontSize: 48.sp)),
                         ),
                         SizedBox(height: 16.h),
                         Center(
