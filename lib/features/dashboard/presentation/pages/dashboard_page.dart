@@ -56,12 +56,15 @@ class _DashboardPageState extends State<DashboardPage> {
       if (authProvider.currentUser != null) {
         final userId = authProvider.currentUser!.id;
         authProvider.loadProfile();
-        context.read<TransactionProvider>().initialize(userId);
+        final txnProvider = context.read<TransactionProvider>();
+        txnProvider.initialize(userId);
         _budgetProvider.loadBudget(userId);
         _budgetProvider.loadCategoryBudgets(userId);
         context.read<ReminderProvider>().load(userId);
         context.read<NotificationCenterProvider>().load(userId);
-        context.read<ReportProvider>().init(userId);
+        final reportProvider = context.read<ReportProvider>();
+        reportProvider.init(userId);
+        reportProvider.attachTransactionProvider(txnProvider);
       }
     });
   }

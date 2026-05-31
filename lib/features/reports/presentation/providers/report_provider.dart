@@ -350,11 +350,8 @@ class ReportProvider extends ChangeNotifier {
         final expense = List<double>.filled(7, 0);
 
         for (final transaction in _transactions) {
-          final date = DateTime(
-            transaction.date.year,
-            transaction.date.month,
-            transaction.date.day,
-          );
+          final local = transaction.date.toLocal();
+          final date = DateTime(local.year, local.month, local.day);
           final index = date.difference(start).inDays;
           if (index < 0 || index >= 7) continue;
           if (transaction.type == 'income') {
@@ -379,7 +376,7 @@ class ReportProvider extends ChangeNotifier {
         final expense = List<double>.filled(weekCount, 0);
 
         for (final transaction in _transactions) {
-          final index = (transaction.date.day - 1) ~/ 7;
+          final index = (transaction.date.toLocal().day - 1) ~/ 7;
           if (index < 0 || index >= weekCount) continue;
           if (transaction.type == 'income') {
             income[index] += transaction.amount;
@@ -401,7 +398,7 @@ class ReportProvider extends ChangeNotifier {
         final expense = List<double>.filled(12, 0);
 
         for (final transaction in _transactions) {
-          final index = transaction.date.month - 1;
+          final index = transaction.date.toLocal().month - 1;
           if (index < 0 || index >= 12) continue;
           if (transaction.type == 'income') {
             income[index] += transaction.amount;
