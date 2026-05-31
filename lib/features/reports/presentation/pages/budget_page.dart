@@ -42,37 +42,39 @@ class _BudgetPageState extends State<BudgetPage> {
 
   Color _progressPillBackground(Color color) => color.withValues(alpha: 0.12);
 
-  Future<void> _changeBudgetMonth(
-    BudgetProvider budget,
-    TransactionProvider txnProvider,
-    String userId,
-    DateTime month,
-  ) async {
-    await Future.wait([
-      budget.setSelectedMonth(userId, month),
-      txnProvider.loadMonth(userId, month),
-    ]);
-  }
+  // Fitur ganti bulan budget dikomen dulu karena belum dibutuhkan saat ini.
+  // Future<void> _changeBudgetMonth(
+  //   BudgetProvider budget,
+  //   TransactionProvider txnProvider,
+  //   String userId,
+  //   DateTime month,
+  // ) async {
+  //   await Future.wait([
+  //     budget.setSelectedMonth(userId, month),
+  //     txnProvider.loadMonth(userId, month),
+  //   ]);
+  // }
 
-  Future<void> _copyPreviousBudgets(
-    BudgetProvider budget,
-    String userId,
-  ) async {
-    final copied = await budget.copyPreviousMonthBudgets(userId);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            copied
-                ? 'Anggaran bulan sebelumnya disalin'
-                : 'Belum ada anggaran di bulan sebelumnya',
-          ),
-          backgroundColor: copied ? AppColors.success : AppColors.warning,
-        ),
-      );
-  }
+  // Fitur salin budget bulan sebelumnya dikomen dulu karena belum dibutuhkan saat ini.
+  // Future<void> _copyPreviousBudgets(
+  //   BudgetProvider budget,
+  //   String userId,
+  // ) async {
+  //   final copied = await budget.copyPreviousMonthBudgets(userId);
+  //   if (!mounted) return;
+  //   ScaffoldMessenger.of(context)
+  //     ..clearSnackBars()
+  //     ..showSnackBar(
+  //       SnackBar(
+  //         content: Text(
+  //           copied
+  //               ? 'Anggaran bulan sebelumnya disalin'
+  //               : 'Belum ada anggaran di bulan sebelumnya',
+  //         ),
+  //         backgroundColor: copied ? AppColors.success : AppColors.warning,
+  //       ),
+  //     );
+  // }
 
   List<CategoryModel> _filterAndSortCategories(
     List<CategoryModel> allCategories,
@@ -107,6 +109,7 @@ class _BudgetPageState extends State<BudgetPage> {
     CategoryModel category,
   ) async {
     final existingBudget = budgetProvider.categoryBudget(category.id);
+    final isEditing = existingBudget != null;
     final initialText = existingBudget != null
         ? RupiahInputFormatter.format(existingBudget.toStringAsFixed(0))
         : '';
@@ -166,7 +169,11 @@ class _BudgetPageState extends State<BudgetPage> {
                       ),
                       SizedBox(height: 16.h),
                       AppButton(
-                        label: isSaving ? 'Menyimpan...' : 'Simpan Anggaran',
+                        label: isSaving
+                            ? 'Menyimpan...'
+                            : (isEditing
+                                ? 'Simpan Perubahan'
+                                : 'Simpan Anggaran'),
                         onPressed: isSaving || budgetProvider.isLoading
                             ? null
                             : () async {
@@ -494,12 +501,13 @@ class _BudgetPageState extends State<BudgetPage> {
                                 expenseCategories,
                               ),
                     ),
-                    SizedBox(height: 12.h),
-                    _buildMonthNavigator(
-                      budget: budget,
-                      txnProvider: txnProvider,
-                      userId: userId,
-                    ),
+                    // Fitur ganti bulan budget dikomen dulu.
+                    // SizedBox(height: 12.h),
+                    // _buildMonthNavigator(
+                    //   budget: budget,
+                    //   txnProvider: txnProvider,
+                    //   userId: userId,
+                    // ),
                   ],
                 ),
               ),
@@ -512,19 +520,21 @@ class _BudgetPageState extends State<BudgetPage> {
                       hasBudget: hasBudget,
                       isLoading: isBudgetLoading,
                     ),
-                    if (!canEdit && !isBudgetLoading) ...[
-                      SizedBox(height: 10.h),
-                      _buildHistoryNotice(),
-                    ],
-                    if (canEdit && !hasBudget && !isBudgetLoading) ...[
-                      SizedBox(height: 10.h),
-                      _buildCopyPreviousButton(
-                        enabled: userId != null,
-                        onPressed: userId == null
-                            ? null
-                            : () => _copyPreviousBudgets(budget, userId),
-                      ),
-                    ],
+                    // Notice riwayat budget hanya dipakai saat fitur ganti bulan aktif.
+                    // if (!canEdit && !isBudgetLoading) ...[
+                    //   SizedBox(height: 10.h),
+                    //   _buildHistoryNotice(),
+                    // ],
+                    // Fitur salin budget bulan sebelumnya dikomen dulu.
+                    // if (canEdit && !hasBudget && !isBudgetLoading) ...[
+                    //   SizedBox(height: 10.h),
+                    //   _buildCopyPreviousButton(
+                    //     enabled: userId != null,
+                    //     onPressed: userId == null
+                    //         ? null
+                    //         : () => _copyPreviousBudgets(budget, userId),
+                    //   ),
+                    // ],
                     SizedBox(height: 22.h),
                     Text(
                       'Rincian Anggaran',
@@ -610,127 +620,130 @@ class _BudgetPageState extends State<BudgetPage> {
     );
   }
 
-  Widget _buildMonthNavigator({
-    required BudgetProvider budget,
-    required TransactionProvider txnProvider,
-    required String? userId,
-  }) {
-    final now = DateTime.now();
-    final currentMonth = DateTime(now.year, now.month, 1);
-    final selectedMonth = DateTime(
-      budget.selectedMonth.year,
-      budget.selectedMonth.month,
-      1,
-    );
-    final canGoNext = selectedMonth.isBefore(currentMonth);
+  // Widget navigator bulan budget dikomen dulu karena belum dibutuhkan saat ini.
+  // Widget _buildMonthNavigator({
+  //   required BudgetProvider budget,
+  //   required TransactionProvider txnProvider,
+  //   required String? userId,
+  // }) {
+  //   final now = DateTime.now();
+  //   final currentMonth = DateTime(now.year, now.month, 1);
+  //   final selectedMonth = DateTime(
+  //     budget.selectedMonth.year,
+  //     budget.selectedMonth.month,
+  //     1,
+  //   );
+  //   final canGoNext = selectedMonth.isBefore(currentMonth);
+  //
+  //   return Padding(
+  //     padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+  //     child: Row(
+  //       mainAxisAlignment: MainAxisAlignment.center,
+  //       children: [
+  //         IconButton(
+  //           icon: Icon(Icons.chevron_left, size: 24.sp),
+  //           onPressed: userId == null
+  //               ? null
+  //               : () => _changeBudgetMonth(
+  //                     budget,
+  //                     txnProvider,
+  //                     userId,
+  //                     DateTime(
+  //                       budget.selectedMonth.year,
+  //                       budget.selectedMonth.month - 1,
+  //                       1,
+  //                     ),
+  //                   ),
+  //           color: AppColors.textSecondary,
+  //           disabledColor: AppColors.hint,
+  //         ),
+  //         Text(
+  //           budget.periodLabel,
+  //           style: GoogleFonts.inter(
+  //             fontSize: 14.sp,
+  //             fontWeight: FontWeight.w600,
+  //             color: AppColors.textPrimary,
+  //           ),
+  //         ),
+  //         IconButton(
+  //           icon: Icon(Icons.chevron_right, size: 24.sp),
+  //           onPressed: userId == null || !canGoNext
+  //               ? null
+  //               : () => _changeBudgetMonth(
+  //                     budget,
+  //                     txnProvider,
+  //                     userId,
+  //                     DateTime(
+  //                       budget.selectedMonth.year,
+  //                       budget.selectedMonth.month + 1,
+  //                       1,
+  //                     ),
+  //                   ),
+  //           color: AppColors.textSecondary,
+  //           disabledColor: AppColors.hint,
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          IconButton(
-            icon: Icon(Icons.chevron_left, size: 24.sp),
-            onPressed: userId == null
-                ? null
-                : () => _changeBudgetMonth(
-                      budget,
-                      txnProvider,
-                      userId,
-                      DateTime(
-                        budget.selectedMonth.year,
-                        budget.selectedMonth.month - 1,
-                        1,
-                      ),
-                    ),
-            color: AppColors.textSecondary,
-            disabledColor: AppColors.hint,
-          ),
-          Text(
-            budget.periodLabel,
-            style: GoogleFonts.inter(
-              fontSize: 14.sp,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          IconButton(
-            icon: Icon(Icons.chevron_right, size: 24.sp),
-            onPressed: userId == null || !canGoNext
-                ? null
-                : () => _changeBudgetMonth(
-                      budget,
-                      txnProvider,
-                      userId,
-                      DateTime(
-                        budget.selectedMonth.year,
-                        budget.selectedMonth.month + 1,
-                        1,
-                      ),
-                    ),
-            color: AppColors.textSecondary,
-            disabledColor: AppColors.hint,
-          ),
-        ],
-      ),
-    );
-  }
+  // Notice riwayat budget dikomen dulu bersama fitur ganti bulan.
+  // Widget _buildHistoryNotice() {
+  //   return Container(
+  //     padding: EdgeInsets.all(12.w),
+  //     decoration: BoxDecoration(
+  //       color: AppColors.info.withValues(alpha: 0.07),
+  //       borderRadius: BorderRadius.circular(8.r),
+  //       border: Border.all(color: AppColors.info.withValues(alpha: 0.18)),
+  //     ),
+  //     child: Row(
+  //       children: [
+  //         Icon(Icons.history_rounded, color: AppColors.info, size: 16.sp),
+  //         SizedBox(width: 8.w),
+  //         Expanded(
+  //           child: Text(
+  //             'Riwayat budget hanya untuk dilihat. Edit anggaran dilakukan di bulan berjalan.',
+  //             style: GoogleFonts.inter(
+  //               fontSize: 11.sp,
+  //               height: 1.35,
+  //               color: AppColors.textSecondary,
+  //               fontWeight: FontWeight.w500,
+  //             ),
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
-  Widget _buildHistoryNotice() {
-    return Container(
-      padding: EdgeInsets.all(12.w),
-      decoration: BoxDecoration(
-        color: AppColors.info.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(8.r),
-        border: Border.all(color: AppColors.info.withValues(alpha: 0.18)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.history_rounded, color: AppColors.info, size: 16.sp),
-          SizedBox(width: 8.w),
-          Expanded(
-            child: Text(
-              'Riwayat budget hanya untuk dilihat. Edit anggaran dilakukan di bulan berjalan.',
-              style: GoogleFonts.inter(
-                fontSize: 11.sp,
-                height: 1.35,
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCopyPreviousButton({
-    required bool enabled,
-    required VoidCallback? onPressed,
-  }) {
-    return SizedBox(
-      width: double.infinity,
-      height: 38.h,
-      child: OutlinedButton.icon(
-        onPressed: enabled ? onPressed : null,
-        icon: Icon(Icons.copy_all_rounded, size: 15.sp),
-        label: Text(
-          'Salin dari Bulan Sebelumnya',
-          style: GoogleFonts.inter(
-            fontSize: 12.sp,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.primary,
-          side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(6.r),
-          ),
-        ),
-      ),
-    );
-  }
+  // Widget tombol salin budget bulan sebelumnya dikomen dulu.
+  // Widget _buildCopyPreviousButton({
+  //   required bool enabled,
+  //   required VoidCallback? onPressed,
+  // }) {
+  //   return SizedBox(
+  //     width: double.infinity,
+  //     height: 38.h,
+  //     child: OutlinedButton.icon(
+  //       onPressed: enabled ? onPressed : null,
+  //       icon: Icon(Icons.copy_all_rounded, size: 15.sp),
+  //       label: Text(
+  //         'Salin dari Bulan Sebelumnya',
+  //         style: GoogleFonts.inter(
+  //           fontSize: 12.sp,
+  //           fontWeight: FontWeight.w700,
+  //         ),
+  //       ),
+  //       style: OutlinedButton.styleFrom(
+  //         foregroundColor: AppColors.primary,
+  //         side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
+  //         shape: RoundedRectangleBorder(
+  //           borderRadius: BorderRadius.circular(6.r),
+  //         ),
+  //       ),
+  //     ),
+  //   );
+  // }
 
   Widget _buildBudgetLoadingState() {
     return Container(
