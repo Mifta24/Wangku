@@ -83,6 +83,7 @@ class RupiahInputFormatter extends TextInputFormatter {
     if (RegExp(r'[^\d]').hasMatch(digits)) return oldValue;
     // Strip leading zeros (e.g. "007" → "7")
     final cleaned = digits.replaceAll(RegExp(r'^0+(?=\d)'), '');
+    if (cleaned.length > 15) return oldValue;
     if (cleaned.isEmpty) return oldValue;
     final formatted = format(cleaned);
     return TextEditingValue(

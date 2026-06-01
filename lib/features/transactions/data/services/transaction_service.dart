@@ -4,9 +4,14 @@ import '../../domain/models/category_model.dart';
 
 class TransactionService {
   final SupabaseClient _supabase = Supabase.instance.client;
-  
+
   static const String _transactionsTable = 'transactions';
   static const String _categoriesTable = 'categories';
+
+  static String _dateStr(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
 
   /// Fetch semua transaksi untuk user tertentu dengan date range filter
   Future<List<TransactionModel>> fetchTransactions({
@@ -23,12 +28,11 @@ class TransactionService {
           ''')
           .eq('user_id', userId);
 
-      // Filter by date range jika provided
       if (startDate != null) {
-        query = query.gte('date', startDate.toIso8601String());
+        query = query.gte('date', _dateStr(startDate));
       }
       if (endDate != null) {
-        query = query.lt('date', endDate.toIso8601String());
+        query = query.lt('date', _dateStr(endDate));
       }
 
       final response = await query.order('date', ascending: false);

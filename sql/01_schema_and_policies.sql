@@ -23,7 +23,7 @@ create table if not exists public.transactions (
   category_id uuid not null references public.categories(id) on delete restrict,
   amount numeric(14, 2) not null check (amount > 0),
   note text not null default '',
-  date timestamptz not null default now(),
+  date date not null default current_date,
   type text not null check (type in ('income', 'expense')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

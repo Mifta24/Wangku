@@ -211,9 +211,6 @@ class _DashboardPageState extends State<DashboardPage> {
                             selectedDate.year,
                             selectedDate.month,
                             selectedDate.day,
-                            DateTime.now().hour,
-                            DateTime.now().minute,
-                            DateTime.now().second,
                           ),
                           type: selectedType,
                         );
@@ -1561,7 +1558,7 @@ class _HomeTab extends StatelessWidget {
                       ),
                     ],
                   ),
-                  SizedBox(height: 24.h),
+                  SizedBox(height: 16.h),
 
                   // ── Transaksi Terbaru ──
                   Row(

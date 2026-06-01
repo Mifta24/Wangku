@@ -118,8 +118,10 @@ class _TransactionListPageState extends State<TransactionListPage> {
       if (userId == null) return;
       final now = DateTime.now();
       final start = DateTime(now.year - 1, now.month, now.day);
-      final end = now.add(const Duration(days: 1));
-      txnProvider.loadByDateRange(userId, start, end);
+      final end = DateTime(now.year + 5, now.month, now.day);
+      if (!txnProvider.hasLoadedRange(start, end)) {
+        txnProvider.loadByDateRange(userId, start, end);
+      }
     });
   }
 
@@ -528,7 +530,7 @@ class _TransactionListPageState extends State<TransactionListPage> {
       categoryId: tx.categoryId,
       amount: tx.amount,
       note: tx.note,
-      date: DateTime.now(),
+      date: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
       type: tx.type,
       category: tx.category,
     );
@@ -658,9 +660,6 @@ class _TransactionListPageState extends State<TransactionListPage> {
                           selectedDate.year,
                           selectedDate.month,
                           selectedDate.day,
-                          transaction.date.hour,
-                          transaction.date.minute,
-                          transaction.date.second,
                         ),
                         type: selectedType,
                         category: txnProvider.categories.firstWhere(
@@ -1312,9 +1311,6 @@ class _TransactionListPageState extends State<TransactionListPage> {
                       selectedDate.year,
                       selectedDate.month,
                       selectedDate.day,
-                      transaction.date.hour,
-                      transaction.date.minute,
-                      transaction.date.second,
                     ),
                     type: selectedType,
                     category: txnProvider.categories.firstWhere(
@@ -2193,7 +2189,9 @@ class _TransactionListPageState extends State<TransactionListPage> {
 
         // ── Transaction List ──
         Expanded(
-          child: RefreshIndicator(
+          child: txnProvider.isLoading && monthItems.isEmpty
+              ? const Center(child: CircularProgressIndicator())
+              : RefreshIndicator(
             onRefresh: () async {
               await txnProvider.refresh(authProvider.currentUser!.id);
             },
