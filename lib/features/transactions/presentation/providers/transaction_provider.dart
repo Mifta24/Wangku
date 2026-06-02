@@ -438,9 +438,19 @@ class TransactionProvider extends ChangeNotifier {
 
   /// Refresh data (call when app comes back to foreground)
   Future<void> refresh(String userId) async {
-    final startDate = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
-    final endDate = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 1);
-    await _loadTransactions(userId, startDate, endDate);
+    final start = _loadedStartDate;
+    final end = _loadedEndDate;
+    if (start != null && end != null) {
+      await _loadTransactions(userId, start, end);
+    } else {
+      final startDate = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
+      final endDate = DateTime(
+        _selectedMonth.year,
+        _selectedMonth.month + 1,
+        1,
+      );
+      await _loadTransactions(userId, startDate, endDate);
+    }
   }
 
   /// Clear state (on logout)

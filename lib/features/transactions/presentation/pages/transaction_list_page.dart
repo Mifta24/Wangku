@@ -585,7 +585,12 @@ class _TransactionListPageState extends State<TransactionListPage> {
       if (t.type == 'expense') totalExpense += t.amount;
     }
 
-    final filteredItems = _applyFilters(monthItems);
+    // When a date range filter is active, apply filters to the full loaded list
+    // so transactions outside the selected month are still reachable.
+    final baseItems = _filters.dateRange != null
+        ? txnProvider.transactions.toList()
+        : monthItems;
+    final filteredItems = _applyFilters(baseItems);
     final visibleItems = filteredItems.take(_visibleCount).toList();
 
     return Column(
