@@ -5,7 +5,7 @@ class BudgetRepository {
   final BudgetService _service = BudgetService();
   final HiveManager _hive = HiveManager.instance;
 
-  /// Ambil semua budget kategori: Supabase utama, Hive fallback
+  /// Ambil budget kategori: coba dari Supabase, kalau gagal (offline) pakai cache Hive
   Future<Map<String, double>> getCategoryBudgets(
     String userId, [
     DateTime? month,

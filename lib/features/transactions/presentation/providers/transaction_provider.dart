@@ -1,20 +1,16 @@
 import 'package:flutter/material.dart';
 import '../../domain/models/transaction_model.dart';
 import '../../domain/models/category_model.dart';
-import '../../domain/models/shortcut_model.dart';
 import '../../data/repositories/transaction_repository.dart';
-import '../../data/repositories/shortcut_repository.dart';
 import '../../../reports/data/repositories/budget_repository.dart';
 
 class TransactionProvider extends ChangeNotifier {
   final TransactionRepository _repository = TransactionRepository();
-  final ShortcutRepository _shortcutRepository = ShortcutRepository();
   final BudgetRepository _budgetRepository = BudgetRepository();
 
   // State
   List<TransactionModel> _transactions = [];
   List<CategoryModel> _categories = [];
-  List<TransactionShortcut> _customShortcuts = [];
   bool _isLoading = false;
   String? _errorMessage;
   DateTime _selectedMonth = DateTime.now();
@@ -79,9 +75,7 @@ class TransactionProvider extends ChangeNotifier {
     _clearError();
 
     try {
-      // Load categories & shortcuts
       await loadCategories(userId);
-      await loadShortcuts(userId);
 
       // Load transaksi bulan ini
       final startDate = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
@@ -211,36 +205,6 @@ class TransactionProvider extends ChangeNotifier {
         .toList();
   }
 
-  /// Get custom shortcuts
-  List<TransactionShortcutPreset> get customShortcutPresets {
-    if (_customShortcuts.isEmpty) {
-      final expenses = getFrequentCategories('expense', limit: 3);
-      final incomes = getFrequentCategories('income', limit: 2);
-      return [...expenses, ...incomes]
-          .map(
-            (category) => TransactionShortcutPreset(
-              category: category,
-              shortcut: TransactionShortcut(categoryId: category.id),
-            ),
-          )
-          .toList();
-    }
-    
-    return _customShortcuts
-        .map((shortcut) {
-          final category = _categories
-              .cast<CategoryModel?>()
-              .firstWhere((c) => c?.id == shortcut.categoryId, orElse: () => null);
-          if (category == null) return null;
-          return TransactionShortcutPreset(
-            category: category,
-            shortcut: shortcut,
-          );
-        })
-        .whereType<TransactionShortcutPreset>()
-        .toList();
-  }
-
   Future<void> updateCategory(CategoryModel category) async {
     try {
       _clearError();
@@ -278,41 +242,12 @@ class TransactionProvider extends ChangeNotifier {
       // Hapus budget kategori ini dari Supabase & Hive supaya tidak ada data orphan
       await _budgetRepository.deleteCategoryBudget(category.userId!, category.id);
       _categories.removeWhere((c) => c.id == category.id);
-      _customShortcuts.removeWhere((shortcut) => shortcut.categoryId == category.id);
       notifyListeners();
     } catch (e) {
       _setError('Gagal hapus kategori: ${e.toString()}');
       notifyListeners();
       rethrow;
     }
-  }
-
-  List<CategoryModel> get customShortcuts =>
-      customShortcutPresets.map((preset) => preset.category).toList();
-
-  /// Load shortcuts
-  Future<void> loadShortcuts(String userId) async {
-    _customShortcuts = await _shortcutRepository.getShortcuts(userId);
-    notifyListeners();
-  }
-
-  /// Save shortcuts
-  Future<void> saveShortcuts(String userId, List<String> categoryIds) async {
-    await saveShortcutPresets(
-      userId,
-      categoryIds
-          .map((categoryId) => TransactionShortcut(categoryId: categoryId))
-          .toList(),
-    );
-  }
-
-  Future<void> saveShortcutPresets(
-    String userId,
-    List<TransactionShortcut> shortcuts,
-  ) async {
-    await _shortcutRepository.saveShortcuts(userId, shortcuts);
-    _customShortcuts = shortcuts;
-    notifyListeners();
   }
 
   /// Load transaksi untuk bulan tertentu
@@ -499,7 +434,6 @@ class TransactionProvider extends ChangeNotifier {
     _repository.unsubscribeCategories();
     _transactions = [];
     _categories = [];
-    _customShortcuts = [];
     _loadedStartDate = null;
     _loadedEndDate = null;
     _isLoading = false;

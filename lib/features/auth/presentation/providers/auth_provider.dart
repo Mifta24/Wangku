@@ -5,14 +5,12 @@ import '../../data/services/auth_service.dart';
 import '../../data/services/profile_service.dart';
 import '../../domain/models/user_profile.dart';
 import '../../../reports/data/repositories/budget_repository.dart';
-import '../../../transactions/data/repositories/shortcut_repository.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
   final ProfileService _profileService = ProfileService();
   final HiveManager _hiveManager = HiveManager.instance;
   final BudgetRepository _budgetRepository = BudgetRepository();
-  final ShortcutRepository _shortcutRepository = ShortcutRepository();
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -114,7 +112,6 @@ class AuthProvider extends ChangeNotifier {
       await _hiveManager.clearUserData(userId);
       await _hiveManager.clearNotifications(userId);
       await _budgetRepository.clearUserBudgets(userId);
-      await _shortcutRepository.clearUserShortcuts(userId);
     }
     await _hiveManager.clearCurrentUserId();
     _profile = null;

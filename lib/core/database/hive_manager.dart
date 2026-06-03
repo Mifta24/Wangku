@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../../features/transactions/domain/models/transaction_model.dart';
 import '../../features/transactions/domain/models/category_model.dart';
-import '../../features/transactions/domain/models/shortcut_model.dart';
 import '../notifications/app_notification_record.dart';
 
 class HiveManager {
@@ -434,16 +433,6 @@ class HiveManager {
     }
   }
 
-  /// Save user custom shortcuts
-  Future<void> saveShortcuts(String userId, List<String> categoryIds) async {
-    await saveShortcutPresets(
-      userId,
-      categoryIds
-          .map((categoryId) => TransactionShortcut(categoryId: categoryId))
-          .toList(),
-    );
-  }
-
   Future<void> saveBudgetNotificationSettings(
     String userId, {
     required bool enabled,
@@ -600,46 +589,6 @@ class HiveManager {
     } catch (e) {
       debugPrint('Error deleting category: $e');
       rethrow;
-    }
-  }
-
-  Future<void> saveShortcutPresets(
-    String userId,
-    List<TransactionShortcut> shortcuts,
-  ) async {
-    try {
-      final userBox = _userBoxInstance ?? await Hive.openBox<dynamic>(_userBox);
-      await userBox.put(
-        '${userId}_shortcuts',
-        shortcuts.map((shortcut) => shortcut.toJson()).toList(),
-      );
-    } catch (e) {
-      debugPrint('Error saving shortcuts: $e');
-    }
-  }
-
-  /// Get user custom shortcuts
-  Future<List<String>> getShortcuts(String userId) async {
-    final shortcuts = await getShortcutPresets(userId);
-    return shortcuts.map((shortcut) => shortcut.categoryId).toList();
-  }
-
-  Future<List<TransactionShortcut>> getShortcutPresets(String userId) async {
-    try {
-      final userBox = _userBoxInstance ?? await Hive.openBox<dynamic>(_userBox);
-      final data = userBox.get('${userId}_shortcuts');
-      if (data == null) return [];
-      final rawItems = List<dynamic>.from(data as List);
-
-      return rawItems.map((item) {
-        if (item is String) {
-          return TransactionShortcut(categoryId: item);
-        }
-        return TransactionShortcut.fromJson(Map<String, dynamic>.from(item as Map));
-      }).where((shortcut) => shortcut.categoryId.isNotEmpty).toList();
-    } catch (e) {
-      debugPrint('Error getting shortcuts: $e');
-      return [];
     }
   }
 
