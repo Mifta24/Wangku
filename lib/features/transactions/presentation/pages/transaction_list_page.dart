@@ -520,47 +520,6 @@ class _TransactionListPageState extends State<TransactionListPage> {
     );
   }
 
-  Future<void> _duplicateTransaction(TransactionModel tx) async {
-    final txnProvider = context.read<TransactionProvider>();
-    final authProvider = context.read<AuthProvider>();
-    if (authProvider.currentUser == null) return;
-
-    final duplicate = TransactionModel(
-      id: '',
-      userId: tx.userId,
-      categoryId: tx.categoryId,
-      amount: tx.amount,
-      note: tx.note,
-      date: DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day),
-      type: tx.type,
-      category: tx.category,
-    );
-
-    try {
-      await txnProvider.addTransaction(duplicate, authProvider.currentUser!.id);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text('Transaksi berhasil diduplikat.'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text('Gagal menduplikat transaksi.'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-    }
-  }
-
-
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
@@ -578,20 +537,22 @@ class _TransactionListPageState extends State<TransactionListPage> {
         )
         .toList();
 
-    double totalIncome = 0;
-    double totalExpense = 0;
-    for (final t in monthItems) {
-      if (t.type == 'income') totalIncome += t.amount;
-      if (t.type == 'expense') totalExpense += t.amount;
-    }
-
-    // When a date range filter is active, apply filters to the full loaded list
-    // so transactions outside the selected month are still reachable.
-    final baseItems = _filters.dateRange != null
+    final hasAmountOrDateFilter = _filters.dateRange != null ||
+        _filters.minAmount != null ||
+        _filters.maxAmount != null;
+    final baseItems = hasAmountOrDateFilter
         ? txnProvider.transactions.toList()
         : monthItems;
     final filteredItems = _applyFilters(baseItems);
     final visibleItems = filteredItems.take(_visibleCount).toList();
+
+    final totalsSource = hasAmountOrDateFilter ? filteredItems : monthItems;
+    double totalIncome = 0;
+    double totalExpense = 0;
+    for (final t in totalsSource) {
+      if (t.type == 'income') totalIncome += t.amount;
+      if (t.type == 'expense') totalExpense += t.amount;
+    }
 
     return Column(
       children: [
@@ -620,7 +581,7 @@ class _TransactionListPageState extends State<TransactionListPage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   GestureDetector(
-                    onTap: _showMonthPicker,
+                    onTap: _filters.dateRange == null ? _showMonthPicker : null,
                     child: Container(
                       padding: EdgeInsets.symmetric(
                         horizontal: 12.w,
@@ -629,28 +590,40 @@ class _TransactionListPageState extends State<TransactionListPage> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(20.r),
-                        border: Border.all(color: AppColors.border),
+                        border: Border.all(
+                          color: _filters.dateRange != null
+                              ? AppColors.primary
+                              : AppColors.border,
+                        ),
                       ),
                       child: Row(
                         children: [
                           Icon(
                             Icons.calendar_month_outlined,
-                            color: AppColors.textSecondary,
+                            color: _filters.dateRange != null
+                                ? AppColors.primary
+                                : AppColors.textSecondary,
                             size: 15.sp,
                           ),
                           SizedBox(width: 6.w),
                           Text(
-                            '${_shortMonths[_selectedMonth.month - 1]} ${_selectedMonth.year}',
+                            _filters.dateRange != null
+                                ? '${_filters.dateRange!.start.day}/${_filters.dateRange!.start.month} – ${_filters.dateRange!.end.day}/${_filters.dateRange!.end.month}'
+                                : '${_shortMonths[_selectedMonth.month - 1]} ${_selectedMonth.year}',
                             style: GoogleFonts.inter(
                               fontSize: 13.sp,
                               fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
+                              color: _filters.dateRange != null
+                                  ? AppColors.primary
+                                  : AppColors.textPrimary,
                             ),
                           ),
                           SizedBox(width: 4.w),
                           Icon(
                             Icons.keyboard_arrow_down_rounded,
-                            color: AppColors.textSecondary,
+                            color: _filters.dateRange != null
+                                ? AppColors.primary
+                                : AppColors.textSecondary,
                             size: 16.sp,
                           ),
                         ],
