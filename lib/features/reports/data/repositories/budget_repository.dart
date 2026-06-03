@@ -58,6 +58,14 @@ class BudgetRepository {
     await _hive.deleteCategoryBudget(userId, categoryId, targetMonth);
   }
 
+  void subscribeToBudgets(String userId, void Function() onChanged) {
+    _service.subscribeToBudgets(userId, onChanged);
+  }
+
+  void unsubscribeBudgets() {
+    _service.unsubscribeBudgets();
+  }
+
   /// Hapus semua budget user (dipanggil saat logout)
   Future<void> clearUserBudgets(String userId) async {
     try {

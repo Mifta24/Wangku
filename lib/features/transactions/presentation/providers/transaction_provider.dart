@@ -89,9 +89,49 @@ class TransactionProvider extends ChangeNotifier {
       await _loadTransactions(userId, startDate, endDate);
 
       _setLoading(false);
+
+      // Mulai listen Supabase Realtime setelah data awal selesai di-load
+      _subscribeRealtime(userId);
     } catch (e) {
       _setError(e.toString());
       _setLoading(false);
+    }
+  }
+
+  void _subscribeRealtime(String userId) {
+    _repository.subscribeToTransactions(userId, () => _silentRefresh(userId));
+    _repository.subscribeToCategories(userId, () => _silentRefreshCategories(userId));
+  }
+
+  Future<void> _silentRefreshCategories(String userId) async {
+    try {
+      final cats = await _repository.getCategories(userId: userId);
+      _categories = cats;
+      _transactions = _transactions.map((t) {
+        final cat = cats.cast<CategoryModel?>().firstWhere(
+          (c) => c?.id == t.categoryId,
+          orElse: () => null,
+        );
+        return cat != null ? t.copyWith(category: cat) : t;
+      }).toList();
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  Future<void> _silentRefresh(String userId) async {
+    final start = _loadedStartDate;
+    final end = _loadedEndDate;
+    if (start == null || end == null) return;
+    try {
+      final txs = await _repository.getTransactions(
+        userId: userId,
+        startDate: start,
+        endDate: end,
+      );
+      _transactions = txs;
+      notifyListeners();
+    } catch (_) {
+      // silent — jangan tampilkan error untuk background refresh
     }
   }
 
@@ -455,6 +495,8 @@ class TransactionProvider extends ChangeNotifier {
 
   /// Clear state (on logout)
   void clear() {
+    _repository.unsubscribeTransactions();
+    _repository.unsubscribeCategories();
     _transactions = [];
     _categories = [];
     _customShortcuts = [];

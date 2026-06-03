@@ -45,6 +45,14 @@ class AuthProvider extends ChangeNotifier {
     try {
       _profile = await _profileService.getProfile(userId);
       notifyListeners();
+      _profileService.subscribeToProfile(userId, () => _silentRefreshProfile(userId));
+    } catch (_) {}
+  }
+
+  Future<void> _silentRefreshProfile(String userId) async {
+    try {
+      _profile = await _profileService.getProfile(userId);
+      notifyListeners();
     } catch (_) {}
   }
 
@@ -99,6 +107,7 @@ class AuthProvider extends ChangeNotifier {
   // Fungsi Logout
   Future<void> logout() async {
     _setLoading(true);
+    _profileService.unsubscribeProfile();
     final userId = _authService.currentUser?.id;
     await _authService.signOut();
     if (userId != null) {

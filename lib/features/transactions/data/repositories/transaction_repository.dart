@@ -275,6 +275,22 @@ class TransactionRepository implements ITransactionRepository {
     }
   }
 
+  void subscribeToTransactions(String userId, void Function() onChanged) {
+    _service.subscribeToTransactions(userId, onChanged);
+  }
+
+  void unsubscribeTransactions() {
+    _service.unsubscribeTransactions();
+  }
+
+  void subscribeToCategories(String userId, void Function() onChanged) {
+    _service.subscribeToCategories(userId, onChanged);
+  }
+
+  void unsubscribeCategories() {
+    _service.unsubscribeCategories();
+  }
+
   /// Sync pending transactions to Supabase (call this when online)
   Future<void> syncPendingTransactions(String userId) async {
     try {

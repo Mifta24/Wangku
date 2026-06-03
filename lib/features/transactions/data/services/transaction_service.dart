@@ -8,6 +8,55 @@ class TransactionService {
   static const String _transactionsTable = 'transactions';
   static const String _categoriesTable = 'categories';
 
+  RealtimeChannel? _transactionChannel;
+  RealtimeChannel? _categoryChannel;
+
+  void subscribeToTransactions(String userId, void Function() onChanged) {
+    _transactionChannel?.unsubscribe();
+    _transactionChannel = _supabase
+        .channel('transactions_$userId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: _transactionsTable,
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: userId,
+          ),
+          callback: (_) => onChanged(),
+        )
+        .subscribe();
+  }
+
+  void unsubscribeTransactions() {
+    _transactionChannel?.unsubscribe();
+    _transactionChannel = null;
+  }
+
+  void subscribeToCategories(String userId, void Function() onChanged) {
+    _categoryChannel?.unsubscribe();
+    _categoryChannel = _supabase
+        .channel('categories_$userId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: _categoriesTable,
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: userId,
+          ),
+          callback: (_) => onChanged(),
+        )
+        .subscribe();
+  }
+
+  void unsubscribeCategories() {
+    _categoryChannel?.unsubscribe();
+    _categoryChannel = null;
+  }
+
   static String _dateStr(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-'
       '${d.month.toString().padLeft(2, '0')}-'

@@ -36,6 +36,7 @@ class NotificationCenterProvider extends ChangeNotifier {
     _notifications = await _repository.getNotifications(userId);
     _isLoading = false;
     notifyListeners();
+    _repository.subscribeToNotifications(userId, _silentReload);
   }
 
   Future<void> reload() async {
@@ -44,9 +45,19 @@ class NotificationCenterProvider extends ChangeNotifier {
     await load(userId);
   }
 
+  Future<void> _silentReload() async {
+    final userId = _userId;
+    if (userId == null) return;
+    try {
+      _notifications = await _repository.getNotifications(userId);
+      notifyListeners();
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
     _newNotifSub?.cancel();
+    _repository.unsubscribeNotifications();
     super.dispose();
   }
 

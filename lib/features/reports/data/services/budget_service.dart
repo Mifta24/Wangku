@@ -5,6 +5,31 @@ class BudgetService {
 
   static const String _budgetsTable = 'budgets';
 
+  RealtimeChannel? _budgetChannel;
+
+  void subscribeToBudgets(String userId, void Function() onChanged) {
+    _budgetChannel?.unsubscribe();
+    _budgetChannel = _supabase
+        .channel('budgets_$userId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: _budgetsTable,
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: userId,
+          ),
+          callback: (_) => onChanged(),
+        )
+        .subscribe();
+  }
+
+  void unsubscribeBudgets() {
+    _budgetChannel?.unsubscribe();
+    _budgetChannel = null;
+  }
+
   /// Fetch semua budget kategori untuk user
   Future<Map<String, double>> fetchCategoryBudgets(
     String userId, [

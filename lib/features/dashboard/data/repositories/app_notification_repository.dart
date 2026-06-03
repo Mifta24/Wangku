@@ -60,4 +60,12 @@ class AppNotificationRepository {
       await _hiveManager.clearNotifications(userId);
     }
   }
+
+  void subscribeToNotifications(String userId, void Function() onChanged) {
+    _service.subscribeToNotifications(userId, onChanged);
+  }
+
+  void unsubscribeNotifications() {
+    _service.unsubscribeNotifications();
+  }
 }

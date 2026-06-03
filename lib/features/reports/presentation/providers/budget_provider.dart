@@ -146,6 +146,16 @@ class BudgetProvider extends ChangeNotifier {
     }
     _isLoading = false;
     notifyListeners();
+    _budgetRepository.subscribeToBudgets(userId, _silentRefreshBudgets);
+  }
+
+  Future<void> _silentRefreshBudgets() async {
+    final userId = _userId;
+    if (userId == null) return;
+    try {
+      _categoryBudgets = await _budgetRepository.getCategoryBudgets(userId, _selectedMonth);
+      notifyListeners();
+    } catch (_) {}
   }
 
   Future<void> setSelectedMonth(String userId, DateTime month) async {
@@ -422,6 +432,7 @@ class BudgetProvider extends ChangeNotifier {
   void dispose() {
     _isDisposed = true;
     txnProvider.removeListener(_onTransactionsChanged);
+    _budgetRepository.unsubscribeBudgets();
     super.dispose();
   }
 }

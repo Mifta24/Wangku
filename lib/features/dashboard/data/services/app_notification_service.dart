@@ -7,6 +7,31 @@ class AppNotificationService {
 
   static const String _table = 'notifications';
 
+  RealtimeChannel? _notificationChannel;
+
+  void subscribeToNotifications(String userId, void Function() onChanged) {
+    _notificationChannel?.unsubscribe();
+    _notificationChannel = _supabase
+        .channel('notifications_$userId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: _table,
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: userId,
+          ),
+          callback: (_) => onChanged(),
+        )
+        .subscribe();
+  }
+
+  void unsubscribeNotifications() {
+    _notificationChannel?.unsubscribe();
+    _notificationChannel = null;
+  }
+
   Future<List<AppNotificationRecord>> fetchNotifications(String userId) async {
     final response = await _supabase
         .from(_table)
