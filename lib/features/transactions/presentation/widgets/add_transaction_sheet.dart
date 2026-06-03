@@ -400,49 +400,38 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
 
   Widget _buildForm() {
     final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          child: SingleChildScrollView(
-            physics: const ClampingScrollPhysics(),
-            padding: EdgeInsets.fromLTRB(20.w, 8.h, 20.w, keyboardHeight + 8.h),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _formLabel('Jumlah'),
-                _formField(
-                  controller: _amountController,
-                  hint: '0',
-                  prefixText: 'Rp ',
-                  icon: Icons.account_balance_wallet_outlined,
-                  keyboardType: TextInputType.number,
-                  focusNode: _amountFocusNode,
-                  errorText: _amountErrorText,
-                  inputFormatters: [RupiahInputFormatter()],
-                  onChangedExtra: () =>
-                      setState(() => _amountErrorText = null),
-                ),
-                SizedBox(height: 14.h),
-                _formLabel('Catatan (opsional)'),
-                _formField(
-                  controller: _noteController,
-                  hint: 'Tulis catatan...',
-                  icon: Icons.edit_note_rounded,
-                ),
-                SizedBox(height: 14.h),
-                _formLabel('Tanggal'),
-                _buildDateField(),
-              ],
-            ),
+    return SingleChildScrollView(
+      physics: const ClampingScrollPhysics(),
+      padding: EdgeInsets.fromLTRB(20.w, 8.h, 20.w, keyboardHeight + 24.h),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _formLabel('Jumlah'),
+          _formField(
+            controller: _amountController,
+            hint: '0',
+            prefixText: 'Rp ',
+            icon: Icons.account_balance_wallet_outlined,
+            keyboardType: TextInputType.number,
+            focusNode: _amountFocusNode,
+            errorText: _amountErrorText,
+            inputFormatters: [RupiahInputFormatter()],
+            onChangedExtra: () => setState(() => _amountErrorText = null),
           ),
-        ),
-        Padding(
-          padding: EdgeInsets.fromLTRB(20.w, 8.h, 20.w,
-              keyboardHeight > 0 ? keyboardHeight + 8.h : 24.h),
-          child: _buildSaveButton(),
-        ),
-      ],
+          SizedBox(height: 14.h),
+          _formLabel('Catatan (opsional)'),
+          _formField(
+            controller: _noteController,
+            hint: 'Tulis catatan...',
+            icon: Icons.edit_note_rounded,
+          ),
+          SizedBox(height: 14.h),
+          _formLabel('Tanggal'),
+          _buildDateField(),
+          SizedBox(height: 40.h),
+          _buildSaveButton(),
+        ],
+      ),
     );
   }
 
