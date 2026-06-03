@@ -18,6 +18,8 @@ import 'core/theme/app_theme.dart';
 import 'core/database/hive_manager.dart';
 import 'core/notifications/notification_service.dart';
 import 'core/notifications/budget_background_worker.dart';
+import 'shared/providers/connectivity_provider.dart';
+import 'shared/widgets/no_internet_overlay.dart';
 import 'package:workmanager/workmanager.dart';
 
 import 'core/config/supabase_config.dart';
@@ -68,6 +70,7 @@ void main() async {
   runApp(
     MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => ConnectivityProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => TransactionProvider()),
         ChangeNotifierProxyProvider<TransactionProvider, DashboardProvider>(
@@ -128,6 +131,9 @@ class WangkuApp extends StatelessWidget {
             Locale('id', 'ID'),
             Locale('en', 'US'),
           ],
+          builder: (context, routerChild) => NoInternetOverlay(
+            child: routerChild ?? const SizedBox.shrink(),
+          ),
         );
       },
     );

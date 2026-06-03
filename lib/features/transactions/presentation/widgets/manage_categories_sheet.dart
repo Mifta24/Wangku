@@ -404,15 +404,26 @@ class _CategoryList extends StatelessWidget {
     try {
       await context.read<TransactionProvider>().deleteCategory(category);
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Kategori berhasil dihapus')),
-      );
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Kategori berhasil dihapus'),
+            backgroundColor: AppColors.success,
+          ),
+        );
     } catch (e) {
       if (!context.mounted) return;
       final message = e.toString().replaceFirst('Exception: ', '');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: AppColors.error,
+          ),
+        );
     }
   }
 }
