@@ -128,7 +128,9 @@ class _RegisterPageState extends State<RegisterPage> {
                     prefixIcon: LucideIcons.mail,
                     validator: (value) {
                       if (value == null || value.isEmpty) return 'Email tidak boleh kosong';
-                      if (!value.contains('@')) return 'Email tidak valid';
+                      if (!RegExp(r'^[\w.+-]+@gmail\.com$').hasMatch(value.trim())) {
+                        return 'Gunakan email @gmail.com';
+                      }
                       return null;
                     },
                   ),

@@ -438,7 +438,8 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
           ),
         ),
         Padding(
-          padding: EdgeInsets.fromLTRB(20.w, 8.h, 20.w, 24.h),
+          padding: EdgeInsets.fromLTRB(20.w, 8.h, 20.w,
+              keyboardHeight > 0 ? keyboardHeight + 8.h : 24.h),
           child: _buildSaveButton(),
         ),
       ],
@@ -594,7 +595,7 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
         child: _isSaving
             ? SizedBox(
                 width: 18.w,
-                height: 18.w,
+                height: 12.w,
                 child: const CircularProgressIndicator(
                     strokeWidth: 2, color: Colors.white),
               )

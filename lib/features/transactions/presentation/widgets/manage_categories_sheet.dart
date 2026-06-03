@@ -157,6 +157,18 @@ class _ManageCategoriesSheetState extends State<ManageCategoriesSheet>
       } else {
         await txnProvider.updateCategory(result.copyWith(userId: userId));
       }
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(category == null
+                ? 'Kategori berhasil ditambahkan'
+                : 'Kategori berhasil diperbarui'),
+            backgroundColor: AppColors.success,
+          ),
+        );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
