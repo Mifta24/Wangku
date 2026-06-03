@@ -7,11 +7,13 @@ import '../../../dashboard/data/repositories/app_notification_repository.dart';
 import '../../../transactions/data/repositories/transaction_repository.dart';
 import '../../../transactions/presentation/providers/transaction_provider.dart';
 import '../../data/repositories/budget_repository.dart';
+import '../../data/services/report_service.dart';
 
 class BudgetProvider extends ChangeNotifier {
   final TransactionProvider txnProvider;
   final BudgetRepository _budgetRepository = BudgetRepository();
   final TransactionRepository _transactionRepository = TransactionRepository();
+  final ReportService _reportService = ReportService();
   final HiveManager _hiveManager = HiveManager.instance;
   final AppNotificationRepository _notificationRepository =
       AppNotificationRepository();
@@ -270,42 +272,55 @@ class BudgetProvider extends ChangeNotifier {
   ) async {
     if (!_notificationsEnabled) return;
     if (!_isSameMonth(transactionDate, DateTime.now())) return;
-    final budget = await _categoryBudgetForMonth(categoryId, DateTime.now());
-    if (budget == null || budget <= 0) return;
+    final userId = _userId;
+    if (userId == null) return;
 
-    final expense = await _categoryExpenseForMonth(
-      categoryId,
-      DateTime.now(),
-    ).catchError((_) => categoryExpense(categoryId));
-    final ratio = expense / budget;
+    final now = DateTime.now();
+    double ratio;
+    double rem;
+
+    try {
+      final alerts = await _reportService.checkBudgetAlerts(
+        userId: userId,
+        year: now.year,
+        month: now.month,
+      );
+      final item = alerts.where((a) => a.categoryId == categoryId).firstOrNull;
+      if (item == null || item.budget <= 0) return;
+      ratio = item.spent / item.budget;
+      rem = item.budget - item.spent;
+    } catch (_) {
+      // Fallback ke kalkulasi lokal jika RPC gagal
+      final budget = await _categoryBudgetForMonth(categoryId, now);
+      if (budget == null || budget <= 0) return;
+      final expense = await _categoryExpenseForMonth(categoryId, now)
+          .catchError((_) => categoryExpense(categoryId));
+      ratio = expense / budget;
+      rem = budget - expense;
+    }
+
     if (ratio < _warningThreshold) return;
 
-    final rem = budget - expense;
-    final userId = _userId;
-    if (userId != null) {
-      final isOver = ratio >= 1.0;
-      final title = isOver ? 'Anggaran Habis!' : 'Peringatan Anggaran!';
-      final body = isOver
-          ? 'Pengeluaranmu di $categoryName sudah melebihi batas anggaran.'
-          : 'Anggaran kategori $categoryName sisa ${_formatRupiah(rem)}.';
+    final isOver = ratio >= 1.0;
+    final title = isOver ? 'Anggaran Habis!' : 'Peringatan Anggaran!';
+    final body = isOver
+        ? 'Pengeluaranmu di $categoryName sudah melebihi batas anggaran.'
+        : 'Anggaran kategori $categoryName sisa ${_formatRupiah(rem)}.';
 
-      // Simpan ke database dulu
-      await _notificationRepository.addNotification(
-        AppNotificationRecord.create(
-          userId: userId,
-          title: title,
-          body: body,
-          type: 'category_budget',
-        ),
-      );
-      // Baru kirim push notif ke HP — supaya keduanya selalu sinkron
-      await NotificationService.instance.showCategoryBudgetWarning(
-        categoryName: categoryName,
-        percent: ratio,
-        remaining: rem,
-        categoryId: categoryId,
-      );
-    }
+    await _notificationRepository.addNotification(
+      AppNotificationRecord.create(
+        userId: userId,
+        title: title,
+        body: body,
+        type: 'category_budget',
+      ),
+    );
+    await NotificationService.instance.showCategoryBudgetWarning(
+      categoryName: categoryName,
+      percent: ratio,
+      remaining: rem,
+      categoryId: categoryId,
+    );
 
     // Total anggaran — dinonaktifkan sementara
     // await _maybeNotifyBudgetWarning();

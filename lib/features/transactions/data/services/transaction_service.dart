@@ -278,8 +278,7 @@ class TransactionService {
     }
   }
 
-  /// Aggregate transaksi untuk dashboard (total income/expense)
-  /// Return: {"total_income": 0, "total_expense": 0}
+  /// Aggregate transaksi via RPC — DB melakukan SUM(), bukan Flutter
   Future<Map<String, double>> getMonthlyAggregates({
     required String userId,
     required DateTime month,
@@ -288,28 +287,16 @@ class TransactionService {
       final startDate = DateTime(month.year, month.month, 1);
       final endDate = DateTime(month.year, month.month + 1, 1);
 
-      final response = await _supabase
-          .from(_transactionsTable)
-          .select('type, amount')
-          .eq('user_id', userId)
-          .gte('date', startDate.toIso8601String())
-          .lt('date', endDate.toIso8601String());
+      final response = await _supabase.rpc('get_monthly_aggregates', params: {
+        'p_user_id': userId,
+        'p_start_date': _dateStr(startDate),
+        'p_end_date': _dateStr(endDate),
+      });
 
-      double totalIncome = 0;
-      double totalExpense = 0;
-
-      for (final row in response as List<dynamic>) {
-        final amount = (row['amount'] as num).toDouble();
-        if (row['type'] == 'income') {
-          totalIncome += amount;
-        } else {
-          totalExpense += amount;
-        }
-      }
-
+      final data = response as Map<String, dynamic>;
       return {
-        'total_income': totalIncome,
-        'total_expense': totalExpense,
+        'total_income': (data['total_income'] as num).toDouble(),
+        'total_expense': (data['total_expense'] as num).toDouble(),
       };
     } catch (e) {
       throw Exception('Gagal fetch aggregate: ${e.toString()}');

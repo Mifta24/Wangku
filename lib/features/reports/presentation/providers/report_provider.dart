@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../../transactions/data/repositories/transaction_repository.dart';
 import '../../../transactions/domain/models/transaction_model.dart';
 import '../../../transactions/presentation/providers/transaction_provider.dart';
+import '../../data/services/report_service.dart';
 
 enum PeriodType { week, month, year }
 enum TransactionType { expense, income }
@@ -40,6 +41,7 @@ class TrendPoint {
 
 class ReportProvider extends ChangeNotifier {
   final TransactionRepository _repository = TransactionRepository();
+  final ReportService _reportService = ReportService();
   String? _userId;
 
   PeriodType _periodType = PeriodType.month;
@@ -57,6 +59,7 @@ class ReportProvider extends ChangeNotifier {
   bool _isLoading = false;
   TransactionProvider? _transactionProvider;
   int _loadRequestId = 0;
+  PeriodReportResult? _lastRpcResult;
 
   ReportProvider({String? userId}) : _userId = userId {
     if (_userId != null) {
@@ -85,6 +88,7 @@ class ReportProvider extends ChangeNotifier {
       return;
     }
 
+    _lastRpcResult = null;
     _transactions = _filterTransactionsForCurrentPeriod(transactions);
     _processData(notify: true);
   }
@@ -175,36 +179,70 @@ class ReportProvider extends ChangeNotifier {
     notifyListeners();
 
     final (start, end) = _currentPeriodRange();
+    final userId = _userId;
+
+    if (userId == null) {
+      _lastRpcResult = null;
+      _transactions = [];
+      _previousIncomeTotal = 0.0;
+      _previousExpenseTotal = 0.0;
+      _processData();
+      _isLoading = false;
+      notifyListeners();
+      return;
+    }
+
+    final (prevStart, prevEnd) = _previousPeriodRange();
 
     try {
-      final userId = _userId;
-      if (userId == null) {
-        _transactions = [];
-        _previousIncomeTotal = 0.0;
-        _previousExpenseTotal = 0.0;
-      } else {
-        final (prevStart, prevEnd) = _previousPeriodRange();
+      // Jalankan RPC (agregat + prev period) dan fetch transaksi periode ini secara paralel.
+      // Transaksi tetap dibutuhkan untuk halaman detail kategori (report.transactions).
+      PeriodReportResult? rpcResult;
+      List<TransactionModel> currentTx = [];
+
+      await Future.wait([
+        _reportService
+            .getPeriodReport(
+              userId: userId,
+              start: start,
+              end: end,
+              prevStart: prevStart,
+              prevEnd: prevEnd,
+              periodType: _periodType,
+            )
+            .then((r) => rpcResult = r),
+        _repository
+            .getTransactions(userId: userId, startDate: start, endDate: end)
+            .then((t) => currentTx = t),
+      ]);
+
+      if (requestId != _loadRequestId) return;
+      _lastRpcResult = rpcResult;
+      _transactions = _filterTransactionsInRange(currentTx, start, end);
+      _previousIncomeTotal = rpcResult?.prevIncome ?? 0.0;
+      _previousExpenseTotal = rpcResult?.prevExpense ?? 0.0;
+    } catch (e) {
+      if (requestId != _loadRequestId) return;
+      debugPrint('Fetch report gagal, fallback ke raw fetch: $e');
+      try {
         final results = await Future.wait([
           _repository.getTransactions(userId: userId, startDate: start, endDate: end),
           _repository.getTransactions(userId: userId, startDate: prevStart, endDate: prevEnd),
         ]);
         if (requestId != _loadRequestId) return;
-
+        _lastRpcResult = null;
         _transactions = _filterTransactionsInRange(results[0], start, end);
         final prevTx = _filterTransactionsInRange(results[1], prevStart, prevEnd);
-        _previousIncomeTotal = prevTx
-            .where((t) => t.type == 'income')
-            .fold(0.0, (s, t) => s + t.amount);
-        _previousExpenseTotal = prevTx
-            .where((t) => t.type == 'expense')
-            .fold(0.0, (s, t) => s + t.amount);
+        _previousIncomeTotal = prevTx.where((t) => t.type == 'income').fold(0.0, (s, t) => s + t.amount);
+        _previousExpenseTotal = prevTx.where((t) => t.type == 'expense').fold(0.0, (s, t) => s + t.amount);
+      } catch (e2) {
+        if (requestId != _loadRequestId) return;
+        debugPrint('Fallback fetch juga gagal: $e2');
+        _lastRpcResult = null;
+        _transactions = [];
+        _previousIncomeTotal = 0.0;
+        _previousExpenseTotal = 0.0;
       }
-    } catch (e) {
-      if (requestId != _loadRequestId) return;
-      debugPrint('Error loading report data: $e');
-      _transactions = [];
-      _previousIncomeTotal = 0.0;
-      _previousExpenseTotal = 0.0;
     }
 
     if (requestId != _loadRequestId) return;
@@ -214,17 +252,42 @@ class ReportProvider extends ChangeNotifier {
   }
 
   void _processData({bool notify = false}) {
-    _incomeTotal = _transactions
-        .where((t) => t.type == 'income')
-        .fold(0.0, (sum, t) => sum + t.amount);
-    _expenseTotal = _transactions
-        .where((t) => t.type == 'expense')
-        .fold(0.0, (sum, t) => sum + t.amount);
+    final rpc = _lastRpcResult;
     _trendPoints = _buildTrendPoints();
+
+    if (rpc != null) {
+      _incomeTotal = rpc.currentIncome;
+      _expenseTotal = rpc.currentExpense;
+
+      final typeStr = _transactionType == TransactionType.expense ? 'expense' : 'income';
+      final relevantCats = rpc.categories.where((c) => c.type == typeStr).toList();
+      _totalAmount = relevantCats.fold(0.0, (sum, c) => sum + c.total);
+
+      if (_totalAmount == 0) {
+        _categories = [];
+        if (notify) notifyListeners();
+        return;
+      }
+
+      _categories = relevantCats.map((c) => CategoryDistribution(
+        categoryId: c.categoryId,
+        name: c.name,
+        icon: c.icon,
+        total: c.total,
+        color: c.color,
+        percentage: c.total / _totalAmount,
+      )).toList()
+        ..sort((a, b) => b.total.compareTo(a.total));
+      if (notify) notifyListeners();
+      return;
+    }
+
+    // Fallback: hitung dari _transactions (offline / refreshFromTransactions)
+    _incomeTotal = _transactions.where((t) => t.type == 'income').fold(0.0, (s, t) => s + t.amount);
+    _expenseTotal = _transactions.where((t) => t.type == 'expense').fold(0.0, (s, t) => s + t.amount);
 
     final typeStr = _transactionType == TransactionType.expense ? 'expense' : 'income';
     final relevantTxs = _transactions.where((t) => t.type == typeStr).toList();
-    
     _totalAmount = relevantTxs.fold(0.0, (sum, t) => sum + t.amount);
 
     if (_totalAmount == 0) {
@@ -246,19 +309,15 @@ class ReportProvider extends ChangeNotifier {
       icons[cid] = t.category?.icon ?? '';
     }
 
-    final List<CategoryDistribution> cats = sums.entries.map((e) {
-      return CategoryDistribution(
-        categoryId: e.key,
-        name: names[e.key]!,
-        icon: icons[e.key] ?? '',
-        total: e.value,
-        color: colors[e.key]!,
-        percentage: e.value / _totalAmount,
-      );
-    }).toList();
-
-    cats.sort((a, b) => b.total.compareTo(a.total));
-    _categories = cats;
+    _categories = sums.entries.map((e) => CategoryDistribution(
+      categoryId: e.key,
+      name: names[e.key]!,
+      icon: icons[e.key] ?? '',
+      total: e.value,
+      color: colors[e.key]!,
+      percentage: e.value / _totalAmount,
+    )).toList()
+      ..sort((a, b) => b.total.compareTo(a.total));
     if (notify) notifyListeners();
   }
 
@@ -338,83 +397,94 @@ class ReportProvider extends ChangeNotifier {
   }
 
   List<TrendPoint> _buildTrendPoints() {
+    final rpc = _lastRpcResult;
+
     switch (_periodType) {
       case PeriodType.week:
         final weekday = _currentDate.weekday;
-        final start = DateTime(
-          _currentDate.year,
-          _currentDate.month,
-          _currentDate.day,
-        ).subtract(Duration(days: weekday - 1));
+        final start = DateTime(_currentDate.year, _currentDate.month, _currentDate.day)
+            .subtract(Duration(days: weekday - 1));
         final income = List<double>.filled(7, 0);
         final expense = List<double>.filled(7, 0);
 
-        for (final transaction in _transactions) {
-          final local = transaction.date.toLocal();
-          final date = DateTime(local.year, local.month, local.day);
-          final index = date.difference(start).inDays;
-          if (index < 0 || index >= 7) continue;
-          if (transaction.type == 'income') {
-            income[index] += transaction.amount;
-          } else {
-            expense[index] += transaction.amount;
+        if (rpc != null) {
+          for (final p in rpc.trend) {
+            final date = DateTime.parse(p.bucket);
+            final index = date.difference(start).inDays;
+            if (index < 0 || index >= 7) continue;
+            income[index] = p.income;
+            expense[index] = p.expense;
+          }
+        } else {
+          for (final t in _transactions) {
+            final local = t.date.toLocal();
+            final date = DateTime(local.year, local.month, local.day);
+            final index = date.difference(start).inDays;
+            if (index < 0 || index >= 7) continue;
+            if (t.type == 'income') { income[index] += t.amount; }
+            else { expense[index] += t.amount; }
           }
         }
 
-        return List.generate(7, (index) {
-          final date = start.add(Duration(days: index));
-          return TrendPoint(
-            label: DateFormat('E', 'id_ID').format(date),
-            income: income[index],
-            expense: expense[index],
-          );
-        });
+        return List.generate(7, (i) => TrendPoint(
+          label: DateFormat('E', 'id_ID').format(start.add(Duration(days: i))),
+          income: income[i],
+          expense: expense[i],
+        ));
+
       case PeriodType.month:
         final lastDay = DateTime(_currentDate.year, _currentDate.month + 1, 0).day;
         final weekCount = ((lastDay - 1) ~/ 7) + 1;
         final income = List<double>.filled(weekCount, 0);
         final expense = List<double>.filled(weekCount, 0);
 
-        for (final transaction in _transactions) {
-          final index = (transaction.date.toLocal().day - 1) ~/ 7;
-          if (index < 0 || index >= weekCount) continue;
-          if (transaction.type == 'income') {
-            income[index] += transaction.amount;
-          } else {
-            expense[index] += transaction.amount;
+        if (rpc != null) {
+          for (final p in rpc.trend) {
+            final index = int.tryParse(p.bucket) ?? -1;
+            if (index < 0 || index >= weekCount) continue;
+            income[index] = p.income;
+            expense[index] = p.expense;
+          }
+        } else {
+          for (final t in _transactions) {
+            final index = (t.date.toLocal().day - 1) ~/ 7;
+            if (index < 0 || index >= weekCount) continue;
+            if (t.type == 'income') { income[index] += t.amount; }
+            else { expense[index] += t.amount; }
           }
         }
 
-        return List.generate(
-          weekCount,
-          (index) => TrendPoint(
-            label: 'M${index + 1}',
-            income: income[index],
-            expense: expense[index],
-          ),
-        );
+        return List.generate(weekCount, (i) => TrendPoint(
+          label: 'M${i + 1}',
+          income: income[i],
+          expense: expense[i],
+        ));
+
       case PeriodType.year:
         final income = List<double>.filled(12, 0);
         final expense = List<double>.filled(12, 0);
 
-        for (final transaction in _transactions) {
-          final index = transaction.date.toLocal().month - 1;
-          if (index < 0 || index >= 12) continue;
-          if (transaction.type == 'income') {
-            income[index] += transaction.amount;
-          } else {
-            expense[index] += transaction.amount;
+        if (rpc != null) {
+          for (final p in rpc.trend) {
+            final index = (int.tryParse(p.bucket) ?? 0) - 1;
+            if (index < 0 || index >= 12) continue;
+            income[index] = p.income;
+            expense[index] = p.expense;
+          }
+        } else {
+          for (final t in _transactions) {
+            final index = t.date.toLocal().month - 1;
+            if (index < 0 || index >= 12) continue;
+            if (t.type == 'income') { income[index] += t.amount; }
+            else { expense[index] += t.amount; }
           }
         }
 
-        return List.generate(12, (index) {
-          final date = DateTime(_currentDate.year, index + 1, 1);
-          return TrendPoint(
-            label: DateFormat('MMM', 'id_ID').format(date),
-            income: income[index],
-            expense: expense[index],
-          );
-        });
+        return List.generate(12, (i) => TrendPoint(
+          label: DateFormat('MMM', 'id_ID').format(DateTime(_currentDate.year, i + 1, 1)),
+          income: income[i],
+          expense: expense[i],
+        ));
     }
   }
 }
