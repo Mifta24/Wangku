@@ -102,7 +102,9 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     keyboardType: TextInputType.emailAddress,
                     validator: (value) {
                       if (value == null || value.isEmpty) return 'Email tidak boleh kosong';
-                      if (!value.contains('@')) return 'Email tidak valid';
+                      if (!RegExp(r'^[\w.+-]+@gmail\.com$').hasMatch(value.trim())) {
+                        return 'Gunakan email @gmail.com';
+                      }
                       return null;
                     },
                   ),

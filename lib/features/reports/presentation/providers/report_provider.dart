@@ -77,6 +77,9 @@ class ReportProvider extends ChangeNotifier {
   void init(String userId) {
     if (_userId == userId) return;
     _userId = userId;
+    _currentDate = DateTime.now();
+    _periodType = PeriodType.month;
+    _transactionType = TransactionType.expense;
     _loadData();
   }
 
