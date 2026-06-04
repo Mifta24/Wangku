@@ -93,6 +93,8 @@ class TransactionProvider extends ChangeNotifier {
   }
 
   void _subscribeRealtime(String userId) {
+    _repository.unsubscribeTransactions();
+    _repository.unsubscribeCategories();
     _repository.subscribeToTransactions(userId, () => _silentRefresh(userId));
     _repository.subscribeToCategories(userId, () => _silentRefreshCategories(userId));
   }

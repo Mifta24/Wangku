@@ -8,6 +8,9 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/pages/change_password_page.dart';
 import '../../../auth/presentation/pages/edit_biodata_page.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../reports/presentation/providers/budget_provider.dart';
+import '../../../transactions/presentation/providers/transaction_provider.dart';
+import '../providers/notification_center_provider.dart';
 
 class AccountProfileSheet extends StatelessWidget {
   const AccountProfileSheet({super.key});
@@ -40,6 +43,9 @@ class AccountProfileSheet extends StatelessWidget {
     );
     if (confirm != true) return;
     if (!context.mounted) return;
+    context.read<TransactionProvider>().clear();
+    context.read<BudgetProvider>().clear();
+    context.read<NotificationCenterProvider>().clear();
     await context.read<AuthProvider>().logout();
   }
 

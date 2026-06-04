@@ -41,6 +41,7 @@ class AuthProvider extends ChangeNotifier {
     final userId = _authService.currentUser?.id;
     if (userId == null) return;
     try {
+      _profileService.unsubscribeProfile();
       _profile = await _profileService.getProfile(userId);
       notifyListeners();
       _profileService.subscribeToProfile(userId, () => _silentRefreshProfile(userId));

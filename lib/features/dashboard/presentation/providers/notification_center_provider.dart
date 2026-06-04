@@ -30,6 +30,7 @@ class NotificationCenterProvider extends ChangeNotifier {
   }
 
   Future<void> load(String userId) async {
+    _repository.unsubscribeNotifications();
     _userId = userId;
     _isLoading = true;
     notifyListeners();
@@ -37,6 +38,13 @@ class NotificationCenterProvider extends ChangeNotifier {
     _isLoading = false;
     notifyListeners();
     _repository.subscribeToNotifications(userId, _silentReload);
+  }
+
+  void clear() {
+    _userId = null;
+    _notifications = [];
+    _repository.unsubscribeNotifications();
+    notifyListeners();
   }
 
   Future<void> reload() async {

@@ -141,6 +141,9 @@ class _DashboardPageState extends State<DashboardPage> {
     );
     if (confirm != true) return;
     if (!mounted) return;
+    context.read<TransactionProvider>().clear();
+    context.read<BudgetProvider>().clear();
+    context.read<NotificationCenterProvider>().clear();
     await context.read<AuthProvider>().logout();
     if (!mounted) return;
     context.goNamed('login');

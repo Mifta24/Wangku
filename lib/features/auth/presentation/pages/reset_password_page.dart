@@ -10,6 +10,9 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/app_text_field.dart';
 import '../providers/auth_provider.dart';
+import '../../../reports/presentation/providers/budget_provider.dart';
+import '../../../transactions/presentation/providers/transaction_provider.dart';
+import '../../../dashboard/presentation/providers/notification_center_provider.dart';
 
 class ResetPasswordPage extends StatefulWidget {
   const ResetPasswordPage({super.key});
@@ -93,6 +96,9 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
               ? _SuccessView(onGoToLogin: () async {
                   final auth = context.read<AuthProvider>();
                   authStateRefreshNotifier.clearPasswordRecovery();
+                  context.read<TransactionProvider>().clear();
+                  context.read<BudgetProvider>().clear();
+                  context.read<NotificationCenterProvider>().clear();
                   await auth.logout();
                   if (!context.mounted) return;
                   context.go('/login');

@@ -19,7 +19,7 @@ class DashboardMetrics {
 }
 
 class DashboardProvider extends ChangeNotifier {
-  late TransactionProvider _transactionProvider;
+  TransactionProvider? _transactionProvider;
   DashboardMetrics? _metrics;
   bool _isLoading = false;
   String? _errorMessage;
@@ -30,8 +30,10 @@ class DashboardProvider extends ChangeNotifier {
 
   /// Initialize dengan TransactionProvider
   void initialize(TransactionProvider transactionProvider) {
+    if (_transactionProvider == transactionProvider) return;
+    _transactionProvider?.removeListener(_onTransactionChanged);
     _transactionProvider = transactionProvider;
-    _transactionProvider.addListener(_onTransactionChanged);
+    _transactionProvider!.addListener(_onTransactionChanged);
     _updateMetrics();
   }
 
@@ -46,7 +48,7 @@ class DashboardProvider extends ChangeNotifier {
       _clearError();
       _setLoading(true);
 
-      final transactions = _transactionProvider.monthTransactions;
+      final transactions = _transactionProvider?.monthTransactions ?? [];
 
       // Calculate totals
       double totalIncome = 0;
@@ -93,7 +95,7 @@ class DashboardProvider extends ChangeNotifier {
 
   /// Get spending by category (top 3)
   List<Map<String, dynamic>> getTopCategories() {
-    final transactions = _transactionProvider.monthTransactions
+    final transactions = (_transactionProvider?.monthTransactions ?? [])
         .where((t) => t.type == 'expense')
         .toList();
 
@@ -136,7 +138,7 @@ class DashboardProvider extends ChangeNotifier {
   /// Cleanup
   @override
   void dispose() {
-    _transactionProvider.removeListener(_onTransactionChanged);
+    _transactionProvider?.removeListener(_onTransactionChanged);
     super.dispose();
   }
 

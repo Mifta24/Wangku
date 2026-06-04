@@ -443,6 +443,18 @@ class BudgetProvider extends ChangeNotifier {
     return budgets[categoryId];
   }
 
+  void clear() {
+    _userId = null;
+    _categoryBudgets = {};
+    _selectedMonth = DateTime.now();
+    _isLoading = false;
+    _errorMessage = null;
+    _lastBudgetAlertDate = null;
+    _alertInProgress = false;
+    _budgetRepository.unsubscribeBudgets();
+    notifyListeners();
+  }
+
   @override
   void dispose() {
     _isDisposed = true;
