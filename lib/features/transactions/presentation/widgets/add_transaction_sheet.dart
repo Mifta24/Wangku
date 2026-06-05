@@ -428,7 +428,7 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
           SizedBox(height: 14.h),
           _formLabel('Tanggal'),
           _buildDateField(),
-          SizedBox(height: 120.h),
+          SizedBox(height: 112.h),
           _buildSaveButton(),
         ],
       ),
