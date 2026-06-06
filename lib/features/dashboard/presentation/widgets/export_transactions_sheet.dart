@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../reports/data/services/report_export_service.dart';
+import '../../../reports/presentation/pages/pdf_preview_page.dart';
 import '../../../transactions/domain/models/transaction_model.dart';
 import '../../../transactions/presentation/providers/transaction_provider.dart';
 
@@ -297,17 +298,30 @@ class _ExportTransactionsSheetState extends State<ExportTransactionsSheet> {
         return;
       }
 
+      if (format == 'pdf') {
+        if (!mounted) return;
+        Navigator.pop(context);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PdfPreviewPage(
+              title: 'Preview Laporan PDF',
+              buildBytes: () => _exportService.buildPdfBytes(
+                transactions: transactions,
+                userName: userName,
+                month: _selectedMonth,
+              ),
+            ),
+          ),
+        );
+        return;
+      }
+
       String? path;
       if (format == 'csv') {
         path = await _exportService.exportCsv(transactions: transactions);
-      } else if (format == 'excel') {
-        path = await _exportService.exportExcel(transactions: transactions);
       } else {
-        path = await _exportService.exportPdf(
-          transactions: transactions,
-          userName: userName,
-          month: _selectedMonth,
-        );
+        path = await _exportService.exportExcel(transactions: transactions);
       }
 
       if (!mounted) return;

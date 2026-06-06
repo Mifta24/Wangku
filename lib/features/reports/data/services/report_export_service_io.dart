@@ -36,18 +36,42 @@ class ReportExportService {
     return file.path;
   }
 
+  Future<Uint8List> buildPdfBytes({
+    required List<TransactionModel> transactions,
+    String? userName,
+    DateTime? month,
+  }) async {
+    final pdf = pw.Document();
+    _buildPdfContent(pdf, transactions: transactions, userName: userName, month: month);
+    return pdf.save();
+  }
+
   Future<String?> exportPdf({
     required List<TransactionModel> transactions,
     String? userName,
     DateTime? month,
   }) async {
     final pdf = pw.Document();
+    _buildPdfContent(pdf, transactions: transactions, userName: userName, month: month);
+
+    final dir = await getApplicationDocumentsDirectory();
+    final fileName = _buildFileName('pdf');
+    final file = File('${dir.path}/$fileName');
+    await file.writeAsBytes(await pdf.save());
+    return file.path;
+  }
+
+  void _buildPdfContent(
+    pw.Document pdf, {
+    required List<TransactionModel> transactions,
+    String? userName,
+    DateTime? month,
+  }) {
     final dateFmt = DateFormat('dd/MM/yyyy');
     final monthLabel =
         month != null ? DateFormat('MMMM yyyy', 'id_ID').format(month) : '';
     final generatedAt = DateFormat('d MMMM yyyy, HH:mm').format(DateTime.now());
 
-    // Totals
     double totalIncome = 0;
     double totalExpense = 0;
     for (final tx in transactions) {
@@ -59,7 +83,6 @@ class ReportExportService {
     }
     final net = totalIncome - totalExpense;
 
-    // Color constants
     const primaryColor = PdfColor.fromInt(0xFF4D96FF);
     const primaryLight = PdfColor.fromInt(0xFFEBF3FF);
     const incomeColor = PdfColor.fromInt(0xFF22C55E);
@@ -84,10 +107,7 @@ class ReportExportService {
             children: [
               pw.Text(
                 label,
-                style: pw.TextStyle(
-                  fontSize: 9,
-                  color: PdfColors.grey700,
-                ),
+                style: pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
               ),
               pw.SizedBox(height: 4),
               pw.Text(
@@ -131,7 +151,6 @@ class ReportExportService {
           ),
         ),
         build: (ctx) => [
-          // ── Header bar ──────────────────────────────────────────────
           pw.Container(
             padding: const pw.EdgeInsets.all(18),
             decoration: pw.BoxDecoration(
@@ -169,10 +188,7 @@ class ReportExportService {
                   children: [
                     pw.Text(
                       'Laporan Keuangan',
-                      style: const pw.TextStyle(
-                        fontSize: 10,
-                        color: PdfColors.white,
-                      ),
+                      style: const pw.TextStyle(fontSize: 10, color: PdfColors.white),
                     ),
                     if (monthLabel.isNotEmpty) ...[
                       pw.SizedBox(height: 3),
@@ -191,8 +207,6 @@ class ReportExportService {
             ),
           ),
           pw.SizedBox(height: 14),
-
-          // ── Summary row ──────────────────────────────────────────────
           pw.Row(
             children: [
               summaryBox('Pemasukan', totalIncome, incomeColor),
@@ -204,8 +218,6 @@ class ReportExportService {
             ],
           ),
           pw.SizedBox(height: 16),
-
-          // ── Table title ──────────────────────────────────────────────
           pw.Text(
             'Detail Transaksi  (${sortedTx.length} transaksi)',
             style: pw.TextStyle(
@@ -215,8 +227,6 @@ class ReportExportService {
             ),
           ),
           pw.SizedBox(height: 8),
-
-          // ── Transaction table ────────────────────────────────────────
           pw.Table(
             border: pw.TableBorder.all(color: borderColor, width: 0.5),
             columnWidths: {
@@ -239,8 +249,7 @@ class ReportExportService {
                   'Jumlah',
                 ].map((h) {
                   return pw.Padding(
-                    padding: const pw.EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 6),
+                    padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 6),
                     child: pw.Text(
                       h,
                       style: pw.TextStyle(
@@ -261,20 +270,16 @@ class ReportExportService {
                   decoration: pw.BoxDecoration(color: rowBg),
                   children: [
                     pw.Padding(
-                      padding: const pw.EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 5),
-                      child: pw.Text('${i + 1}',
-                          style: const pw.TextStyle(fontSize: 8)),
+                      padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                      child: pw.Text('${i + 1}', style: const pw.TextStyle(fontSize: 8)),
                     ),
                     pw.Padding(
-                      padding: const pw.EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 5),
+                      padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
                       child: pw.Text(dateFmt.format(tx.date),
                           style: const pw.TextStyle(fontSize: 8)),
                     ),
                     pw.Padding(
-                      padding: const pw.EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 5),
+                      padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
                       child: pw.Text(
                         isIncome ? 'Pemasukan' : 'Pengeluaran',
                         style: pw.TextStyle(
@@ -285,24 +290,21 @@ class ReportExportService {
                       ),
                     ),
                     pw.Padding(
-                      padding: const pw.EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 5),
+                      padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
                       child: pw.Text(
                         tx.category?.name ?? '-',
                         style: const pw.TextStyle(fontSize: 8),
                       ),
                     ),
                     pw.Padding(
-                      padding: const pw.EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 5),
+                      padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
                       child: pw.Text(
                         tx.note.isEmpty ? '-' : tx.note,
                         style: const pw.TextStyle(fontSize: 8),
                       ),
                     ),
                     pw.Padding(
-                      padding: const pw.EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 5),
+                      padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
                       child: pw.Text(
                         fmt(tx.amount),
                         style: pw.TextStyle(
@@ -320,12 +322,6 @@ class ReportExportService {
         ],
       ),
     );
-
-    final dir = await getApplicationDocumentsDirectory();
-    final fileName = _buildFileName('pdf');
-    final file = File('${dir.path}/$fileName');
-    await file.writeAsBytes(await pdf.save());
-    return file.path;
   }
 
   Future<String?> exportExcel({required List<TransactionModel> transactions}) async {
@@ -333,7 +329,6 @@ class ReportExportService {
     final excel = Excel.createExcel();
     final sheet = excel['Laporan'];
 
-    // Header
     final headers = ['No.', 'Tanggal', 'Tipe', 'Kategori', 'Catatan', 'Jumlah'];
     for (var i = 0; i < headers.length; i++) {
       sheet
@@ -341,7 +336,6 @@ class ReportExportService {
           .value = TextCellValue(headers[i]);
     }
 
-    // Data rows sorted by date ascending
     final sorted = List<TransactionModel>.from(transactions)
       ..sort((a, b) => a.date.compareTo(b.date));
     for (var rowIdx = 0; rowIdx < sorted.length; rowIdx++) {
@@ -386,5 +380,4 @@ class ReportExportService {
     }
     return escaped;
   }
-
 }
