@@ -26,7 +26,6 @@ class BudgetProvider extends ChangeNotifier {
   bool _alertInProgress = false;
   bool _isDisposed = false;
   bool _notificationsEnabled = true;
-  DateTime _selectedMonth = DateTime.now();
 
   static const double _warningThreshold = 0.8;
 
@@ -38,33 +37,25 @@ class BudgetProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get notificationsEnabled => _notificationsEnabled;
-  DateTime get selectedMonth => _selectedMonth;
-  bool get isCurrentMonth => _isSameMonth(_selectedMonth, DateTime.now());
+  bool get isCurrentMonth => true;
+
   String get periodLabel {
     const months = [
-      'Januari',
-      'Februari',
-      'Maret',
-      'April',
-      'Mei',
-      'Juni',
-      'Juli',
-      'Agustus',
-      'September',
-      'Oktober',
-      'November',
-      'Desember',
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
     ];
-    return '${months[_selectedMonth.month - 1]} ${_selectedMonth.year}';
+    final now = DateTime.now();
+    return '${months[now.month - 1]} ${now.year}';
   }
 
   double get monthExpense {
+    final now = DateTime.now();
     return txnProvider.transactions
         .where(
           (t) =>
               t.type == 'expense' &&
               _categoryBudgets.containsKey(t.categoryId) &&
-              _isSameMonth(t.date, _selectedMonth),
+              _isSameMonth(t.date, now),
         )
         .fold<double>(0.0, (p, e) => p + e.amount);
   }
@@ -73,12 +64,13 @@ class BudgetProvider extends ChangeNotifier {
       _categoryBudgets.values.fold(0.0, (sum, v) => sum + v);
 
   double categoryExpense(String categoryId) {
+    final now = DateTime.now();
     return txnProvider.transactions
         .where(
           (t) =>
               t.type == 'expense' &&
               t.categoryId == categoryId &&
-              _isSameMonth(t.date, _selectedMonth),
+              _isSameMonth(t.date, now),
         )
         .fold<double>(0.0, (p, e) => p + e.amount);
   }
@@ -127,21 +119,13 @@ class BudgetProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
-  Future<void> loadCategoryBudgets(String userId, [DateTime? month]) async {
+  Future<void> loadCategoryBudgets(String userId) async {
     _userId = userId;
-    if (month != null) {
-      _selectedMonth = DateTime(month.year, month.month, 1);
-    }
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
     try {
-      // Supabase utama, Hive fallback (ditangani di repository)
-      _categoryBudgets = await _budgetRepository.getCategoryBudgets(
-        userId,
-        _selectedMonth,
-      );
-      // Reset alert date cache supaya dicek ulang dari Hive
+      _categoryBudgets = await _budgetRepository.getCategoryBudgets(userId);
       _lastBudgetAlertDate = await _hiveManager.getBudgetAlertLastDate(userId);
     } catch (e) {
       _errorMessage = e.toString();
@@ -155,71 +139,9 @@ class BudgetProvider extends ChangeNotifier {
     final userId = _userId;
     if (userId == null) return;
     try {
-      _categoryBudgets = await _budgetRepository.getCategoryBudgets(userId, _selectedMonth);
+      _categoryBudgets = await _budgetRepository.getCategoryBudgets(userId);
       notifyListeners();
     } catch (_) {}
-  }
-
-  Future<void> setSelectedMonth(String userId, DateTime month) async {
-    final now = DateTime.now();
-    final currentMonth = DateTime(now.year, now.month, 1);
-    final targetMonth = DateTime(month.year, month.month, 1);
-    if (targetMonth.isAfter(currentMonth)) return;
-    await loadCategoryBudgets(userId, targetMonth);
-  }
-
-  Future<void> previousMonth(String userId) {
-    return setSelectedMonth(
-      userId,
-      DateTime(_selectedMonth.year, _selectedMonth.month - 1, 1),
-    );
-  }
-
-  Future<void> nextMonth(String userId) {
-    return setSelectedMonth(
-      userId,
-      DateTime(_selectedMonth.year, _selectedMonth.month + 1, 1),
-    );
-  }
-
-  Future<bool> copyPreviousMonthBudgets(String userId) async {
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
-    try {
-      final previousMonth = DateTime(
-        _selectedMonth.year,
-        _selectedMonth.month - 1,
-        1,
-      );
-      final previousBudgets = await _budgetRepository.getCategoryBudgets(
-        userId,
-        previousMonth,
-      );
-      if (previousBudgets.isEmpty) {
-        _isLoading = false;
-        notifyListeners();
-        return false;
-      }
-
-      for (final entry in previousBudgets.entries) {
-        await _budgetRepository.saveCategoryBudget(
-          userId,
-          entry.key,
-          entry.value,
-          _selectedMonth,
-        );
-      }
-      _categoryBudgets = previousBudgets;
-      _isLoading = false;
-      notifyListeners();
-      return true;
-    } catch (e) {
-      _errorMessage = e.toString();
-      _isLoading = false;
-      notifyListeners();
-      return false;
-    }
   }
 
   Future<void> saveCategoryBudget(
@@ -232,12 +154,7 @@ class BudgetProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
     try {
-      await _budgetRepository.saveCategoryBudget(
-        userId,
-        categoryId,
-        amount,
-        _selectedMonth,
-      );
+      await _budgetRepository.saveCategoryBudget(userId, categoryId, amount);
       _categoryBudgets = {..._categoryBudgets, categoryId: amount};
     } catch (e) {
       _errorMessage = e.toString();
@@ -251,11 +168,7 @@ class BudgetProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
     try {
-      await _budgetRepository.deleteCategoryBudget(
-        userId,
-        categoryId,
-        _selectedMonth,
-      );
+      await _budgetRepository.deleteCategoryBudget(userId, categoryId);
       _categoryBudgets = Map.from(_categoryBudgets)..remove(categoryId);
     } catch (e) {
       _errorMessage = e.toString();
@@ -264,7 +177,6 @@ class BudgetProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Cek & kirim notif kategori setelah input transaksi pengeluaran.
   Future<void> checkCategoryWarningAfterTransaction(
     String categoryId,
     String categoryName,
@@ -290,11 +202,23 @@ class BudgetProvider extends ChangeNotifier {
       ratio = item.spent / item.budget;
       rem = item.budget - item.spent;
     } catch (_) {
-      // Fallback ke kalkulasi lokal jika RPC gagal
-      final budget = await _categoryBudgetForMonth(categoryId, now);
+      final budget = categoryBudget(categoryId);
       if (budget == null || budget <= 0) return;
-      final expense = await _categoryExpenseForMonth(categoryId, now)
-          .catchError((_) => categoryExpense(categoryId));
+      final start = DateTime(now.year, now.month, 1);
+      final end = DateTime(now.year, now.month + 1, 1);
+      double expense;
+      if (txnProvider.hasLoadedRange(start, end)) {
+        expense = categoryExpense(categoryId);
+      } else {
+        final transactions = await _transactionRepository.getTransactions(
+          userId: userId,
+          startDate: start,
+          endDate: end,
+        );
+        expense = transactions
+            .where((t) => t.type == 'expense' && t.categoryId == categoryId)
+            .fold<double>(0.0, (p, e) => p + e.amount);
+      }
       ratio = expense / budget;
       rem = budget - expense;
     }
@@ -321,9 +245,6 @@ class BudgetProvider extends ChangeNotifier {
       remaining: rem,
       categoryId: categoryId,
     );
-
-    // Total anggaran — dinonaktifkan sementara
-    // await _maybeNotifyBudgetWarning();
   }
 
   void _onTransactionsChanged() {
@@ -331,48 +252,7 @@ class BudgetProvider extends ChangeNotifier {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_isDisposed) return;
       notifyListeners();
-      // _maybeNotifyBudgetWarning();
     });
-  }
-
-  // ignore: unused_element
-  Future<void> _maybeNotifyBudgetWarning() async {
-    if (_alertInProgress) return;
-    final userId = _userId;
-    if (userId == null) return;
-    if (!_notificationsEnabled) return;
-    if (totalCategoryBudget <= 0) return;
-    if (progress < _warningThreshold) return;
-
-    final now = DateTime.now();
-    final last = _lastBudgetAlertDate ??
-        await _hiveManager.getBudgetAlertLastDate(userId);
-    if (_isSameDay(last, now)) return;
-
-    _alertInProgress = true;
-    final isOver = progress >= 1.0;
-    final title = isOver ? 'Anggaran Habis!' : 'Peringatan Anggaran!';
-    final body = isOver
-        ? 'Total pengeluaran kamu sudah melebihi batas anggaran.'
-        : 'Total pengeluaran kamu sudah mencapai ${(progress * 100).toStringAsFixed(0)}% dari anggaran.';
-
-    // Simpan ke database dulu
-    await _notificationRepository.addNotification(
-      AppNotificationRecord.create(
-        userId: userId,
-        title: title,
-        body: body,
-        type: 'budget',
-      ),
-    );
-    // Baru kirim push notif ke HP — supaya keduanya selalu sinkron
-    await NotificationService.instance.showBudgetWarning(
-      percent: progress,
-      remaining: remaining,
-    );
-    await _hiveManager.saveBudgetAlertLastDate(userId, now);
-    _lastBudgetAlertDate = now;
-    _alertInProgress = false;
   }
 
   String _formatRupiah(double amount) {
@@ -399,54 +279,47 @@ class BudgetProvider extends ChangeNotifier {
     return a.year == b.year && a.month == b.month;
   }
 
-  Future<double> _categoryExpenseForMonth(
-    String categoryId,
-    DateTime month,
-  ) async {
-    final start = DateTime(month.year, month.month, 1);
-    final end = DateTime(month.year, month.month + 1, 1);
+  // ignore: unused_element
+  Future<void> _maybeNotifyBudgetWarning() async {
+    if (_alertInProgress) return;
     final userId = _userId;
+    if (userId == null) return;
+    if (!_notificationsEnabled) return;
+    if (totalCategoryBudget <= 0) return;
+    if (progress < _warningThreshold) return;
 
-    if (txnProvider.hasLoadedRange(start, end)) {
-      return txnProvider.transactions
-          .where(
-            (t) =>
-                t.type == 'expense' &&
-                t.categoryId == categoryId &&
-                !t.date.isBefore(start) &&
-                t.date.isBefore(end),
-          )
-          .fold<double>(0.0, (p, e) => p + e.amount);
-    }
+    final now = DateTime.now();
+    final last = _lastBudgetAlertDate ??
+        await _hiveManager.getBudgetAlertLastDate(userId);
+    if (_isSameDay(last, now)) return;
 
-    if (userId == null) return categoryExpense(categoryId);
+    _alertInProgress = true;
+    final isOver = progress >= 1.0;
+    final title = isOver ? 'Anggaran Habis!' : 'Peringatan Anggaran!';
+    final body = isOver
+        ? 'Total pengeluaran kamu sudah melebihi batas anggaran.'
+        : 'Total pengeluaran kamu sudah mencapai ${(progress * 100).toStringAsFixed(0)}% dari anggaran.';
 
-    final transactions = await _transactionRepository.getTransactions(
-      userId: userId,
-      startDate: start,
-      endDate: end,
+    await _notificationRepository.addNotification(
+      AppNotificationRecord.create(
+        userId: userId,
+        title: title,
+        body: body,
+        type: 'budget',
+      ),
     );
-
-    return transactions
-        .where((t) => t.type == 'expense' && t.categoryId == categoryId)
-        .fold<double>(0.0, (p, e) => p + e.amount);
-  }
-
-  Future<double?> _categoryBudgetForMonth(
-    String categoryId,
-    DateTime month,
-  ) async {
-    if (_isSameMonth(month, _selectedMonth)) return categoryBudget(categoryId);
-    final userId = _userId;
-    if (userId == null) return null;
-    final budgets = await _budgetRepository.getCategoryBudgets(userId, month);
-    return budgets[categoryId];
+    await NotificationService.instance.showBudgetWarning(
+      percent: progress,
+      remaining: remaining,
+    );
+    await _hiveManager.saveBudgetAlertLastDate(userId, now);
+    _lastBudgetAlertDate = now;
+    _alertInProgress = false;
   }
 
   void clear() {
     _userId = null;
     _categoryBudgets = {};
-    _selectedMonth = DateTime.now();
     _isLoading = false;
     _errorMessage = null;
     _lastBudgetAlertDate = null;

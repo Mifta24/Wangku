@@ -5,57 +5,32 @@ class BudgetRepository {
   final BudgetService _service = BudgetService();
   final HiveManager _hive = HiveManager.instance;
 
-  /// Ambil budget kategori: coba dari Supabase, kalau gagal (offline) pakai cache Hive
-  Future<Map<String, double>> getCategoryBudgets(
-    String userId, [
-    DateTime? month,
-  ]) async {
-    final targetMonth = month ?? DateTime.now();
+  Future<Map<String, double>> getCategoryBudgets(String userId) async {
     try {
-      final budgets = await _service.fetchCategoryBudgets(userId, targetMonth);
-      // Update cache Hive supaya sinkron
+      final budgets = await _service.fetchCategoryBudgets(userId);
       for (final entry in budgets.entries) {
-        await _hive.saveCategoryBudget(
-          userId,
-          entry.key,
-          entry.value,
-          targetMonth,
-        );
+        await _hive.saveCategoryBudget(userId, entry.key, entry.value);
       }
       return budgets;
     } catch (_) {
-      // Offline: pakai data Hive
-      return _hive.getCategoryBudgets(userId, targetMonth);
+      return _hive.getCategoryBudgets(userId);
     }
   }
 
-  /// Simpan budget kategori: Supabase dulu, lalu update cache Hive
   Future<void> saveCategoryBudget(
     String userId,
     String categoryId,
     double amount,
-    [DateTime? month]
   ) async {
-    final targetMonth = month ?? DateTime.now();
-    // Simpan ke Supabase
-    await _service.saveCategoryBudget(userId, categoryId, amount, targetMonth);
-    // Update cache lokal
-    await _hive.saveCategoryBudget(userId, categoryId, amount, targetMonth);
+    await _service.saveCategoryBudget(userId, categoryId, amount);
+    await _hive.saveCategoryBudget(userId, categoryId, amount);
   }
 
-  /// Hapus budget kategori dari Supabase dan Hive
-  Future<void> deleteCategoryBudget(
-    String userId,
-    String categoryId, [
-    DateTime? month,
-  ]) async {
-    final targetMonth = month ?? DateTime.now();
+  Future<void> deleteCategoryBudget(String userId, String categoryId) async {
     try {
-      await _service.deleteCategoryBudget(userId, categoryId, targetMonth);
-    } catch (_) {
-      // Lanjut hapus lokal meski server gagal
-    }
-    await _hive.deleteCategoryBudget(userId, categoryId, targetMonth);
+      await _service.deleteCategoryBudget(userId, categoryId);
+    } catch (_) {}
+    await _hive.deleteCategoryBudget(userId, categoryId);
   }
 
   void subscribeToBudgets(String userId, void Function() onChanged) {
@@ -66,12 +41,10 @@ class BudgetRepository {
     _service.unsubscribeBudgets();
   }
 
-  /// Hapus semua budget user (dipanggil saat logout)
   Future<void> clearUserBudgets(String userId) async {
     try {
       await _service.deleteAllUserBudgets(userId);
     } catch (_) {}
-    // Hapus dari Hive juga
     final budgets = await _hive.getCategoryBudgets(userId);
     for (final categoryId in budgets.keys) {
       await _hive.deleteCategoryBudget(userId, categoryId);

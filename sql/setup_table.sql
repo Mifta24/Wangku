@@ -86,20 +86,14 @@ create table if not exists public.budgets (
   id           uuid         primary key default gen_random_uuid(),
   user_id      uuid         not null references auth.users(id) on delete cascade,
   category_id  uuid         not null references public.categories(id) on delete cascade,
-  budget_year  integer      not null default extract(year  from now())::integer,
-  budget_month integer      not null default extract(month from now())::integer
-                            check (budget_month between 1 and 12),
   amount       numeric(14,2) not null check (amount >= 0),
   created_at   timestamptz  not null default now(),
   updated_at   timestamptz  not null default now(),
-  unique (user_id, category_id, budget_year, budget_month)
+  unique (user_id, category_id)
 );
 
 create index if not exists idx_budgets_user
   on public.budgets (user_id);
-
-create index if not exists idx_budgets_user_month
-  on public.budgets (user_id, budget_year, budget_month);
 
 
 -- ================================================================
@@ -109,10 +103,6 @@ create table if not exists public.profiles (
   id         uuid  primary key references auth.users(id) on delete cascade,
   name       text  not null default '',
   phone      text  not null default '',
-  bio        text  not null default '',
-  job        text  not null default '',
-  city       text  not null default '',
-  gender     text  check (gender in ('Laki-laki', 'Perempuan', '')),
   birth_date date,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -491,9 +481,7 @@ begin
       and tx.date   <  v_end
     group by tx.category_id
   ) t on t.category_id = b.category_id
-  where b.user_id      = p_user_id
-    and b.budget_year  = p_year
-    and b.budget_month = p_month
+  where b.user_id = p_user_id
   order by percentage desc;
 end;
 $$;
