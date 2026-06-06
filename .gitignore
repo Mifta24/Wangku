@@ -47,3 +47,5 @@ app.*.map.json
 
 # Supabase Config (Credentials)
 lib/core/config/supabase_config.dart
+
+.claude/
