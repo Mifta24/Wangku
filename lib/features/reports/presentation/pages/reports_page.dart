@@ -297,7 +297,6 @@ class _ReportsPageState extends State<ReportsPage> {
       PeriodType.year => 'Tahun Ini',
     };
     final label = isSurplus ? 'Surplus $periodLabel' : 'Defisit $periodLabel';
-    // final changePercent = report.netChangePercentage;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -352,45 +351,6 @@ class _ReportsPageState extends State<ReportsPage> {
       ),
     );
   }
-
-  // Widget _buildChangeChip(double changePercent, PeriodType periodType) {
-  //   final isImproved = changePercent >= 0;
-  //   final color = isImproved ? AppColors.income : AppColors.expense;
-  //   final icon = isImproved ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded;
-  //   final sign = isImproved ? '+' : '-';
-  //   final absPercent = changePercent.abs().toStringAsFixed(1);
-  //   final prevLabel = switch (periodType) {
-  //     PeriodType.week => 'minggu lalu',
-  //     PeriodType.month => 'bulan lalu',
-  //     PeriodType.year => 'tahun lalu',
-  //   };
-
-  //   return Tooltip(
-  //     message: 'Dibanding $prevLabel',
-  //     child: Container(
-  //       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-  //       decoration: BoxDecoration(
-  //         color: color.withValues(alpha: 0.10),
-  //         borderRadius: BorderRadius.circular(20),
-  //       ),
-  //       child: Row(
-  //         mainAxisSize: MainAxisSize.min,
-  //         children: [
-  //           Icon(icon, size: 11, color: color),
-  //           const SizedBox(width: 2),
-  //           Text(
-  //             '$sign$absPercent%',
-  //             style: GoogleFonts.inter(
-  //               fontSize: 11,
-  //               fontWeight: FontWeight.w700,
-  //               color: color,
-  //             ),
-  //           ),
-  //         ],
-  //       ),
-  //     ),
-  //   );
-  // }
 
   Widget _buildSummaryChip(String label, double amount, Color color) {
     return Row(

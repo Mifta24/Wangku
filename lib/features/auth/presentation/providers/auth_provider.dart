@@ -148,12 +148,6 @@ class AuthProvider extends ChangeNotifier {
           id: userId,
           name: data['name']?.toString() ?? current.name,
           phone: data['phone']?.toString() ?? current.phone,
-          bio: data['bio']?.toString() ?? current.bio,
-          job: data['job']?.toString() ?? current.job,
-          city: data['city']?.toString() ?? current.city,
-          gender: data['gender']?.toString().isNotEmpty == true
-              ? data['gender']?.toString()
-              : current.gender,
           birthDate: data['birth_date'] != null
               ? DateTime.tryParse(data['birth_date'].toString())
               : current.birthDate,
