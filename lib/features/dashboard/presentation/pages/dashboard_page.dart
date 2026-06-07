@@ -14,7 +14,6 @@ import '../../../reports/presentation/providers/reminder_provider.dart';
 import '../../../reports/presentation/providers/report_provider.dart';
 import '../../../transactions/presentation/providers/transaction_provider.dart';
 import '../../../transactions/domain/models/transaction_model.dart';
-import '../../../transactions/domain/models/category_model.dart';
 import '../../../transactions/presentation/widgets/manage_categories_sheet.dart';
 import '../../../transactions/presentation/widgets/add_transaction_sheet.dart';
 import '../../../transactions/presentation/pages/transaction_list_page.dart';

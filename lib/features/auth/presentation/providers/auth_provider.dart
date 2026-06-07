@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../../../core/database/hive_manager.dart';
 import '../../data/services/auth_service.dart';
 import '../../data/services/profile_service.dart';
 import '../../domain/models/user_profile.dart';
@@ -9,7 +9,6 @@ import '../../../reports/data/repositories/budget_repository.dart';
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
   final ProfileService _profileService = ProfileService();
-  final HiveManager _hiveManager = HiveManager.instance;
   final BudgetRepository _budgetRepository = BudgetRepository();
 
   bool _isLoading = false;
@@ -22,7 +21,6 @@ class AuthProvider extends ChangeNotifier {
   bool get needsEmailConfirmation => _needsEmailConfirmation;
   UserProfile? get profile => _profile;
 
-  // Cek apakah user sudah login atau belum
   User? get currentUser => _authService.currentUser;
   bool get isAuthenticated => currentUser != null;
 
@@ -36,7 +34,6 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Load profil dari tabel profiles
   Future<void> loadProfile() async {
     final userId = _authService.currentUser?.id;
     if (userId == null) return;
@@ -55,7 +52,6 @@ class AuthProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
-  // Fungsi Login
   Future<bool> login(String email, String password) async {
     _setLoading(true);
     _setError(null);
@@ -63,7 +59,8 @@ class AuthProvider extends ChangeNotifier {
       await _authService.signInWithEmailPassword(email, password);
       final userId = _authService.currentUser?.id;
       if (userId != null) {
-        await _hiveManager.saveCurrentUserId(userId);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('current_user_id', userId);
         await loadProfile();
       }
       _setLoading(false);
@@ -75,23 +72,21 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Fungsi Register
   Future<bool> register(String email, String password, String name) async {
     _setLoading(true);
     _setError(null);
     _needsEmailConfirmation = false;
     try {
       final response = await _authService.signUp(email, password, name);
-      // Jika session null, artinya Supabase memerlukan konfirmasi email
       if (response.session == null) {
         _needsEmailConfirmation = true;
         _setLoading(false);
         return true;
       }
-      // Jika session ada, user langsung login
       final userId = response.user?.id;
       if (userId != null) {
-        await _hiveManager.saveCurrentUserId(userId);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('current_user_id', userId);
         await loadProfile();
       }
       _setLoading(false);
@@ -103,18 +98,16 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Fungsi Logout
   Future<void> logout() async {
     _setLoading(true);
     _profileService.unsubscribeProfile();
     final userId = _authService.currentUser?.id;
     await _authService.signOut();
     if (userId != null) {
-      await _hiveManager.clearUserData(userId);
-      await _hiveManager.clearNotifications(userId);
       await _budgetRepository.clearUserBudgets(userId);
     }
-    await _hiveManager.clearCurrentUserId();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('current_user_id');
     _profile = null;
     _setLoading(false);
   }
@@ -139,9 +132,7 @@ class AuthProvider extends ChangeNotifier {
     _setError(null);
     try {
       final userId = _authService.currentUser?.id;
-      // Simpan ke Supabase Auth userMetadata (untuk kompatibilitas session)
       await _authService.updateProfileData(data);
-      // Sync ke tabel profiles
       if (userId != null) {
         final current = _profile ?? UserProfile(id: userId);
         final updated = UserProfile(
@@ -164,7 +155,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Ubah password in-app
   Future<bool> changePassword(String newPassword) async {
     _setLoading(true);
     _setError(null);
@@ -179,7 +169,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Fungsi Lupa Password - kirim OTP
   Future<bool> forgotPassword(String email) async {
     _setLoading(true);
     _setError(null);
@@ -194,7 +183,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Verifikasi OTP
   Future<bool> verifyOtp(String email, String token) async {
     _setLoading(true);
     _setError(null);

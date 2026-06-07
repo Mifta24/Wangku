@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../../core/database/hive_manager.dart';
 import '../../../../core/notifications/notification_service.dart';
 
 class ReminderProvider extends ChangeNotifier {
-  final HiveManager _hiveManager = HiveManager.instance;
-
   static const String defaultTitle = 'Jangan lupa catat transaksi';
   static const String defaultBody =
       'Catat pemasukan dan pengeluaran hari ini supaya rapi.';
@@ -28,15 +26,14 @@ class ReminderProvider extends ChangeNotifier {
     _setLoading(true);
     _errorMessage = null;
     try {
-      final data = await _hiveManager.getDailyReminder(userId);
-      if (data != null) {
-        _enabled = (data['enabled'] as bool?) ?? false;
-        final hour = (data['hour'] as num?)?.toInt() ?? _time.hour;
-        final minute = (data['minute'] as num?)?.toInt() ?? _time.minute;
-        _time = TimeOfDay(hour: hour, minute: minute);
-        _title = data['title']?.toString() ?? defaultTitle;
-        _body = data['body']?.toString() ?? defaultBody;
-      }
+      final prefs = await SharedPreferences.getInstance();
+      _enabled = prefs.getBool('reminder_enabled_$userId') ?? false;
+      _time = TimeOfDay(
+        hour: prefs.getInt('reminder_hour_$userId') ?? _time.hour,
+        minute: prefs.getInt('reminder_minute_$userId') ?? _time.minute,
+      );
+      _title = prefs.getString('reminder_title_$userId') ?? defaultTitle;
+      _body = prefs.getString('reminder_body_$userId') ?? defaultBody;
     } catch (e) {
       _errorMessage = e.toString();
     }
@@ -52,14 +49,7 @@ class ReminderProvider extends ChangeNotifier {
       if (!scheduled) {
         _enabled = false;
         _errorMessage = 'Izin notifikasi belum diberikan.';
-        await _hiveManager.saveDailyReminder(
-          userId,
-          enabled: false,
-          hour: _time.hour,
-          minute: _time.minute,
-          title: _title,
-          body: _body,
-        );
+        await _saveToPrefs(userId);
         notifyListeners();
       }
     }
@@ -70,14 +60,7 @@ class ReminderProvider extends ChangeNotifier {
     _setLoading(true);
     _errorMessage = null;
     try {
-      await _hiveManager.saveDailyReminder(
-        userId,
-        enabled: value,
-        hour: _time.hour,
-        minute: _time.minute,
-        title: _title,
-        body: _body,
-      );
+      await _saveToPrefs(userId);
       if (value) {
         final scheduled = await NotificationService.instance.scheduleDailyReminder(
           hour: _time.hour,
@@ -88,14 +71,7 @@ class ReminderProvider extends ChangeNotifier {
         if (!scheduled) {
           _enabled = false;
           _errorMessage = 'Izin notifikasi belum diberikan.';
-          await _hiveManager.saveDailyReminder(
-            userId,
-            enabled: false,
-            hour: _time.hour,
-            minute: _time.minute,
-            title: _title,
-            body: _body,
-          );
+          await _saveToPrefs(userId);
         }
       } else {
         await NotificationService.instance.cancelDailyReminder();
@@ -111,14 +87,7 @@ class ReminderProvider extends ChangeNotifier {
     _setLoading(true);
     _errorMessage = null;
     try {
-      await _hiveManager.saveDailyReminder(
-        userId,
-        enabled: _enabled,
-        hour: time.hour,
-        minute: time.minute,
-        title: _title,
-        body: _body,
-      );
+      await _saveToPrefs(userId);
       if (_enabled) {
         final scheduled = await NotificationService.instance.scheduleDailyReminder(
           hour: time.hour,
@@ -129,14 +98,7 @@ class ReminderProvider extends ChangeNotifier {
         if (!scheduled) {
           _enabled = false;
           _errorMessage = 'Izin notifikasi belum diberikan.';
-          await _hiveManager.saveDailyReminder(
-            userId,
-            enabled: false,
-            hour: time.hour,
-            minute: time.minute,
-            title: _title,
-            body: _body,
-          );
+          await _saveToPrefs(userId);
         }
       }
     } catch (e) {
@@ -155,14 +117,7 @@ class ReminderProvider extends ChangeNotifier {
     _setLoading(true);
     _errorMessage = null;
     try {
-      await _hiveManager.saveDailyReminder(
-        userId,
-        enabled: _enabled,
-        hour: _time.hour,
-        minute: _time.minute,
-        title: _title,
-        body: _body,
-      );
+      await _saveToPrefs(userId);
       if (_enabled) {
         final scheduled = await NotificationService.instance.scheduleDailyReminder(
           hour: _time.hour,
@@ -173,20 +128,22 @@ class ReminderProvider extends ChangeNotifier {
         if (!scheduled) {
           _enabled = false;
           _errorMessage = 'Izin notifikasi belum diberikan.';
-          await _hiveManager.saveDailyReminder(
-            userId,
-            enabled: false,
-            hour: _time.hour,
-            minute: _time.minute,
-            title: _title,
-            body: _body,
-          );
+          await _saveToPrefs(userId);
         }
       }
     } catch (e) {
       _errorMessage = e.toString();
     }
     _setLoading(false);
+  }
+
+  Future<void> _saveToPrefs(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('reminder_enabled_$userId', _enabled);
+    await prefs.setInt('reminder_hour_$userId', _time.hour);
+    await prefs.setInt('reminder_minute_$userId', _time.minute);
+    await prefs.setString('reminder_title_$userId', _title);
+    await prefs.setString('reminder_body_$userId', _body);
   }
 
   void _setLoading(bool value) {

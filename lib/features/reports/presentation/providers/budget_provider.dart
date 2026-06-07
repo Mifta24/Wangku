@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../../core/database/hive_manager.dart';
 import '../../../../core/notifications/app_notification_record.dart';
 import '../../../../core/notifications/notification_service.dart';
 import '../../../dashboard/data/repositories/app_notification_repository.dart';
@@ -14,7 +14,6 @@ class BudgetProvider extends ChangeNotifier {
   final BudgetRepository _budgetRepository = BudgetRepository();
   final TransactionRepository _transactionRepository = TransactionRepository();
   final ReportService _reportService = ReportService();
-  final HiveManager _hiveManager = HiveManager.instance;
   final AppNotificationRepository _notificationRepository =
       AppNotificationRepository();
 
@@ -22,8 +21,6 @@ class BudgetProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
   String? _userId;
-  DateTime? _lastBudgetAlertDate;
-  bool _alertInProgress = false;
   bool _isDisposed = false;
   bool _notificationsEnabled = true;
 
@@ -100,9 +97,9 @@ class BudgetProvider extends ChangeNotifier {
   Future<void> loadBudget(String userId) async {
     _userId = userId;
     try {
-      _lastBudgetAlertDate = await _hiveManager.getBudgetAlertLastDate(userId);
-      final settings = await _hiveManager.getBudgetNotificationSettings(userId);
-      _notificationsEnabled = (settings?['enabled'] as bool?) ?? true;
+      final prefs = await SharedPreferences.getInstance();
+      _notificationsEnabled =
+          prefs.getBool('budget_notif_enabled_$userId') ?? true;
       notifyListeners();
     } catch (_) {}
   }
@@ -112,10 +109,8 @@ class BudgetProvider extends ChangeNotifier {
     _notificationsEnabled = enabled;
     notifyListeners();
     try {
-      await _hiveManager.saveBudgetNotificationSettings(
-        userId,
-        enabled: _notificationsEnabled,
-      );
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('budget_notif_enabled_$userId', enabled);
     } catch (_) {}
   }
 
@@ -126,7 +121,6 @@ class BudgetProvider extends ChangeNotifier {
     notifyListeners();
     try {
       _categoryBudgets = await _budgetRepository.getCategoryBudgets(userId);
-      _lastBudgetAlertDate = await _hiveManager.getBudgetAlertLastDate(userId);
     } catch (e) {
       _errorMessage = e.toString();
     }
@@ -231,13 +225,15 @@ class BudgetProvider extends ChangeNotifier {
         ? 'Pengeluaranmu di $categoryName sudah melebihi batas anggaran.'
         : 'Anggaran kategori $categoryName sisa ${_formatRupiah(rem)}.';
 
-    await _notificationRepository.addNotification(
-      AppNotificationRecord.create(
-        userId: userId,
-        title: title,
-        body: body,
-      ),
-    );
+    try {
+      await _notificationRepository.addNotification(
+        AppNotificationRecord.create(
+          userId: userId,
+          title: title,
+          body: body,
+        ),
+      );
+    } catch (_) {}
     await NotificationService.instance.showCategoryBudgetWarning(
       categoryName: categoryName,
       percent: ratio,
@@ -269,50 +265,8 @@ class BudgetProvider extends ChangeNotifier {
     return 'Rp $result';
   }
 
-  bool _isSameDay(DateTime? a, DateTime b) {
-    if (a == null) return false;
-    return a.year == b.year && a.month == b.month && a.day == b.day;
-  }
-
   bool _isSameMonth(DateTime a, DateTime b) {
     return a.year == b.year && a.month == b.month;
-  }
-
-  // ignore: unused_element
-  Future<void> _maybeNotifyBudgetWarning() async {
-    if (_alertInProgress) return;
-    final userId = _userId;
-    if (userId == null) return;
-    if (!_notificationsEnabled) return;
-    if (totalCategoryBudget <= 0) return;
-    if (progress < _warningThreshold) return;
-
-    final now = DateTime.now();
-    final last = _lastBudgetAlertDate ??
-        await _hiveManager.getBudgetAlertLastDate(userId);
-    if (_isSameDay(last, now)) return;
-
-    _alertInProgress = true;
-    final isOver = progress >= 1.0;
-    final title = isOver ? 'Anggaran Habis!' : 'Peringatan Anggaran!';
-    final body = isOver
-        ? 'Total pengeluaran kamu sudah melebihi batas anggaran.'
-        : 'Total pengeluaran kamu sudah mencapai ${(progress * 100).toStringAsFixed(0)}% dari anggaran.';
-
-    await _notificationRepository.addNotification(
-      AppNotificationRecord.create(
-        userId: userId,
-        title: title,
-        body: body,
-      ),
-    );
-    await NotificationService.instance.showBudgetWarning(
-      percent: progress,
-      remaining: remaining,
-    );
-    await _hiveManager.saveBudgetAlertLastDate(userId, now);
-    _lastBudgetAlertDate = now;
-    _alertInProgress = false;
   }
 
   void clear() {
@@ -320,8 +274,6 @@ class BudgetProvider extends ChangeNotifier {
     _categoryBudgets = {};
     _isLoading = false;
     _errorMessage = null;
-    _lastBudgetAlertDate = null;
-    _alertInProgress = false;
     _budgetRepository.unsubscribeBudgets();
     notifyListeners();
   }

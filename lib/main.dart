@@ -4,7 +4,6 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'features/auth/presentation/providers/auth_provider.dart';
@@ -16,7 +15,6 @@ import 'features/reports/presentation/providers/reminder_provider.dart';
 import 'features/reports/presentation/providers/report_provider.dart';
 import 'core/config/router.dart';
 import 'core/theme/app_theme.dart';
-import 'core/database/hive_manager.dart';
 import 'core/notifications/notification_service.dart';
 import 'core/notifications/budget_background_worker.dart';
 import 'shared/providers/connectivity_provider.dart';
@@ -45,14 +43,8 @@ void main() async {
     anonKey: _supabaseAnonKey,
   );
 
-  // Inisialisasi Hive
-  await Hive.initFlutter();
-
   // Inisialisasi locale data untuk DateFormat (mis. id_ID)
   await initializeDateFormatting('id_ID');
-  
-  // Inisialisasi Hive Manager untuk database lokal
-  await HiveManager.instance.initializeBoxes();
 
   // Inisialisasi notifikasi lokal
   await NotificationService.instance.initialize();

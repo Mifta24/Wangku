@@ -1,8 +1,9 @@
 import 'package:flutter/widgets.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:workmanager/workmanager.dart';
 
-import '../database/hive_manager.dart';
+import '../config/supabase_config.dart';
 import 'app_notification_record.dart';
 import 'notification_service.dart';
 
@@ -13,63 +14,77 @@ void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
     WidgetsFlutterBinding.ensureInitialized();
     try {
-      await Hive.initFlutter();
-      await HiveManager.instance.initializeBoxes();
+      await Supabase.initialize(
+        url: SupabaseConfig.url,
+        anonKey: SupabaseConfig.anonKey,
+      );
       await NotificationService.instance.initialize();
 
       if (task == budgetCheckTask) {
         await _runBudgetCheck();
       }
-    } catch (_) {
-      // Swallow errors to avoid task failures looping
-    }
+    } catch (_) {}
     return Future.value(true);
   });
 }
 
 Future<void> _runBudgetCheck() async {
-  final hive = HiveManager.instance;
-  final userId = await hive.getCurrentUserId();
+  final prefs = await SharedPreferences.getInstance();
+  final userId = prefs.getString('current_user_id');
   if (userId == null || userId.isEmpty) return;
 
-  final settings = await hive.getBudgetNotificationSettings(userId);
-  final enabled = (settings?['enabled'] as bool?) ?? true;
+  final enabled = prefs.getBool('budget_notif_enabled_$userId') ?? true;
   if (!enabled) return;
 
-  final categoryBudgets = await hive.getCategoryBudgets(userId);
-  final totalBudget = categoryBudgets.values.fold<double>(0.0, (s, v) => s + v);
-  if (totalBudget <= 0) return;
+  final supabase = Supabase.instance.client;
+  if (supabase.auth.currentSession == null) return;
 
-  final txs = await hive.getTransactions(userId);
-  final now = DateTime.now();
-  final monthExpense = txs
-      .where((t) =>
-          t.type == 'expense' &&
-          t.date.year == now.year &&
-          t.date.month == now.month)
-      .fold<double>(0.0, (p, e) => p + e.amount);
+  try {
+    final budgetResponse = await supabase
+        .from('budgets')
+        .select('amount')
+        .eq('user_id', userId);
 
-  final progress = monthExpense / totalBudget;
-  if (progress < 0.8) return;
+    final totalBudget = (budgetResponse as List<dynamic>)
+        .fold<double>(0.0, (s, r) => s + (r['amount'] as num).toDouble());
+    if (totalBudget <= 0) return;
 
-  final last = await hive.getBudgetAlertLastDate(userId);
-  if (_isSameDay(last, now)) return;
+    final now = DateTime.now();
+    final startOfMonth = DateTime(now.year, now.month, 1).toIso8601String();
+    final txResponse = await supabase
+        .from('transactions')
+        .select('amount')
+        .eq('user_id', userId)
+        .eq('type', 'expense')
+        .gte('date', startOfMonth);
 
-  await NotificationService.instance.showBudgetWarning(
-    percent: progress,
-    remaining: (totalBudget - monthExpense).clamp(0.0, double.infinity),
-  );
-  final isOver = progress >= 1.0;
-  await hive.saveNotification(
-    AppNotificationRecord.create(
+    final monthExpense = (txResponse as List<dynamic>)
+        .fold<double>(0.0, (s, r) => s + (r['amount'] as num).toDouble());
+
+    final progress = monthExpense / totalBudget;
+    if (progress < 0.8) return;
+
+    final lastAlertStr = prefs.getString('budget_alert_last_$userId');
+    final lastAlert =
+        lastAlertStr != null ? DateTime.tryParse(lastAlertStr) : null;
+    if (_isSameDay(lastAlert, now)) return;
+
+    await NotificationService.instance.showBudgetWarning(
+      percent: progress,
+      remaining: (totalBudget - monthExpense).clamp(0.0, double.infinity),
+    );
+
+    final isOver = progress >= 1.0;
+    final notification = AppNotificationRecord.create(
       userId: userId,
       title: isOver ? 'Anggaran Habis!' : 'Peringatan Anggaran!',
       body: isOver
           ? 'Total pengeluaran kamu sudah melebihi batas anggaran.'
           : 'Total pengeluaran kamu sudah mencapai ${(progress * 100).toStringAsFixed(0)}% dari anggaran.',
-    ),
-  );
-  await hive.saveBudgetAlertLastDate(userId, now);
+    );
+    await supabase.from('notifications').insert(notification.toSupabaseJson());
+    await prefs.setString('budget_alert_last_$userId', now.toIso8601String());
+  } catch (_) {}
 }
 
 bool _isSameDay(DateTime? a, DateTime b) {

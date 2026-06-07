@@ -1,64 +1,39 @@
 import 'dart:async';
-import '../../../../core/database/hive_manager.dart';
 import '../../../../core/notifications/app_notification_record.dart';
 import '../services/app_notification_service.dart';
 
 class AppNotificationRepository {
   final AppNotificationService _service = AppNotificationService();
-  final HiveManager _hiveManager = HiveManager.instance;
 
-  // Stream untuk broadcast notif baru ke semua listener (misal NotificationCenterProvider)
   static final _newNotificationController =
       StreamController<AppNotificationRecord>.broadcast();
   static Stream<AppNotificationRecord> get onNewNotification =>
       _newNotificationController.stream;
 
   Future<List<AppNotificationRecord>> getNotifications(String userId) async {
-    try {
-      final notifications = await _service.fetchNotifications(userId);
-      await _hiveManager.cacheNotifications(userId, notifications);
-      return notifications;
-    } catch (_) {
-      return _hiveManager.getNotifications(userId);
-    }
+    return _service.fetchNotifications(userId);
   }
 
   Future<AppNotificationRecord> addNotification(
     AppNotificationRecord notification,
   ) async {
-    try {
-      final saved = await _service.createNotification(notification);
-      await _hiveManager.saveNotification(saved);
-      // Broadcast ke semua listener
-      _newNotificationController.add(saved);
-      return saved;
-    } catch (_) {
-      await _hiveManager.saveNotification(notification);
-      _newNotificationController.add(notification);
-      return notification;
-    }
+    final saved = await _service.createNotification(notification);
+    _newNotificationController.add(saved);
+    return saved;
   }
 
   Future<void> deleteNotification({
     required String userId,
     required String notificationId,
   }) async {
-    try {
-      await _service.deleteNotification(
-        userId: userId,
-        notificationId: notificationId,
-      );
-    } finally {
-      await _hiveManager.deleteNotification(userId, notificationId);
-    }
+    await _service.deleteNotification(
+      userId: userId,
+      notificationId: notificationId,
+    );
   }
 
   Future<void> clearNotifications(String userId) async {
-    try {
-      await _service.clearNotifications(userId);
-    } finally {
-      await _hiveManager.clearNotifications(userId);
-    }
+    await _service.clearNotifications(userId);
   }
 
   void subscribeToNotifications(String userId, void Function() onChanged) {
