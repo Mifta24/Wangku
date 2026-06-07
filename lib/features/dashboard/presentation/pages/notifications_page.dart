@@ -210,8 +210,6 @@ class _NotificationsPageState extends State<NotificationsPage> {
     required NotificationCenterProvider provider,
     required AppNotificationRecord notification,
   }) {
-    final color = _typeColor(notification.type);
-
     return Dismissible(
       key: ValueKey(notification.id),
       direction: DismissDirection.endToStart,
@@ -248,10 +246,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
               width: 42.w,
               height: 42.w,
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
+                color: AppColors.primary.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12.r),
               ),
-              child: Icon(_typeIcon(notification.type), color: color, size: 21.sp),
+              child: Icon(Icons.notifications_outlined, color: AppColors.primary, size: 21.sp),
             ),
             SizedBox(width: 12.w),
             Expanded(
@@ -304,28 +302,4 @@ class _NotificationsPageState extends State<NotificationsPage> {
     );
   }
 
-  IconData _typeIcon(String type) {
-    switch (type) {
-      case 'budget':
-        return Icons.account_balance_wallet_outlined;
-      case 'category_budget':
-        return Icons.pie_chart_outline_rounded;
-      case 'reminder':
-        return Icons.alarm_rounded;
-      default:
-        return Icons.notifications_outlined;
-    }
-  }
-
-  Color _typeColor(String type) {
-    switch (type) {
-      case 'budget':
-      case 'category_budget':
-        return AppColors.warning;
-      case 'reminder':
-        return AppColors.info;
-      default:
-        return AppColors.primary;
-    }
-  }
 }

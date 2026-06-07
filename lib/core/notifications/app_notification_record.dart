@@ -6,7 +6,6 @@ class AppNotificationRecord {
     required this.userId,
     required this.title,
     required this.body,
-    required this.type,
     required this.createdAt,
   });
 
@@ -14,7 +13,6 @@ class AppNotificationRecord {
   final String userId;
   final String title;
   final String body;
-  final String type;
   final DateTime createdAt;
 
   Map<String, dynamic> toJson() {
@@ -23,7 +21,6 @@ class AppNotificationRecord {
       'userId': userId,
       'title': title,
       'body': body,
-      'type': type,
       'createdAt': createdAt.toIso8601String(),
     };
   }
@@ -34,7 +31,6 @@ class AppNotificationRecord {
       userId: (json['userId'] ?? json['user_id']) as String? ?? '',
       title: json['title'] as String? ?? 'Notifikasi',
       body: json['body'] as String? ?? '',
-      type: json['type'] as String? ?? 'system',
       createdAt:
           DateTime.tryParse(
                 (json['createdAt'] ?? json['created_at']) as String? ?? '',
@@ -49,7 +45,6 @@ class AppNotificationRecord {
       'user_id': userId,
       'title': title,
       'body': body,
-      'type': type,
       'created_at': createdAt.toIso8601String(),
     };
   }
@@ -58,7 +53,6 @@ class AppNotificationRecord {
     required String userId,
     required String title,
     required String body,
-    required String type,
   }) {
     final now = DateTime.now();
     return AppNotificationRecord(
@@ -66,7 +60,6 @@ class AppNotificationRecord {
       userId: userId,
       title: title,
       body: body,
-      type: type,
       createdAt: now,
     );
   }

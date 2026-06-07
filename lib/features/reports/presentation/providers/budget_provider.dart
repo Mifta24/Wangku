@@ -236,7 +236,6 @@ class BudgetProvider extends ChangeNotifier {
         userId: userId,
         title: title,
         body: body,
-        type: 'category_budget',
       ),
     );
     await NotificationService.instance.showCategoryBudgetWarning(
@@ -305,7 +304,6 @@ class BudgetProvider extends ChangeNotifier {
         userId: userId,
         title: title,
         body: body,
-        type: 'budget',
       ),
     );
     await NotificationService.instance.showBudgetWarning(

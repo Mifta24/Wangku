@@ -67,7 +67,6 @@ Future<void> _runBudgetCheck() async {
       body: isOver
           ? 'Total pengeluaran kamu sudah melebihi batas anggaran.'
           : 'Total pengeluaran kamu sudah mencapai ${(progress * 100).toStringAsFixed(0)}% dari anggaran.',
-      type: 'budget',
     ),
   );
   await hive.saveBudgetAlertLastDate(userId, now);

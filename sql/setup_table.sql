@@ -71,7 +71,6 @@ create table if not exists public.notifications (
   user_id    uuid        not null references auth.users(id) on delete cascade,
   title      text        not null,
   body       text        not null,
-  type       text        not null default 'system',
   created_at timestamptz not null default now()
 );
 
