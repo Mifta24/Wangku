@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../../core/notifications/app_notification_record.dart';
+import '../../../dashboard/domain/models/app_notification_model.dart';
 import '../../../../core/notifications/notification_service.dart';
+import '../../domain/models/budget_model.dart';
 import '../../../dashboard/data/repositories/app_notification_repository.dart';
 import '../../../transactions/data/repositories/transaction_repository.dart';
 import '../../../transactions/presentation/providers/transaction_provider.dart';
 import '../../data/repositories/budget_repository.dart';
-import '../../data/services/report_service.dart';
+import '../../../reports/data/services/report_service.dart';
 
 class BudgetProvider extends ChangeNotifier {
   final TransactionProvider txnProvider;
@@ -17,7 +18,7 @@ class BudgetProvider extends ChangeNotifier {
   final AppNotificationRepository _notificationRepository =
       AppNotificationRepository();
 
-  Map<String, double> _categoryBudgets = {};
+  List<BudgetModel> _budgets = [];
   bool _isLoading = false;
   String? _errorMessage;
   String? _userId;
@@ -30,7 +31,9 @@ class BudgetProvider extends ChangeNotifier {
     txnProvider.addListener(_onTransactionsChanged);
   }
 
-  Map<String, double> get categoryBudgets => _categoryBudgets;
+  List<BudgetModel> get budgets => _budgets;
+  Map<String, double> get categoryBudgets =>
+      {for (final b in _budgets) b.categoryId: b.amount};
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get notificationsEnabled => _notificationsEnabled;
@@ -47,18 +50,19 @@ class BudgetProvider extends ChangeNotifier {
 
   double get monthExpense {
     final now = DateTime.now();
+    final budgetedIds = _budgets.map((b) => b.categoryId).toSet();
     return txnProvider.transactions
         .where(
           (t) =>
               t.type == 'expense' &&
-              _categoryBudgets.containsKey(t.categoryId) &&
+              budgetedIds.contains(t.categoryId) &&
               _isSameMonth(t.date, now),
         )
         .fold<double>(0.0, (p, e) => p + e.amount);
   }
 
   double get totalCategoryBudget =>
-      _categoryBudgets.values.fold(0.0, (sum, v) => sum + v);
+      _budgets.fold(0.0, (sum, b) => sum + b.amount);
 
   double categoryExpense(String categoryId) {
     final now = DateTime.now();
@@ -72,7 +76,13 @@ class BudgetProvider extends ChangeNotifier {
         .fold<double>(0.0, (p, e) => p + e.amount);
   }
 
-  double? categoryBudget(String categoryId) => _categoryBudgets[categoryId];
+  double? categoryBudget(String categoryId) {
+    try {
+      return _budgets.firstWhere((b) => b.categoryId == categoryId).amount;
+    } catch (_) {
+      return null;
+    }
+  }
 
   double categoryProgress(String categoryId) {
     final budget = categoryBudget(categoryId);
@@ -120,7 +130,7 @@ class BudgetProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
     try {
-      _categoryBudgets = await _budgetRepository.getCategoryBudgets(userId);
+      _budgets = await _budgetRepository.getCategoryBudgets(userId);
     } catch (e) {
       _errorMessage = e.toString();
     }
@@ -133,7 +143,7 @@ class BudgetProvider extends ChangeNotifier {
     final userId = _userId;
     if (userId == null) return;
     try {
-      _categoryBudgets = await _budgetRepository.getCategoryBudgets(userId);
+      _budgets = await _budgetRepository.getCategoryBudgets(userId);
       notifyListeners();
     } catch (_) {}
   }
@@ -149,7 +159,13 @@ class BudgetProvider extends ChangeNotifier {
     notifyListeners();
     try {
       await _budgetRepository.saveCategoryBudget(userId, categoryId, amount);
-      _categoryBudgets = {..._categoryBudgets, categoryId: amount};
+      final idx = _budgets.indexWhere((b) => b.categoryId == categoryId);
+      final updated = BudgetModel(userId: userId, categoryId: categoryId, amount: amount);
+      if (idx >= 0) {
+        _budgets = [..._budgets]..[idx] = updated;
+      } else {
+        _budgets = [..._budgets, updated];
+      }
     } catch (e) {
       _errorMessage = e.toString();
     }
@@ -163,7 +179,7 @@ class BudgetProvider extends ChangeNotifier {
     notifyListeners();
     try {
       await _budgetRepository.deleteCategoryBudget(userId, categoryId);
-      _categoryBudgets = Map.from(_categoryBudgets)..remove(categoryId);
+      _budgets = _budgets.where((b) => b.categoryId != categoryId).toList();
     } catch (e) {
       _errorMessage = e.toString();
     }
@@ -271,7 +287,7 @@ class BudgetProvider extends ChangeNotifier {
 
   void clear() {
     _userId = null;
-    _categoryBudgets = {};
+    _budgets = [];
     _isLoading = false;
     _errorMessage = null;
     _budgetRepository.unsubscribeBudgets();

@@ -10,7 +10,7 @@ import 'features/auth/presentation/providers/auth_provider.dart';
 import 'features/transactions/presentation/providers/transaction_provider.dart';
 import 'features/dashboard/presentation/providers/dashboard_provider.dart';
 import 'features/dashboard/presentation/providers/notification_center_provider.dart';
-import 'features/reports/presentation/providers/budget_provider.dart';
+import 'features/budget/presentation/providers/budget_provider.dart';
 import 'features/reports/presentation/providers/reminder_provider.dart';
 import 'features/reports/presentation/providers/report_provider.dart';
 import 'core/config/router.dart';

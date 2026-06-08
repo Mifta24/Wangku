@@ -8,7 +8,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/pages/change_password_page.dart';
 import '../../../auth/presentation/pages/edit_biodata_page.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
-import '../../../reports/presentation/providers/budget_provider.dart';
+import '../../../budget/presentation/providers/budget_provider.dart';
 import '../../../transactions/presentation/providers/transaction_provider.dart';
 import '../providers/notification_center_provider.dart';
 

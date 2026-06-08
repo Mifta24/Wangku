@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
-import '../../../../core/notifications/app_notification_record.dart';
+import '../../domain/models/app_notification_model.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../providers/notification_center_provider.dart';
 

@@ -1,6 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../../core/notifications/app_notification_record.dart';
+import '../../domain/models/app_notification_model.dart';
 
 class AppNotificationService {
   final SupabaseClient _supabase = Supabase.instance.client;

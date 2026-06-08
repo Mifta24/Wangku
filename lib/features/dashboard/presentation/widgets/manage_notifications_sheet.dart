@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
-import '../../../reports/presentation/providers/budget_provider.dart';
+import '../../../budget/presentation/providers/budget_provider.dart';
 import '../../../reports/presentation/providers/reminder_provider.dart';
 
 class ManageNotificationsSheet extends StatefulWidget {

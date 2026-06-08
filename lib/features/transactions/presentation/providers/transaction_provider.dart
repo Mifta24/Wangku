@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../domain/models/transaction_model.dart';
 import '../../domain/models/category_model.dart';
 import '../../data/repositories/transaction_repository.dart';
-import '../../../reports/data/repositories/budget_repository.dart';
+import '../../../budget/data/repositories/budget_repository.dart';
 
 class TransactionProvider extends ChangeNotifier {
   final TransactionRepository _repository = TransactionRepository();

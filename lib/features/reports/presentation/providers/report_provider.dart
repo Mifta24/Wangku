@@ -5,9 +5,9 @@ import '../../../transactions/data/repositories/transaction_repository.dart';
 import '../../../transactions/domain/models/transaction_model.dart';
 import '../../../transactions/presentation/providers/transaction_provider.dart';
 import '../../data/services/report_service.dart';
+import '../../domain/models/period_report_model.dart';
 
-enum PeriodType { week, month, year }
-enum TransactionType { expense, income }
+export '../../domain/models/period_report_model.dart' show PeriodType, TransactionType;
 
 class CategoryDistribution {
   final String categoryId;

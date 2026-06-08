@@ -4,7 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:workmanager/workmanager.dart';
 
 import '../config/supabase_config.dart';
-import 'app_notification_record.dart';
+import '../../features/dashboard/domain/models/app_notification_model.dart';
 import 'notification_service.dart';
 
 const String budgetCheckTask = 'budget_check_task';

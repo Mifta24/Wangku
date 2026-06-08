@@ -1,9 +1,10 @@
+import '../../domain/models/budget_model.dart';
 import '../services/budget_service.dart';
 
 class BudgetRepository {
   final BudgetService _service = BudgetService();
 
-  Future<Map<String, double>> getCategoryBudgets(String userId) async {
+  Future<List<BudgetModel>> getCategoryBudgets(String userId) async {
     return _service.fetchCategoryBudgets(userId);
   }
 

@@ -9,7 +9,7 @@ import '../../../../shared/widgets/app_card.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../presentation/providers/dashboard_provider.dart';
 import '../../presentation/providers/notification_center_provider.dart';
-import '../../../reports/presentation/providers/budget_provider.dart';
+import '../../../budget/presentation/providers/budget_provider.dart';
 import '../../../reports/presentation/providers/reminder_provider.dart';
 import '../../../reports/presentation/providers/report_provider.dart';
 import '../../../transactions/presentation/providers/transaction_provider.dart';
@@ -18,7 +18,7 @@ import '../../../transactions/presentation/widgets/manage_categories_sheet.dart'
 import '../../../transactions/presentation/widgets/add_transaction_sheet.dart';
 import '../../../transactions/presentation/pages/transaction_list_page.dart';
 import '../../../reports/presentation/pages/reports_page.dart';
-import '../../../reports/presentation/pages/budget_page.dart';
+import '../../../budget/presentation/pages/budget_page.dart';
 import 'notifications_page.dart';
 import '../widgets/account_profile_sheet.dart';
 import '../widgets/export_transactions_sheet.dart';

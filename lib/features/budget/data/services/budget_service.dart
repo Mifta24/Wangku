@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../domain/models/budget_model.dart';
 
 class BudgetService {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -30,18 +31,15 @@ class BudgetService {
     _budgetChannel = null;
   }
 
-  Future<Map<String, double>> fetchCategoryBudgets(String userId) async {
+  Future<List<BudgetModel>> fetchCategoryBudgets(String userId) async {
     final response = await _supabase
         .from(_budgetsTable)
-        .select('category_id, amount')
+        .select()
         .eq('user_id', userId);
 
-    final result = <String, double>{};
-    for (final row in response as List<dynamic>) {
-      result[row['category_id'] as String] =
-          (row['amount'] as num).toDouble();
-    }
-    return result;
+    return (response as List<dynamic>)
+        .map((row) => BudgetModel.fromJson(row as Map<String, dynamic>))
+        .toList();
   }
 
   Future<void> saveCategoryBudget(
@@ -49,13 +47,13 @@ class BudgetService {
     String categoryId,
     double amount,
   ) async {
+    final model = BudgetModel(
+      userId: userId,
+      categoryId: categoryId,
+      amount: amount,
+    );
     await _supabase.from(_budgetsTable).upsert(
-      {
-        'user_id': userId,
-        'category_id': categoryId,
-        'amount': amount,
-        'updated_at': DateTime.now().toIso8601String(),
-      },
+      model.toSupabaseJson(),
       onConflict: 'user_id,category_id',
     );
   }

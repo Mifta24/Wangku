@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../data/services/auth_service.dart';
-import '../../data/services/profile_service.dart';
+import '../../data/repositories/auth_repository.dart';
+import '../../data/repositories/profile_repository.dart';
 import '../../domain/models/user_profile.dart';
-import '../../../reports/data/repositories/budget_repository.dart';
+import '../../../budget/data/repositories/budget_repository.dart';
 
 class AuthProvider extends ChangeNotifier {
-  final AuthService _authService = AuthService();
-  final ProfileService _profileService = ProfileService();
+  final AuthRepository _authRepository = AuthRepository();
+  final ProfileRepository _profileRepository = ProfileRepository();
   final BudgetRepository _budgetRepository = BudgetRepository();
 
   bool _isLoading = false;
@@ -21,7 +21,7 @@ class AuthProvider extends ChangeNotifier {
   bool get needsEmailConfirmation => _needsEmailConfirmation;
   UserProfile? get profile => _profile;
 
-  User? get currentUser => _authService.currentUser;
+  User? get currentUser => _authRepository.currentUser;
   bool get isAuthenticated => currentUser != null;
 
   void _setLoading(bool value) {
@@ -35,19 +35,19 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> loadProfile() async {
-    final userId = _authService.currentUser?.id;
+    final userId = _authRepository.currentUser?.id;
     if (userId == null) return;
     try {
-      _profileService.unsubscribeProfile();
-      _profile = await _profileService.getProfile(userId);
+      _profileRepository.unsubscribeProfile();
+      _profile = await _profileRepository.getProfile(userId);
       notifyListeners();
-      _profileService.subscribeToProfile(userId, () => _silentRefreshProfile(userId));
+      _profileRepository.subscribeToProfile(userId, () => _silentRefreshProfile(userId));
     } catch (_) {}
   }
 
   Future<void> _silentRefreshProfile(String userId) async {
     try {
-      _profile = await _profileService.getProfile(userId);
+      _profile = await _profileRepository.getProfile(userId);
       notifyListeners();
     } catch (_) {}
   }
@@ -56,8 +56,8 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(true);
     _setError(null);
     try {
-      await _authService.signInWithEmailPassword(email, password);
-      final userId = _authService.currentUser?.id;
+      await _authRepository.signIn(email, password);
+      final userId = _authRepository.currentUser?.id;
       if (userId != null) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('current_user_id', userId);
@@ -77,13 +77,13 @@ class AuthProvider extends ChangeNotifier {
     _setError(null);
     _needsEmailConfirmation = false;
     try {
-      final response = await _authService.signUp(email, password, name);
-      if (response.session == null) {
+      final needsConfirmation = await _authRepository.signUp(email, password, name);
+      if (needsConfirmation) {
         _needsEmailConfirmation = true;
         _setLoading(false);
         return true;
       }
-      final userId = response.user?.id;
+      final userId = _authRepository.currentUser?.id;
       if (userId != null) {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('current_user_id', userId);
@@ -100,9 +100,9 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> logout() async {
     _setLoading(true);
-    _profileService.unsubscribeProfile();
-    final userId = _authService.currentUser?.id;
-    await _authService.signOut();
+    _profileRepository.unsubscribeProfile();
+    final userId = _authRepository.currentUser?.id;
+    await _authRepository.signOut();
     if (userId != null) {
       await _budgetRepository.clearUserBudgets(userId);
     }
@@ -116,7 +116,7 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(true);
     _setError(null);
     try {
-      await _authService.updateProfileName(name);
+      await _authRepository.updateProfileName(name);
       _setLoading(false);
       notifyListeners();
       return true;
@@ -131,8 +131,8 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(true);
     _setError(null);
     try {
-      final userId = _authService.currentUser?.id;
-      await _authService.updateProfileData(data);
+      final userId = _authRepository.currentUser?.id;
+      await _authRepository.updateProfileData(data);
       if (userId != null) {
         final current = _profile ?? UserProfile(id: userId);
         final updated = UserProfile(
@@ -143,7 +143,7 @@ class AuthProvider extends ChangeNotifier {
               ? DateTime.tryParse(data['birth_date'].toString())
               : current.birthDate,
         );
-        _profile = await _profileService.saveProfile(updated);
+        _profile = await _profileRepository.saveProfile(updated);
       }
       _setLoading(false);
       notifyListeners();
@@ -159,7 +159,7 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(true);
     _setError(null);
     try {
-      await _authService.changePassword(newPassword);
+      await _authRepository.changePassword(newPassword);
       _setLoading(false);
       return true;
     } catch (e) {
@@ -173,7 +173,7 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(true);
     _setError(null);
     try {
-      await _authService.resetPassword(email);
+      await _authRepository.resetPassword(email);
       _setLoading(false);
       return true;
     } catch (e) {
@@ -187,7 +187,7 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(true);
     _setError(null);
     try {
-      await _authService.verifyOtp(email, token);
+      await _authRepository.verifyOtp(email, token);
       _setLoading(false);
       return true;
     } catch (e) {

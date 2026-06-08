@@ -1,5 +1,5 @@
 import 'dart:async';
-import '../../../../core/notifications/app_notification_record.dart';
+import '../../domain/models/app_notification_model.dart';
 import '../services/app_notification_service.dart';
 
 class AppNotificationRepository {

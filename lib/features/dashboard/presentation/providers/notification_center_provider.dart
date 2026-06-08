@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 
-import '../../../../core/notifications/app_notification_record.dart';
+import '../../domain/models/app_notification_model.dart';
 import '../../data/repositories/app_notification_repository.dart';
 
 class NotificationCenterProvider extends ChangeNotifier {
