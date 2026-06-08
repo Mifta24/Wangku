@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:wangku/core/theme/lucide_icons.dart';
 
 import '../../../../core/theme/app_colors.dart';
-import '../../domain/models/category_model.dart';
+import '../../../categories/domain/models/category_model.dart';
 
 class TransactionFilters {
   const TransactionFilters({

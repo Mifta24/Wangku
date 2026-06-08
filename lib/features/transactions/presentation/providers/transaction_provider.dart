@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import '../../domain/models/transaction_model.dart';
-import '../../domain/models/category_model.dart';
 import '../../data/repositories/transaction_repository.dart';
+import '../../../categories/domain/models/category_model.dart';
+import '../../../categories/data/repositories/category_repository.dart';
 import '../../../budget/data/repositories/budget_repository.dart';
 
 class TransactionProvider extends ChangeNotifier {
   final TransactionRepository _repository = TransactionRepository();
+  final CategoryRepository _categoryRepository = CategoryRepository();
   final BudgetRepository _budgetRepository = BudgetRepository();
 
-  // State
   List<TransactionModel> _transactions = [];
   List<CategoryModel> _categories = [];
   bool _isLoading = false;
@@ -17,12 +18,12 @@ class TransactionProvider extends ChangeNotifier {
   DateTime? _loadedStartDate;
   DateTime? _loadedEndDate;
 
-  // Getters
   List<TransactionModel> get transactions => _transactions;
   List<CategoryModel> get categories => _categories;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   DateTime get selectedMonth => _selectedMonth;
+
   bool hasLoadedRange(DateTime startDate, DateTime endDate) {
     final loadedStart = _loadedStartDate;
     final loadedEnd = _loadedEndDate;
@@ -30,7 +31,6 @@ class TransactionProvider extends ChangeNotifier {
     return !startDate.isBefore(loadedStart) && !endDate.isAfter(loadedEnd);
   }
 
-  // Computed getters
   List<TransactionModel> get todayTransactions {
     final today = DateTime.now();
     return _transactions
@@ -49,17 +49,11 @@ class TransactionProvider extends ChangeNotifier {
         .toList();
   }
 
-  double get monthIncome {
-    return monthTransactions
-        .where((t) => t.type == 'income')
-        .fold(0, (sum, t) => sum + t.amount);
-  }
+  double get monthIncome =>
+      monthTransactions.where((t) => t.type == 'income').fold(0, (s, t) => s + t.amount);
 
-  double get monthExpense {
-    return monthTransactions
-        .where((t) => t.type == 'expense')
-        .fold(0, (sum, t) => sum + t.amount);
-  }
+  double get monthExpense =>
+      monthTransactions.where((t) => t.type == 'expense').fold(0, (s, t) => s + t.amount);
 
   double get monthBalance => monthIncome - monthExpense;
 
@@ -69,22 +63,15 @@ class TransactionProvider extends ChangeNotifier {
   List<CategoryModel> get incomeCategories =>
       _categories.where((c) => c.type == 'income').toList();
 
-  /// Load initial data (categories + transaksi untuk bulan ini)
   Future<void> initialize(String userId) async {
     _setLoading(true);
     _clearError();
-
     try {
       await loadCategories(userId);
-
-      // Load transaksi bulan ini
       final startDate = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
       final endDate = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 1);
       await _loadTransactions(userId, startDate, endDate);
-
       _setLoading(false);
-
-      // Mulai listen Supabase Realtime setelah data awal selesai di-load
       _subscribeRealtime(userId);
     } catch (e) {
       _setError(e.toString());
@@ -94,14 +81,14 @@ class TransactionProvider extends ChangeNotifier {
 
   void _subscribeRealtime(String userId) {
     _repository.unsubscribeTransactions();
-    _repository.unsubscribeCategories();
+    _categoryRepository.unsubscribeCategories();
     _repository.subscribeToTransactions(userId, () => _silentRefresh(userId));
-    _repository.subscribeToCategories(userId, () => _silentRefreshCategories(userId));
+    _categoryRepository.subscribeToCategories(userId, () => _silentRefreshCategories(userId));
   }
 
   Future<void> _silentRefreshCategories(String userId) async {
     try {
-      final cats = await _repository.getCategories(userId: userId);
+      final cats = await _categoryRepository.getCategories(userId);
       _categories = cats;
       _transactions = _transactions.map((t) {
         final cat = cats.cast<CategoryModel?>().firstWhere(
@@ -126,12 +113,9 @@ class TransactionProvider extends ChangeNotifier {
       );
       _transactions = txs;
       notifyListeners();
-    } catch (_) {
-      // silent — jangan tampilkan error untuk background refresh
-    }
+    } catch (_) {}
   }
 
-  /// Load transaksi dengan date range
   Future<void> _loadTransactions(
     String userId,
     DateTime startDate,
@@ -140,13 +124,11 @@ class TransactionProvider extends ChangeNotifier {
     try {
       _setLoading(true);
       _clearError();
-
       final txs = await _repository.getTransactions(
         userId: userId,
         startDate: startDate,
         endDate: endDate,
       );
-
       _loadedStartDate = startDate;
       _loadedEndDate = endDate;
       _transactions = txs;
@@ -160,10 +142,9 @@ class TransactionProvider extends ChangeNotifier {
     }
   }
 
-  /// Load categories
   Future<void> loadCategories(String userId) async {
     try {
-      final cats = await _repository.getCategories(userId: userId);
+      final cats = await _categoryRepository.getCategories(userId);
       _categories = cats;
       notifyListeners();
     } catch (e) {
@@ -172,50 +153,25 @@ class TransactionProvider extends ChangeNotifier {
     }
   }
 
-  /// Tambah custom category
   Future<void> addCustomCategory(CategoryModel category) async {
     try {
       _clearError();
-      final newCat = await _repository.createCategory(category);
+      final newCat = await _categoryRepository.createCategory(category);
       _categories.add(newCat);
       notifyListeners();
     } catch (e) {
-      _setError('Gagal tambah kategori custom: ${e.toString()}');
+      _setError('Gagal tambah kategori: ${e.toString()}');
       notifyListeners();
       rethrow;
     }
   }
 
-  /// Dapatkan kategori yang sering digunakan
-  List<CategoryModel> getFrequentCategories(String type, {int limit = 4}) {
-    final relevantTxs = _transactions.where((t) => t.type == type).toList();
-    if (relevantTxs.isEmpty) return [];
-
-    final Map<String, int> frequencies = {};
-    for (var tx in relevantTxs) {
-      frequencies[tx.categoryId] = (frequencies[tx.categoryId] ?? 0) + 1;
-    }
-
-    final sortedEntries = frequencies.entries.toList()
-      ..sort((a, b) => b.value.compareTo(a.value));
-
-    final topCategoryIds = sortedEntries.take(limit).map((e) => e.key).toList();
-    
-    return topCategoryIds
-        .map((id) => _categories.cast<CategoryModel?>().firstWhere((c) => c?.id == id, orElse: () => null))
-        .whereType<CategoryModel>()
-        .toList();
-  }
-
   Future<void> updateCategory(CategoryModel category) async {
     try {
       _clearError();
-      final updated = await _repository.updateCategory(category);
+      final updated = await _categoryRepository.updateCategory(category);
       final index = _categories.indexWhere((c) => c.id == updated.id);
-      if (index != -1) {
-        _categories[index] = updated;
-      }
-      // Re-embed ALL categories so color/icon changes propagate everywhere
+      if (index != -1) _categories[index] = updated;
       _transactions = _transactions.map((t) {
         final cat = _categories.cast<CategoryModel?>().firstWhere(
           (c) => c?.id == t.categoryId,
@@ -240,8 +196,7 @@ class TransactionProvider extends ChangeNotifier {
           'Kategori masih dipakai transaksi. Ubah atau hapus transaksinya dulu.',
         );
       }
-      await _repository.deleteCategory(category);
-      // Hapus budget kategori ini dari Supabase & Hive supaya tidak ada data orphan
+      await _categoryRepository.deleteCategory(category);
       await _budgetRepository.deleteCategoryBudget(category.userId!, category.id);
       _categories.removeWhere((c) => c.id == category.id);
       notifyListeners();
@@ -252,7 +207,23 @@ class TransactionProvider extends ChangeNotifier {
     }
   }
 
-  /// Load transaksi untuk bulan tertentu
+  List<CategoryModel> getFrequentCategories(String type, {int limit = 4}) {
+    final relevantTxs = _transactions.where((t) => t.type == type).toList();
+    if (relevantTxs.isEmpty) return [];
+    final Map<String, int> frequencies = {};
+    for (var tx in relevantTxs) {
+      frequencies[tx.categoryId] = (frequencies[tx.categoryId] ?? 0) + 1;
+    }
+    final sortedIds = frequencies.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return sortedIds
+        .take(limit)
+        .map((e) => _categories.cast<CategoryModel?>()
+            .firstWhere((c) => c?.id == e.key, orElse: () => null))
+        .whereType<CategoryModel>()
+        .toList();
+  }
+
   Future<void> loadMonth(String userId, DateTime month) async {
     _selectedMonth = month;
     final startDate = DateTime(month.year, month.month, 1);
@@ -260,7 +231,6 @@ class TransactionProvider extends ChangeNotifier {
     await _loadTransactions(userId, startDate, endDate);
   }
 
-  /// Load transaksi untuk rentang tanggal tertentu.
   Future<void> loadByDateRange(
     String userId,
     DateTime startDate,
@@ -269,16 +239,10 @@ class TransactionProvider extends ChangeNotifier {
     await _loadTransactions(userId, startDate, endDate);
   }
 
-  /// Add transaksi baru (Quick Add)
-  Future<void> addTransaction(
-    TransactionModel transaction,
-    String userId,
-  ) async {
+  Future<void> addTransaction(TransactionModel transaction, String userId) async {
     try {
       _clearError();
       final newTxn = await _repository.addTransaction(transaction);
-
-      // Tambah ke cache aktif hanya kalau tanggal transaksi masuk range yang sedang dibuka.
       if (_isWithinLoadedRange(newTxn.date)) {
         _transactions.insert(0, newTxn);
       }
@@ -290,19 +254,13 @@ class TransactionProvider extends ChangeNotifier {
     }
   }
 
-  /// Update transaksi
   Future<void> updateTransaction(
     String transactionId,
     TransactionModel transaction,
   ) async {
     try {
       _clearError();
-      final updated = await _repository.updateTransaction(
-        transactionId,
-        transaction,
-      );
-
-      // Update di state
+      final updated = await _repository.updateTransaction(transactionId, transaction);
       final index = _transactions.indexWhere((t) => t.id == transactionId);
       if (index != -1) {
         if (_isWithinLoadedRange(updated.date)) {
@@ -321,13 +279,10 @@ class TransactionProvider extends ChangeNotifier {
     }
   }
 
-  /// Delete transaksi
   Future<void> deleteTransaction(String transactionId) async {
     try {
       _clearError();
       await _repository.deleteTransaction(transactionId);
-
-      // Remove dari state
       _transactions.removeWhere((t) => t.id == transactionId);
       notifyListeners();
     } catch (e) {
@@ -337,14 +292,10 @@ class TransactionProvider extends ChangeNotifier {
     }
   }
 
-  /// Get transaksi berdasarkan kategori
   List<TransactionModel> getTransactionsByCategory(String categoryId) {
-    return monthTransactions
-        .where((t) => t.categoryId == categoryId)
-        .toList();
+    return monthTransactions.where((t) => t.categoryId == categoryId).toList();
   }
 
-  /// Get kategori distribution untuk pie chart
   Future<List<Map<String, dynamic>>> getCategoryDistribution(
     String userId,
     String type,
@@ -362,7 +313,6 @@ class TransactionProvider extends ChangeNotifier {
     }
   }
 
-  /// Get monthly aggregates (income vs expense)
   Future<Map<String, double>> getMonthlyAggregates(String userId) async {
     try {
       return await _repository.getMonthlyAggregates(
@@ -376,10 +326,8 @@ class TransactionProvider extends ChangeNotifier {
     }
   }
 
-  /// Search transaksi
   List<TransactionModel> searchTransactions(String query) {
     if (query.isEmpty) return monthTransactions;
-
     final lowerQuery = query.toLowerCase();
     return monthTransactions
         .where((t) =>
@@ -388,23 +336,13 @@ class TransactionProvider extends ChangeNotifier {
         .toList();
   }
 
-  /// Filter transaksi by type
   List<TransactionModel> filterByType(String type) {
     return monthTransactions.where((t) => t.type == type).toList();
   }
 
-  /// Private helper methods
-  void _setLoading(bool value) {
-    _isLoading = value;
-  }
-
-  void _setError(String? message) {
-    _errorMessage = message;
-  }
-
-  void _clearError() {
-    _errorMessage = null;
-  }
+  void _setLoading(bool value) => _isLoading = value;
+  void _setError(String? message) => _errorMessage = message;
+  void _clearError() => _errorMessage = null;
 
   bool _isWithinLoadedRange(DateTime date) {
     final loadedStart = _loadedStartDate;
@@ -413,7 +351,6 @@ class TransactionProvider extends ChangeNotifier {
     return !date.isBefore(loadedStart) && date.isBefore(loadedEnd);
   }
 
-  /// Refresh data (call when app comes back to foreground)
   Future<void> refresh(String userId) async {
     final start = _loadedStartDate;
     final end = _loadedEndDate;
@@ -421,19 +358,14 @@ class TransactionProvider extends ChangeNotifier {
       await _loadTransactions(userId, start, end);
     } else {
       final startDate = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
-      final endDate = DateTime(
-        _selectedMonth.year,
-        _selectedMonth.month + 1,
-        1,
-      );
+      final endDate = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 1);
       await _loadTransactions(userId, startDate, endDate);
     }
   }
 
-  /// Clear state (on logout)
   void clear() {
     _repository.unsubscribeTransactions();
-    _repository.unsubscribeCategories();
+    _categoryRepository.unsubscribeCategories();
     _transactions = [];
     _categories = [];
     _loadedStartDate = null;

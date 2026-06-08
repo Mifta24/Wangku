@@ -1,5 +1,5 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'category_model.dart';
+import '../../../categories/domain/models/category_model.dart';
 
 part 'transaction_model.freezed.dart';
 part 'transaction_model.g.dart';

@@ -10,10 +10,10 @@ import '../../../../shared/widgets/app_text_field.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../budget/presentation/providers/budget_provider.dart';
 import '../../../reports/presentation/providers/report_provider.dart';
-import '../../domain/models/category_model.dart';
+import '../../../categories/domain/models/category_model.dart';
 import '../../domain/models/transaction_model.dart';
 import '../providers/transaction_provider.dart';
-import 'add_category_dialog.dart';
+import '../../../categories/presentation/widgets/add_category_dialog.dart';
 
 Future<void> showAddTransactionSheet(
   BuildContext context, {

@@ -7,7 +7,7 @@ import 'package:uuid/uuid.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/models/category_model.dart';
-import '../providers/transaction_provider.dart';
+import '../../../transactions/presentation/providers/transaction_provider.dart';
 
 class ManageCategoriesSheet extends StatefulWidget {
   const ManageCategoriesSheet({super.key});

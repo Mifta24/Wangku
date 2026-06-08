@@ -6,7 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../presentation/providers/budget_provider.dart';
 import '../../../transactions/presentation/providers/transaction_provider.dart';
-import '../../../transactions/domain/models/category_model.dart';
+import '../../../categories/domain/models/category_model.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/app_button.dart';

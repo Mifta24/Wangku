@@ -1,6 +1,5 @@
 import 'package:uuid/uuid.dart';
 import '../../domain/models/transaction_model.dart';
-import '../../domain/models/category_model.dart';
 import '../services/transaction_service.dart';
 
 abstract class ITransactionRepository {
@@ -11,15 +10,8 @@ abstract class ITransactionRepository {
   });
 
   Future<TransactionModel> addTransaction(TransactionModel transaction);
-  Future<TransactionModel> updateTransaction(
-    String id,
-    TransactionModel transaction,
-  );
+  Future<TransactionModel> updateTransaction(String id, TransactionModel transaction);
   Future<void> deleteTransaction(String id);
-  Future<List<CategoryModel>> getCategories({required String userId, String? type});
-  Future<CategoryModel> createCategory(CategoryModel category);
-  Future<CategoryModel> updateCategory(CategoryModel category);
-  Future<void> deleteCategory(CategoryModel category);
   Future<Map<String, double>> getMonthlyAggregates({
     required String userId,
     required DateTime month,
@@ -39,7 +31,7 @@ class TransactionRepository implements ITransactionRepository {
     required String userId,
     DateTime? startDate,
     DateTime? endDate,
-  }) async {
+  }) {
     return _service.fetchTransactions(
       userId: userId,
       startDate: startDate,
@@ -59,44 +51,20 @@ class TransactionRepository implements ITransactionRepository {
   Future<TransactionModel> updateTransaction(
     String id,
     TransactionModel transaction,
-  ) async {
+  ) {
     return _service.updateTransaction(id, transaction);
   }
 
   @override
-  Future<void> deleteTransaction(String id) async {
-    await _service.deleteTransaction(id);
-  }
-
-  @override
-  Future<List<CategoryModel>> getCategories({required String userId, String? type}) async {
-    final categories = await _service.getCategories(userId);
-    if (type != null) {
-      return categories.where((c) => c.type == type).toList();
-    }
-    return categories;
-  }
-
-  @override
-  Future<CategoryModel> createCategory(CategoryModel category) async {
-    return _service.createCategory(category);
-  }
-
-  @override
-  Future<CategoryModel> updateCategory(CategoryModel category) async {
-    return _service.updateCategory(category);
-  }
-
-  @override
-  Future<void> deleteCategory(CategoryModel category) async {
-    await _service.deleteCategory(category);
+  Future<void> deleteTransaction(String id) {
+    return _service.deleteTransaction(id);
   }
 
   @override
   Future<Map<String, double>> getMonthlyAggregates({
     required String userId,
     required DateTime month,
-  }) async {
+  }) {
     return _service.getMonthlyAggregates(userId: userId, month: month);
   }
 
@@ -105,7 +73,7 @@ class TransactionRepository implements ITransactionRepository {
     required String userId,
     required DateTime month,
     required String type,
-  }) async {
+  }) {
     return _service.getCategoryDistribution(
       userId: userId,
       month: month,
@@ -119,13 +87,5 @@ class TransactionRepository implements ITransactionRepository {
 
   void unsubscribeTransactions() {
     _service.unsubscribeTransactions();
-  }
-
-  void subscribeToCategories(String userId, void Function() onChanged) {
-    _service.subscribeToCategories(userId, onChanged);
-  }
-
-  void unsubscribeCategories() {
-    _service.unsubscribeCategories();
   }
 }

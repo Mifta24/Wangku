@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
-import '../../domain/models/category_model.dart';
+import '../../../categories/domain/models/category_model.dart';
 import '../../domain/models/transaction_model.dart';
 import '../providers/transaction_provider.dart';
 import '../widgets/add_transaction_sheet.dart';
