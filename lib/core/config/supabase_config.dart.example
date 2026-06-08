@@ -1,0 +1,6 @@
+// Copy file ini menjadi supabase_config.dart dan isi dengan credentials Supabase Anda.
+// File supabase_config.dart ada di .gitignore dan tidak boleh di-commit.
+class SupabaseConfig {
+  static const String url = 'YOUR_SUPABASE_URL';
+  static const String anonKey = 'YOUR_SUPABASE_ANON_KEY';
+}
